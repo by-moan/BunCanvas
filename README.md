@@ -11,7 +11,7 @@ This proyect is still in its infancy, and it can barely render stuff on screen.
 ## How to build and run (Linux only)
 Clone the nanovg repo and place it under CPPCanvas/Thirdparty:
 ``` sh
-$ git clone https://github.com/memononen/nanovg CPPCanvas/ThirdParty/nanovg-master
+$ git clone https://github.com/memononen/nanovg CPPCanvas/Thirdparty/nanovg-master
 ```
 
 Download GLAD with the following options: (Language: C/C++, Specification: OpenGL, API: gl 3.3, Profile: Core) and extract its contents into CPPCanvas/Thirdparty/glad
@@ -19,5 +19,6 @@ Download GLAD with the following options: (Language: C/C++, Specification: OpenG
 
 Run the build script:
 ``` sh
-# Run the build script, the build will be saved to build
-$ ./build.sh build/BunCanvas_Linux_x64.so
+# Run the build script, the build will be saved to build/BunCanvas_Linux_x64.so
+$ ./build.sh 
+```

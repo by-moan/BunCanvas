@@ -70,7 +70,6 @@ extern "C" {
 			return;
 		}
 		
-		// 3. Initialize NanoVG
 		// NVG_ANTIALIAS makes edges smooth; NVG_STENCIL_STROKES is required for certain fills
 		vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 		if (!vg) {
@@ -79,10 +78,6 @@ extern "C" {
 			glfwTerminate();
 			return;
 		}
-
-		GLint stencilBits = 0;
-		glGetIntegerv(GLFW_STENCIL_BITS, &stencilBits);
-		std::cout << "Stencil: " << stencilBits << "\n";
 	    draw_prepare();
 		nvgGlobalCompositeOperation(vg, NVG_SOURCE_OVER);
 	}
@@ -110,7 +105,7 @@ extern "C" {
 	
 	void canvas_set_fill_style(const char* c) {
 		unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-		std::cout << c << " " << rgb << "\n";
+		// std::cout << c << " " << rgb << "\n";
 		CanvasProperties::fillStyle = nvgRGB(
 		    (rgb >> 16) & 0xFF, // 255
 		    (rgb >> 8)  & 0xFF, // 0

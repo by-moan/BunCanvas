@@ -14,7 +14,6 @@ export default class Window {
 			// console.log("window updating")
 			lib.symbols.update_window();
 		},0)
-		console.log("window created")
 	}
 
 	//Other Implementations to be done...

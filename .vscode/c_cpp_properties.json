@@ -1,0 +1,17 @@
+{
+"configurations": [
+	{
+		"name": "linux-gcc-x64",
+		"includePath": [
+			"${workspaceFolder}/CPPCanvas/Thirdparty/glad/include",
+			"${workspaceFolder}/CPPCanvas/Thirdparty/nanovg-master/src"
+		],
+		"compilerPath": "/usr/bin/clang++",
+		"cStandard": "c23",
+		"cppStandard": "c++20",
+		"intelliSenseMode": "linux-clang-x64",
+		"compilerArgs": []
+	}
+],
+"version": 4
+}

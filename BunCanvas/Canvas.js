@@ -1,6 +1,6 @@
 import lib, { encoder } from "./symbols";
 
-class CanvasRenderindContext2D {
+class CanvasRenderingContext2D {
     set fillStyle(style) {
         lib.symbols.canvas_set_fill_style(encoder.encode(`${style}\0`))
     }
@@ -20,6 +20,6 @@ export class Canvas {
     }
 
     getContext(contextType) {
-        return new CanvasRenderindContext2D()
+        return new CanvasRenderingContext2D()
     }
 }

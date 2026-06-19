@@ -28,11 +28,8 @@ void draw_prepare(){
 	
 	
 	// Clear the background
-	//glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	float pxRatio = (float)CanvasProperties::fbWidth / (float)CanvasProperties::winWidth;
 	// --- NanoVG Drawing Starts Here ---
-	// nvgBeginFrame(vg, CanvasProperties::fbWidth,CanvasProperties::fbHeight, pxRatio);
 	nvgBeginFrame(vg, CanvasProperties::winWidth, CanvasProperties::winHeight, pxRatio);
 }
 
@@ -40,6 +37,17 @@ void draw_end() {
 	nvgEndFrame(vg);
 }
 
+bool frame_dirty = false;
+
+// Call this inside any drawing operation to flag that the frame needs to be swapped
+void mark_dirty() {
+	frame_dirty = true;
+}
+
+void framebuffer_size_callback(GLFWwindow* win, int width, int height) {
+	// If the window resizes, we must redraw
+	frame_dirty = true;
+}
 
 extern "C" {
 	void create_window(int w, int h){
@@ -48,7 +56,6 @@ extern "C" {
 			return;
 		};
 		
-		// Request OpenGL 3.3 Core Profile
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
@@ -64,13 +71,16 @@ extern "C" {
 		}
 		
 		glfwMakeContextCurrent(window);
+
+		glfwSwapInterval(0);
+
+		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 		
 		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 			std::cerr << "Failed to initialize GLAD\n";
 			return;
 		}
 		
-		// NVG_ANTIALIAS makes edges smooth; NVG_STENCIL_STROKES is required for certain fills
 		vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 		if (!vg) {
 			std::cerr << "Couldn't initialize NanoVG Context...\n";
@@ -78,14 +88,24 @@ extern "C" {
 			glfwTerminate();
 			return;
 		}
-	    draw_prepare();
 		nvgGlobalCompositeOperation(vg, NVG_SOURCE_OVER);
+		draw_prepare();
+		frame_dirty = false;
 	}
+
 	void update_window(){
-	    draw_end();
-	    glfwPollEvents();
-	    glfwSwapBuffers(window);
-	    draw_prepare();
+		// Always poll events to keep the window responsive (even if we don't swap buffers)
+		glfwPollEvents();
+
+		// If nothing was drawn, skip rendering and buffer swapping!
+		if (!frame_dirty) {
+			return;
+		}
+
+		draw_end();
+		glfwSwapBuffers(window);
+		draw_prepare();
+		frame_dirty = false; // Reset the flag
 	}
 
 
@@ -121,21 +141,19 @@ extern "C" {
 	
 	void canvas_fill_rect(int x, int y, int w, int h){
 		if (window_destroyed) return;
-		// draw_prepare();
 		nvgBeginPath(vg);
 		nvgRect(vg,x,y,w,h);
 		nvgFillColor(vg, CanvasProperties::fillStyle);
 		nvgFill(vg);
-		// draw_end();
+		mark_dirty(); // Flag that we drew something
 	}
 
 	void canvas_clear_rect(int x, int y, int w, int h){
 		if (window_destroyed) return;
-		// draw_prepare();
 		nvgBeginPath(vg);
 		nvgRect(vg,x,y,w,h);
 		nvgFillColor(vg, nvgRGB(0,0,0));
 		nvgFill(vg);
-		// draw_end();
+		mark_dirty(); // Flag that we cleared something
 	}
 }

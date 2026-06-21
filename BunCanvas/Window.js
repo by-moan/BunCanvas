@@ -1,9 +1,13 @@
+import { Canvas } from "./Canvas";
 import lib from "./symbols";
-
 const requestedFrames = []
 
 export default class Window {
 	#wndPtr;
+
+	#lastMouseX = 0
+	#lastMouseY = 0
+
 	constructor(width, height) {
 		lib.symbols.create_window(width,height)
 		
@@ -14,17 +18,19 @@ export default class Window {
 				process.exit(0);
 				return
 			}
-			// console.log("window updating")
-			// requestedFrames.forEach(item => {
-			// 	item()
-			// })
+			
+			lib.symbols.update_window();
 			const pLen = requestedFrames.length
 			for (let i = 0; i < pLen; i++) {
 				(requestedFrames.shift())()
 			}
-			lib.symbols.update_window();
-			
 		},0);
+	}
+
+	append(canvas){
+		if (canvas instanceof Canvas) {
+			lib.symbols.canvas_append(canvas.__iptr)
+		}
 	}
 	//Other Implementations to be done...
 };

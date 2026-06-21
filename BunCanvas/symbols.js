@@ -18,22 +18,42 @@ export default dlopen("./build/BunCanvas_Linux_x64.so", {
 		args: [],
 		returns: "void",
 	},
-    canvas_set_fill_style: {
-		args: ["cstring"],
+	canvas_create: {
+		args: ["int","int"],
+		returns: "ptr",
+	},
+	canvas_append: {
+		args: ["ptr",],
 		returns: "void",
-    },
-    canvas_set_stroke_style: {
-		args: ["cstring"],
+	},
+	canvas_setup_context: {
+		args: ["ptr",],
+		returns: "void",
+	},
+    canvas_set_fill_style: {
+		args: ["ptr","cstring"],
 		returns: "void",
     },
     canvas_fill_rect: {
-		args: ["int","int","int","int",],
+		args: ["ptr","int","int","int","int"],
 		returns: "void",
     },
-    canvas_clear_rect: {
-		args: ["int","int","int","int",],
-		returns: "void",
-    },
+    // canvas_set_stroke_style: {
+	// 	args: ["cstring"],
+	// 	returns: "void",
+    // },
+    // canvas_fill_rect: {
+	// 	args: ["int","int","int","int",],
+	// 	returns: "void",
+    // },
+    // canvas_clear_rect: {
+	// 	args: ["int","int","int","int",],
+	// 	returns: "void",
+    // },
+    // set_glfswapinterval: {
+	// 	args: ["int"],
+	// 	returns: "void",
+    // },
 });
 
 // const cnv = document.createElement("canvas")

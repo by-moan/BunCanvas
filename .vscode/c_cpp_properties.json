@@ -3,7 +3,9 @@
 	{
 		"name": "linux-gcc-x64",
 		"includePath": [
+			"${workspaceFolder}/CPPCanvas",
 			"${workspaceFolder}/CPPCanvas/Thirdparty/glad/include",
+			"${workspaceFolder}/CPPCanvas/Thirdparty/skia_build/skia/",
 			"${workspaceFolder}/CPPCanvas/Thirdparty/nanovg-master/src"
 		],
 		"compilerPath": "/usr/bin/clang++",

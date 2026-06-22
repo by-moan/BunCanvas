@@ -18,6 +18,16 @@ class BunCanvas {
 
 std::vector<BunCanvas*> canvases;
 
+BunCanvas* validated(void* ptr){
+    BunCanvas* obj = static_cast<BunCanvas*>(ptr);
+
+    if (obj->magic != BunCanvas::MAGIC)
+    return nullptr;
+
+
+    return obj;
+}
+
 extern "C" {
     
     void* canvas_create(int w, int h) {
@@ -36,9 +46,10 @@ extern "C" {
     //Sets native internal context so it is returned if is asked again.
     void canvas_setup_context(void* canvasObj){
         if (!canvasObj) return;
-        BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
-        if (obj->magic != BunCanvas::MAGIC)
-        return;
+        BunCanvas* obj = validated(canvasObj);
+
+        if (obj == nullptr) return;
+        
 
         obj->ctx = obj->surface->getCanvas();
     }
@@ -46,10 +57,9 @@ extern "C" {
     void canvas_set_fill_style(void* canvasObj, const char* c) {
         if (!canvasObj) return;
         
-        BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
-        
-        if (obj->magic != BunCanvas::MAGIC || obj->locked == true)
-        return;
+        BunCanvas* obj = validated(canvasObj);
+
+        if (obj == nullptr) return;
         
         unsigned int rgb = std::strtoul(c+1, nullptr, 16);
         
@@ -63,20 +73,18 @@ extern "C" {
     
     void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
-        BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
-        
-        if (obj->magic != BunCanvas::MAGIC || obj->locked == true)
-        return;
+        BunCanvas* obj = validated(canvasObj);
+
+        if (obj == nullptr || obj->locked == true) return;
         
         obj->ctx->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fCol);
     }
     
     void canvas_resize(void* canvasObj, int w, int h) {
         if (!canvasObj) return;
-        BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
-        
-        if (obj->magic != BunCanvas::MAGIC || obj->locked == true)
-        return;
+        BunCanvas* obj = validated(canvasObj);
+
+        if (obj == nullptr || obj->locked == true) return;
 
         obj->locked = true;
 

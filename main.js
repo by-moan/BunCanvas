@@ -1,12 +1,9 @@
-import { Canvas } from "./BunCanvas/Canvas";
-import Window, {requestAnimationFrame} from "./BunCanvas/Window";
+import {Window, Canvas, requestAnimationFrame} from "./BunCanvas/BunCanvas";
 
 const window = new Window(800,600)
 
-const canvas = new Canvas(500,500)
-console.log("canvas created")
+const canvas = new Canvas(600,500)
 const ctx = canvas.getContext()
-console.log("context created")
 
 window.append(canvas)
 
@@ -20,6 +17,9 @@ setInterval(()=>{
     count = 0
 },1000)
 
+window.onresize = (evt)=>{
+    console.log(`Width: ${window.innerWidth} Height: ${window.innerHeight}`)
+}
 
 function loop() {
     // console.log("aaaa")

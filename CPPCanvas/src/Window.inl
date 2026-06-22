@@ -1,3 +1,21 @@
+class Event {
+    public:
+    std::string evtType;
+    std::string values;
+    
+    // This event is data-oriented, mainly so the Bun engine can parse it and use it internally
+    Event(std::string type, std::string val) : evtType(type), values(val) {}
+};
+
+std::vector<Event> events;
+std::string events_buffer;
+bool pollingEvents = false;
+
+void window_resize_callback(GLFWwindow* window, int width, int height) {
+    if (pollingEvents == true) return;
+    events.emplace_back("wresize", "{\"width\":" + std::to_string(width) + ", \"height\": " + std::to_string(height) + "}");
+}
+
 extern "C" {
     void create_window(int w, int h, const char* title = "App"){
         if (!glfwInit()) {
@@ -18,6 +36,12 @@ extern "C" {
             glfwTerminate();
             return;
         }
+        
+        #pragma region Events Setup
+        
+        glfwSetWindowSizeCallback(window, window_resize_callback);
+        
+        #pragma endregion
         
         glfwMakeContextCurrent(window);
         
@@ -62,6 +86,28 @@ extern "C" {
         canvas = sWrapper->surface->getCanvas();
     }
     
+    const char* window_query_events() {
+        if (pollingEvents == true) return "[]";
+
+        pollingEvents = true;
+        events_buffer = "[";
+        
+        
+        if (events.empty() == false) {
+            for (auto item : events) {
+                events_buffer+="{\"type\":\"" + item.evtType + "\",\"values\":" + item.values + "},";
+            }
+            events_buffer.pop_back();
+        }
+        events_buffer += "]";
+        pollingEvents = false;
+        
+
+        events.clear();
+
+        return events_buffer.c_str();
+    }
+    
     void update_window(){
         glfwPollEvents();
         int width, height;
@@ -82,8 +128,9 @@ extern "C" {
             );
             canvas = sWrapper->surface->getCanvas();
         }
-
+        
         for (auto element : canvases) {
+            if (element->locked == true) continue;
             canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
         }
         

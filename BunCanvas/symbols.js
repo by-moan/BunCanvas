@@ -1,7 +1,27 @@
 import { dlopen, FFIType } from "bun:ffi";
 
+let extension;
+
+if (process.platform === "win32") {
+	extension = "dll"
+}else if (process.platform === "darwin") {
+	extension = "dylib"
+}else if (process.platform === "linux") {
+	extension = "so"
+}
+
+const path = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+
+const exists = await Bun.file(path).exists();
+
+if(!exists) {
+	console.error(`${path} was not found in the working directory!`)
+	process.exit(-1)
+}
+
 export const encoder = new TextEncoder();
-export default dlopen("./build/BunCanvas_Linux_x64.so", {
+
+export const lib = dlopen(path, {
 	create_window: {
 		args: ["int","int"],
 		returns: "void",
@@ -18,9 +38,17 @@ export default dlopen("./build/BunCanvas_Linux_x64.so", {
 		args: [],
 		returns: "void",
 	},
+	window_query_events: {
+		args: [],
+		returns: "cstring",
+	},
 	canvas_create: {
 		args: ["int","int"],
 		returns: "ptr",
+	},
+	canvas_resize: {
+		args: ["ptr","int","int"],
+		returns: "void",
 	},
 	canvas_append: {
 		args: ["ptr",],
@@ -30,30 +58,14 @@ export default dlopen("./build/BunCanvas_Linux_x64.so", {
 		args: ["ptr",],
 		returns: "void",
 	},
-    canvas_set_fill_style: {
+	canvas_set_fill_style: {
 		args: ["ptr","cstring"],
 		returns: "void",
-    },
-    canvas_fill_rect: {
+	},
+	canvas_fill_rect: {
 		args: ["ptr","int","int","int","int"],
 		returns: "void",
-    },
-    // canvas_set_stroke_style: {
-	// 	args: ["cstring"],
-	// 	returns: "void",
-    // },
-    // canvas_fill_rect: {
-	// 	args: ["int","int","int","int",],
-	// 	returns: "void",
-    // },
-    // canvas_clear_rect: {
-	// 	args: ["int","int","int","int",],
-	// 	returns: "void",
-    // },
-    // set_glfswapinterval: {
-	// 	args: ["int"],
-	// 	returns: "void",
-    // },
+	},
 });
 
 // const cnv = document.createElement("canvas")

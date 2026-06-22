@@ -1,4 +1,7 @@
-/build
+/build/Linux/*
+/build/Windows/*
+/build/MacOS/*
 /nvg_demo
 /CPPCanvas/Thirdparty/*
+/CPPCanvas/build/*
 *.BAK

@@ -17,8 +17,14 @@ setInterval(()=>{
     count = 0
 },1000)
 
+
 window.onresize = (evt)=>{
     console.log(`Width: ${window.innerWidth} Height: ${window.innerHeight}`)
+}
+window.onmousemove = (evt)=>{
+    console.log(`X: ${evt.clientX} Y: ${evt.clientY} mX: ${evt.movementX} mY: ${evt.movementY}`)
+    x = evt.clientX
+    y = evt.clientY
 }
 
 function loop() {
@@ -27,8 +33,6 @@ function loop() {
     count++;
     ctx.fillStyle = "#ff00ff"
     ctx.fillRect(x,y,10,10)
-    x+=0.1
-    y+=0.1
 
     requestAnimationFrame(loop)
 }

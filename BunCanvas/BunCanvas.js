@@ -1,5 +1,5 @@
 import { lib,encoder } from "./symbols";
-
+import { MouseEvent } from "./MouseEvent"
 const requestedFrames = []
 const canvasPtrs = new WeakMap();
 
@@ -43,11 +43,15 @@ export class Window {
 	#dim = new Float64Array(2);
 
 	#rEvts = new Map();
+	#mMoveEvts = new Map();
+
 	#evtDetails = new WeakMap();
 	
 	#freeIndex = new Array();
 	#eIndex = 0
+
 	onresize = ()=>{}
+	onmousemove = ()=>{}
 
 	get innerWidth(){
 		return this.#dim[0]
@@ -73,16 +77,25 @@ export class Window {
 
 			const evts = JSON.parse(lib.symbols.window_query_events())
 
-			for (const event of evts) {
-				if (event.type == "wresize") {
-					this.#dim[0] = event.values.width
-					this.#dim[1] = event.values.height
+			if (evts.length != 0) {
+				for (const event of evts) {
+					if (event.type == "wresize") {
+						this.#dim[0] = event.values.width
+						this.#dim[1] = event.values.height
 
-					const details = {type: "resize", target: this, timestamp: performance.now()};
-					this.onresize(details)
-					this.#rEvts.forEach((item,key)=>{
-						item(details);
-					})
+						const details = {type: "resize", target: this, timestamp: performance.now()};
+						this.onresize(details)
+						this.#rEvts.forEach((item,key)=>{
+							item(details);
+						})
+					}
+					if (event.type == "mmove") {
+						const evt = new MouseEvent("move", {altKey:false, button:0, buttons:0, clientX:event.values.xpos, clientY:event.values.ypos, movementX: event.values.movx, movementY: event.values.movy, ctrlKey:false, metaKey:false, screenX:0, screenY:0, shiftKey:false})
+						this.onmousemove(evt)
+						this.#mMoveEvts.forEach((item,key)=>{
+							item(details);
+						})
+					}
 				}
 			}
 
@@ -102,7 +115,10 @@ export class Window {
 		if (usedIndex == this.#eIndex) this.#eIndex++;
 
 		if (name == "resize") {
-			this.#rEvts.set(this.#eIndex, {name: name, cb: fn})
+			this.#rEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
+		} else if (name == "mousemove") {
+			this.#mMoveEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
 		}
 	}

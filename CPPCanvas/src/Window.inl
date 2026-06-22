@@ -16,6 +16,15 @@ void window_resize_callback(GLFWwindow* window, int width, int height) {
     events.emplace_back("wresize", "{\"width\":" + std::to_string(width) + ", \"height\": " + std::to_string(height) + "}");
 }
 
+double prevX = 0;
+double prevY = 0;
+void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (pollingEvents == true || xpos == prevX || ypos == prevY) return;
+    events.emplace_back("mmove", "{\"xpos\":" + std::to_string((int)xpos) + ", \"ypos\": " + std::to_string((int)ypos) + ",\"movx\":" + std::to_string((int)(xpos-prevX)) + ",\"movy\":" + std::to_string((int)(ypos-prevY)) + "}");
+    prevX = xpos;
+    prevY = ypos;
+}
+
 extern "C" {
     void create_window(int w, int h, const char* title = "App"){
         if (!glfwInit()) {
@@ -40,7 +49,8 @@ extern "C" {
         #pragma region Events Setup
         
         glfwSetWindowSizeCallback(window, window_resize_callback);
-        
+        glfwSetCursorPosCallback(window, cursor_pos_callback);
+
         #pragma endregion
         
         glfwMakeContextCurrent(window);

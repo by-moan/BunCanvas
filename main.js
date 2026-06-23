@@ -1,9 +1,11 @@
 import {Window, Canvas, requestAnimationFrame} from "./BunCanvas/BunCanvas";
 
-const window = new Window(800,600)
 
 const canvas = new Canvas(600,500)
 const ctx = canvas.getContext()
+
+const window = new Window(800,600)
+
 
 window.append(canvas)
 
@@ -33,7 +35,7 @@ function loop() {
     // console.log("aaaa")
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
-    ctx.fillStyle = "#36853f"
+    ctx.fillStyle = "tan"
     ctx.strokeStyle = "#413b72"
     ctx.lineWidth = 2
 

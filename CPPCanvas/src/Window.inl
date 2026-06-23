@@ -94,6 +94,11 @@ extern "C" {
         glfwGetFramebufferSize(window, &width, &height);
         
         canvas = sWrapper->surface->getCanvas();
+
+        clearColor.setColor(SK_ColorTRANSPARENT);
+        clearColor.setStyle(SkPaint::kFill_Style);
+        clearColor.setBlendMode(SkBlendMode::kClear);
+        clearColor.setAntiAlias(1);
     }
     
     const char* window_query_events() {

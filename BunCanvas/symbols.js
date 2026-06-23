@@ -60,11 +60,11 @@ export const lib = dlopen(path, {
 	},
 	canvas_set_fill_style: {
 		args: ["ptr","cstring"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_set_stroke_style: {
 		args: ["ptr","cstring"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_set_stroke_width: {
 		args: ["ptr","float"],
@@ -109,6 +109,10 @@ export const lib = dlopen(path, {
 	canvas_path_close: {
 		args: ["ptr"],
 		returns: "void",
+	},
+	canvas_set_composite_operation: {
+		args: ["ptr", "cstring"],
+		returns: "bool",
 	},
 });
 

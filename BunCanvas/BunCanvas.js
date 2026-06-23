@@ -5,6 +5,8 @@ const canvasPtrs = new WeakMap();
 
 class CanvasRenderingContext2D {
     #iptr;
+	#lineWidth;
+	#compositeOperation;
 
     set fillStyle(style) {
         lib.symbols.canvas_set_fill_style(this.#iptr,encoder.encode(`${style}\0`))
@@ -14,7 +16,19 @@ class CanvasRenderingContext2D {
     }
     set lineWidth(width) {
         lib.symbols.canvas_set_stroke_width(this.#iptr,width)
+		this.#lineWidth = width
     }
+    get lineWidth() {
+       	return this.#lineWidth
+    }
+    set globalCompositeOperation(operation) {
+        if(lib.symbols.canvas_set_composite_operation(this.#iptr,operation) == true)
+			this.#compositeOperation = operation
+    }
+
+	get globalCompositeOperation(){
+		return this.#compositeOperation
+	}
 
     fillRect(x,y,w,h){
         lib.symbols.canvas_fill_rect(this.#iptr,x,y,w,h)

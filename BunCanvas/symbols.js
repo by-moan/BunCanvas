@@ -62,8 +62,52 @@ export const lib = dlopen(path, {
 		args: ["ptr","cstring"],
 		returns: "void",
 	},
+	canvas_set_stroke_style: {
+		args: ["ptr","cstring"],
+		returns: "void",
+	},
+	canvas_set_stroke_width: {
+		args: ["ptr","float"],
+		returns: "void",
+	},
 	canvas_fill_rect: {
 		args: ["ptr","int","int","int","int"],
+		returns: "void",
+	},
+	canvas_clear_rect: {
+		args: ["ptr","int","int","int","int"],
+		returns: "void",
+	},
+	canvas_path_begin: {
+		args: ["ptr"],
+		returns: "void",
+	},
+	canvas_path_move_to: {
+		args: ["ptr", "int", "int"],
+		returns: "void",
+	},
+	canvas_path_line_to: {
+		args: ["ptr", "int", "int"],
+		returns: "void",
+	},
+	canvas_path_arc: {
+		args: ["ptr", "float", "float","float","float","float"],
+		returns: "void",
+	},
+	canvas_path_arc_to: {
+		args: ["ptr", "float", "float","float","float","float"],
+		returns: "void",
+	},
+	canvas_path_bezier_to: {
+		args: ["ptr", "float", "float","float","float","float","float"],
+		returns: "void",
+	},
+	canvas_path_stroke: {
+		args: ["ptr"],
+		returns: "void",
+	},
+	canvas_path_close: {
+		args: ["ptr"],
 		returns: "void",
 	},
 });

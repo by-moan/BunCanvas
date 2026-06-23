@@ -18,22 +18,39 @@ setInterval(()=>{
 },1000)
 
 
-window.onresize = (evt)=>{
+window.addEventListener("resize", (evt)=>{
     console.log(`Width: ${window.innerWidth} Height: ${window.innerHeight}`)
-}
-window.onmousemove = (evt)=>{
-    console.log(`X: ${evt.clientX} Y: ${evt.clientY} mX: ${evt.movementX} mY: ${evt.movementY}`)
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+})
+window.addEventListener("mousemove", (evt)=>{
+    // console.log(`X: ${evt.clientX} Y: ${evt.clientY} mX: ${evt.movementX} mY: ${evt.movementY}`)
     x = evt.clientX
     y = evt.clientY
-}
+})
 
 function loop() {
     // console.log("aaaa")
-    // ctx.clearRect(200,200,1000,1000)
     count++;
-    ctx.fillStyle = "#ff00ff"
-    ctx.fillRect(x,y,10,10)
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
+    ctx.fillStyle = "#36853f"
+    ctx.strokeStyle = "#413b72"
+    ctx.lineWidth = 2
 
+    ctx.fillRect(x,y,10,10)
+    
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.lineTo(100, 20);
+    ctx.arcTo(150, 20, 150, 70, 50);
+    ctx.lineTo(150, 120);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(20, 20);
+    ctx.bezierCurveTo(20, 100, 200, 100, 200, 20);
+    // Draw the path
+    ctx.stroke();
     requestAnimationFrame(loop)
 }
 

@@ -138,13 +138,15 @@ extern "C" {
             );
             canvas = sWrapper->surface->getCanvas();
         }
+
+        canvas->clear(SK_ColorTRANSPARENT);
+
         
         for (auto element : canvases) {
             if (element->locked == true) continue;
             canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
         }
         
-        // canvas->clear(SK_ColorTRANSPARENT);
         
         // SkPaint p;
         // p.setColor(SK_ColorRED);

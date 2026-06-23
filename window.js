@@ -1,10 +1,10 @@
-import { Canvas } from "./BunCanvas/Canvas";
+// import { Canvas } from "./BunCanvas/Canvas";
 import Window from "./BunCanvas/Window";
 
 const window = new Window(800,600)
 
-const canvas = new Canvas()
-const ctx = canvas.getContext()
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d")
 
 let x = 0;
 let y = 0;

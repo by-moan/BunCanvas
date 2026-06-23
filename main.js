@@ -38,7 +38,7 @@ function loop() {
     ctx.lineWidth = 2
 
     ctx.fillRect(x,y,10,10)
-    
+
     ctx.beginPath();
     ctx.moveTo(20, 20);
     ctx.lineTo(100, 20);
@@ -50,6 +50,10 @@ function loop() {
     ctx.moveTo(20, 20);
     ctx.bezierCurveTo(20, 100, 200, 100, 200, 20);
     // Draw the path
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(100, 75, 50, 0, 2 * Math.PI);
     ctx.stroke();
     requestAnimationFrame(loop)
 }

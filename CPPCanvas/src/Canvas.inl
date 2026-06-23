@@ -187,7 +187,7 @@ extern "C" {
 
         if (obj == nullptr) return;
 
-        obj->pathBuilder.addArc(SkRect::MakeXYWH(x1,y1,radius*2,radius*2), startAngle, sweepangle);
+        obj->pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
     }
 
     void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
@@ -196,11 +196,6 @@ extern "C" {
 
         if (obj == nullptr) return;
 
-        // Parameters:
-        // oval – bounds of ellipse containing arc
-        // startAngleDeg – starting angle of arc in degrees
-        // sweepAngleDeg – sweep, in degrees. Positive is clockwise; treated modulo 360
-        // forceMoveTo – true to start a new contour with arc
         obj->pathBuilder.arcTo({x1,y1},{x2,y2},radius);
     }
 

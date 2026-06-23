@@ -176,6 +176,11 @@ export class Window {
 				this.#rEvts.delete(det)
 				this.#evtDetails.delete(fn)
 			}
+		}else if (name == "mousemove") {
+			if (det != undefined) {
+				this.#mMoveEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
 		}
 	}
 

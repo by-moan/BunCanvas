@@ -29,6 +29,7 @@ $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ gn gen out/Release --args='is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=true skia_use_egl=true'
+$ ninja -C out/Release
 ```
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `bun ./main.js`
 

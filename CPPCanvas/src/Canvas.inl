@@ -212,10 +212,6 @@ class BunCanvasRenderingContext2D {
         fillColor.setBlendMode(compositeOperations.at("source-over"));
     }
 
-    ~BunCanvasRenderingContext2D(){
-        delete ctx;
-    }
-
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface>& surface) {
         ctx = surface->getCanvas();
@@ -323,8 +319,6 @@ extern "C" {
         if (obj == nullptr) return nullptr;
         
         void* ptr = obj->getContext(ctxType);
-        
-        std::cout << ptr << "\n";
 
         return ptr;
         
@@ -416,14 +410,6 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (!obj) return;
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
-        
-        // SkPaint p;
-        // p.setBlendMode(SkBlendMode::kClear);
-        
-        // obj->ctx->save();
-        // obj->ctx->clipRect(SkRect::MakeXYWH(x, y, w, h));
-        // obj->ctx->drawPaint(p);
-        // obj->ctx->restore();
     }
     
     void canvas_resize(void* canvasObj, int w, int h) {
@@ -433,14 +419,6 @@ extern "C" {
         if (obj == nullptr) return;
 
         obj->resize(w,h);
-        
-        // obj->locked = true;
-        // obj->surface.reset();
-        // obj->surface = SkSurfaces::Raster(
-        //     SkImageInfo::MakeN32Premul(w,h)
-        // );
-        // obj->ctx = obj->surface->getCanvas();
-        // obj->locked = false;
     }
     
     void canvas_path_begin(void* canvasObj) {
@@ -492,12 +470,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
-        // Parameters:
-        // oval – bounds of ellipse containing arc
-        // startAngleDeg – starting angle of arc in degrees
-        // sweepAngleDeg – sweep, in degrees. Positive is clockwise; treated modulo 360
-        // forceMoveTo – true to start a new contour with arc
+
         obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
     void canvas_path_stroke(void* canvasObj) {
@@ -524,8 +497,6 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
-        // void drawImageRect(const sk_sp<SkImage>& image, const SkRect& dst,
-        //                const SkSamplingOptions& sampling, const SkPaint* paint = nullptr) {
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     

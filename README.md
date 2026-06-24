@@ -31,3 +31,53 @@ $ cd skia
 $ gn gen out/Release --args='is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=true skia_use_egl=true'
 ```
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `bun ./main.js`
+
+
+
+## License & Third-Party Components
+
+### BunCanvas License
+
+BunCanvas is licensed under the Apache License 2.0.
+
+See the LICENSE file for full details.
+
+## Third-Party Dependencies
+
+This project uses several third-party components that are not part of BunCanvas and are licensed separately:
+
+### Google Skia
+
+Skia is used as the underlying graphics engine.
+
+- License: BSD-style (Skia project license)
+- Source: https://github.com/google/skia
+
+You are responsible for complying with Skia’s license terms when building or distributing.
+
+## System Libraries
+
+The following system-provided libraries are used at runtime or build time:
+- OpenGL (GL)
+- EGL
+- pthread
+- dl
+- m
+
+These are typically provided by the operating system and are not redistributed by this project.
+
+## Other Dependencies
+
+Additional libraries may include:
+
+GLFW
+FreeType
+fontconfig
+libjpeg
+
+Each is governed by its respective license. See THIRD_PARTY_LICENSES.txt for full details.
+
+----
+## Build Notice
+
+Building BunCanvas requires downloading and compiling Skia and other dependencies. These dependencies are governed by their own licenses and are not redistributed as part of this repository.

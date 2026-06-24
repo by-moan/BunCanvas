@@ -20,7 +20,7 @@ double prevX = 0;
 double prevY = 0;
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     if (pollingEvents == true || xpos == prevX || ypos == prevY) return;
-    events.emplace_back("mmove", "{\"xpos\":" + std::to_string((int)xpos) + ", \"ypos\": " + std::to_string((int)ypos) + ",\"movx\":" + std::to_string((int)(xpos-prevX)) + ",\"movy\":" + std::to_string((int)(ypos-prevY)) + "}");
+    events.emplace_back("mmove", "{\"xpos\":" + std::to_string(xpos) + ", \"ypos\": " + std::to_string(ypos) + ",\"movx\":" + std::to_string(xpos-prevX) + ",\"movy\":" + std::to_string(ypos-prevY) + "}");
     prevX = xpos;
     prevY = ypos;
 }
@@ -147,7 +147,7 @@ extern "C" {
 
         
         for (auto element : canvases) {
-            if (element->locked == true) continue;
+            // if (element->locked == true) continue;
             canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
         }
         

@@ -59,7 +59,7 @@ function loop() {
 
 
     ctx.globalCompositeOperation = "screen"
-    ctx.drawImage(img, x-50,y-50,100,100);
+    ctx.drawImage(img, x-100,y-50,200,100);
     // ctx.fillRect(x-25,y-25,50,50)
     ctx.globalCompositeOperation = "source-over"
     requestAnimationFrame(loop)

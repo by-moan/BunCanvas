@@ -74,8 +74,10 @@ class CanvasRenderingContext2D {
     //     lib.symbols.canvas_clear_rect(x,y,w,h)
     // }
     constructor(iptr) {
-        this.#iptr = iptr
-        lib.symbols.canvas_setup_context(this.#iptr)
+		const ptr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
+		ptrs.set(this, ptr)
+        this.#iptr = ptr
+        
     }
 }
 
@@ -105,7 +107,9 @@ export class Canvas {
 	}
 
     getContext(contextType) {
-        return new CanvasRenderingContext2D(this.#iptr)
+        if (contextType == "2d") {
+			return new CanvasRenderingContext2D(this.#iptr)
+		}
     }
 }
 

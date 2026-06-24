@@ -55,8 +55,8 @@ export const lib = dlopen(path, {
 		returns: "void",
 	},
 	canvas_setup_context: {
-		args: ["ptr",],
-		returns: "void",
+		args: ["ptr", "cstring"],
+		returns: "ptr",
 	},
 	canvas_set_fill_style: {
 		args: ["ptr","cstring"],
@@ -115,7 +115,7 @@ export const lib = dlopen(path, {
 		returns: "bool",
 	},
 	canvas_draw_image: {
-		args: ["ptr","ptr","int","int","int","int"],
+		args: ["ptr","ptr","float","float","float","float"],
 		returns: "void",
 	},
 	image_load: {

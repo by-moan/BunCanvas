@@ -181,38 +181,103 @@ std::unordered_map<std::string,SkColor4f> keywordColors{{
     {"yellowgreen",SkColor4f{0.6039216f, 0.8039216f, 0.1960784f, 1.0f}},
 }};
 
-class BunCanvas {
+class BunCanvasRenderingContext2D {
+    SkCanvas* ctx = nullptr;
     public:
     SkPathBuilder pathBuilder;
     SkPaint fillColor;
     SkPaint strokeColor;
     SkPaint imageColor;
-    SkPath path;
-    SkCanvas* ctx = nullptr;
-    static constexpr uint64_t MAGIC = 0xBCA1155A;
+    static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
-    sk_sp<SkSurface> surface;
 
     SkSamplingOptions sampling;
-
-    //Lock in case a sensitive state, e.g. resizing is ongoing
     bool locked = false;
-    
-    BunCanvas(int w, int h) : surface(SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h))), sampling(SkFilterMode::kLinear) {
+
+    BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
+        strokeColor.setColor(SK_ColorBLACK);
+        strokeColor.setStyle(SkPaint::kStroke_Style);
+        strokeColor.setStrokeWidth(1);
+        strokeColor.setAntiAlias(1);
+        strokeColor.setBlendMode(compositeOperations.at("source-over"));
+        
+        imageColor.setColor(SK_ColorWHITE);
+        imageColor.setStyle(SkPaint::kFill_Style);
+        imageColor.setAntiAlias(1);
+        imageColor.setBlendMode(compositeOperations.at("source-over"));
+        
+        fillColor.setColor(SK_ColorBLACK);
+        fillColor.setStyle(SkPaint::kFill_Style);
+        fillColor.setAntiAlias(1);
+        fillColor.setBlendMode(compositeOperations.at("source-over"));
+    }
+
+    ~BunCanvasRenderingContext2D(){
+        delete ctx;
+    }
+
+    //Mimicking the behavior of values reset when resizing a canvas object.
+    void reset(sk_sp<SkSurface>& surface) {
+        ctx = surface->getCanvas();
+        ctx->resetMatrix();
+        pathBuilder.reset();
+        fillColor.setBlendMode(compositeOperations.at("source-over"));
+        fillColor.setColor(SK_ColorBLACK);
+        fillColor.setStyle(SkPaint::kFill_Style);
+        fillColor.setAntiAlias(1);
+
+        strokeColor.setBlendMode(compositeOperations.at("source-over"));
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
         strokeColor.setStrokeWidth(1);
         strokeColor.setAntiAlias(1);
         
-        imageColor.setColor(SK_ColorWHITE);
-        imageColor.setStyle(SkPaint::kFill_Style);
-        imageColor.setAntiAlias(1);
-        
-        fillColor.setColor(SK_ColorBLACK);
-        fillColor.setStyle(SkPaint::kFill_Style);
-        fillColor.setAntiAlias(1);
+        imageColor.setBlendMode(compositeOperations.at("source-over"));
+    }
+
+    SkCanvas* operator()() {
+        return ctx;
     }
 };
+
+class BunCanvas {
+    BunCanvasRenderingContext2D* rendering2D = nullptr;
+    std::string ctxType;
+    public:
+    
+    static constexpr uint64_t MAGIC = 0xBCA1155A;
+    uint64_t magic = MAGIC;
+    sk_sp<SkSurface> surface;
+
+    
+    BunCanvas(int w, int h) : surface(SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h))){}
+
+    ~BunCanvas(){
+        delete rendering2D;
+    }
+
+    //Maybe future support for webGPU rendering context if possible
+    void* getContext(const char* c) {
+        if (std::strcmp("2d",ctxType.c_str()) == 0) return rendering2D;
+        if (std::strcmp("2d",c) == 0) {
+            if (rendering2D == nullptr) rendering2D = new BunCanvasRenderingContext2D(surface);
+            ctxType = c;
+            return rendering2D;
+        }
+
+        return nullptr;
+    }
+
+    void resize(int w, int h) {
+        surface.reset();
+        surface = SkSurfaces::Raster(
+            SkImageInfo::MakeN32Premul(w,h)
+        );
+        if (ctxType == "2d") rendering2D->reset(surface);
+    }
+};
+
+
 
 std::vector<BunCanvas*> canvases;
 
@@ -220,6 +285,15 @@ BunCanvas* validated(void* ptr){
     BunCanvas* obj = static_cast<BunCanvas*>(ptr);
     
     if (obj->magic != BunCanvas::MAGIC)
+    return nullptr;
+    
+    
+    return obj;
+}
+BunCanvasRenderingContext2D* validatedContext(void* ptr){
+    BunCanvasRenderingContext2D* obj = static_cast<BunCanvasRenderingContext2D*>(ptr);
+    
+    if (obj->magic != BunCanvasRenderingContext2D::MAGIC)
     return nullptr;
     
     
@@ -242,19 +316,26 @@ extern "C" {
     }
     
     //Sets native internal context so it is returned if is asked again.
-    void canvas_setup_context(void* canvasObj){
-        if (!canvasObj) return;
+    void* canvas_setup_context(void* canvasObj, const char* ctxType){
+        if (!canvasObj) return nullptr;
         BunCanvas* obj = validated(canvasObj);
         
-        if (obj == nullptr) return;
+        if (obj == nullptr) return nullptr;
         
+        void* ptr = obj->getContext(ctxType);
         
-        obj->ctx = obj->surface->getCanvas();
+        std::cout << ptr << "\n";
+
+        return ptr;
+        
+        // obj->ctx = obj->surface->getCanvas();
     }
     
-    #define propertyColor(methodName,target) bool methodName (void* canvasObj, const char* c) {\
-        if (!canvasObj) return false;\
-        BunCanvas* obj = validated(canvasObj);\
+    #define propertyColor(methodName,target) bool methodName (void* renderingContext, const char* c) {\
+        if (!renderingContext) return false;\
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
+        if (obj == nullptr)\
+        return false;\
         try {\
             target.setColor(keywordColors.at(c));\
             return true;\
@@ -313,7 +394,7 @@ extern "C" {
     void canvas_set_stroke_width(void* canvasObj, float w) {
         if (!canvasObj) return;
         
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -322,26 +403,27 @@ extern "C" {
     
     void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
-        obj->ctx->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
+        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
     
     void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (!obj) return;
+        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
         
-        SkPaint p;
-        p.setBlendMode(SkBlendMode::kClear);
+        // SkPaint p;
+        // p.setBlendMode(SkBlendMode::kClear);
         
-        obj->ctx->save();
-        obj->ctx->clipRect(SkRect::MakeXYWH(x, y, w, h));
-        obj->ctx->drawPaint(p);
-        obj->ctx->restore();
+        // obj->ctx->save();
+        // obj->ctx->clipRect(SkRect::MakeXYWH(x, y, w, h));
+        // obj->ctx->drawPaint(p);
+        // obj->ctx->restore();
     }
     
     void canvas_resize(void* canvasObj, int w, int h) {
@@ -349,28 +431,30 @@ extern "C" {
         BunCanvas* obj = validated(canvasObj);
         
         if (obj == nullptr) return;
+
+        obj->resize(w,h);
         
-        obj->locked = true;
-        obj->surface.reset();
-        obj->surface = SkSurfaces::Raster(
-            SkImageInfo::MakeN32Premul(w,h)
-        );
-        obj->ctx = obj->surface->getCanvas();
-        obj->locked = false;
+        // obj->locked = true;
+        // obj->surface.reset();
+        // obj->surface = SkSurfaces::Raster(
+        //     SkImageInfo::MakeN32Premul(w,h)
+        // );
+        // obj->ctx = obj->surface->getCanvas();
+        // obj->locked = false;
     }
     
     void canvas_path_begin(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+
         
         if (obj == nullptr) return;
-        obj->path.reset();
         obj->pathBuilder.reset();
     }
     
     void canvas_path_move_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -378,7 +462,7 @@ extern "C" {
     }
     void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -387,7 +471,7 @@ extern "C" {
     
     void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -396,7 +480,7 @@ extern "C" {
     
     void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -405,7 +489,7 @@ extern "C" {
     
     void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -418,36 +502,36 @@ extern "C" {
     }
     void canvas_path_stroke(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) {
             return;
         };
-        obj->ctx->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
+        (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
     }
     
     void canvas_path_close(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
         
         obj->pathBuilder.close();
     }
     
-    void canvas_draw_image(void* canvasObj, void* image, int x,int y,int w,int h) {
+    void canvas_draw_image(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
         // void drawImageRect(const sk_sp<SkImage>& image, const SkRect& dst,
         //                const SkSamplingOptions& sampling, const SkPaint* paint = nullptr) {
-        obj->ctx->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+        (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     
     bool canvas_set_composite_operation(void* canvasObj, const char* name) {
         if (!canvasObj) return false;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return false;
         

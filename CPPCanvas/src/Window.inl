@@ -24,7 +24,6 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     prevX = xpos;
     prevY = ypos;
 }
-
 extern "C" {
     void create_window(int w, int h, const char* title = "App"){
         if (!glfwInit()) {
@@ -50,7 +49,7 @@ extern "C" {
         
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
-
+        
         #pragma endregion
         
         glfwMakeContextCurrent(window);

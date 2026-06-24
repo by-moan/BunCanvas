@@ -1,11 +1,11 @@
-import {Window, Canvas, requestAnimationFrame} from "./BunCanvas/BunCanvas";
-
+import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas";
 
 const canvas = new Canvas(600,500)
-const ctx = canvas.getContext()
+const ctx = canvas.getContext("2d")
 
 const window = new Window(800,600)
 
+const img = new Image("./face.png");
 
 window.append(canvas)
 
@@ -35,11 +35,10 @@ function loop() {
     // console.log("aaaa")
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
-    ctx.fillStyle = "tan"
+    ctx.fillStyle = "cornflowerblue"
     ctx.strokeStyle = "#413b72"
     ctx.lineWidth = 2
 
-    ctx.fillRect(x,y,10,10)
 
     ctx.beginPath();
     ctx.moveTo(20, 20);
@@ -57,6 +56,12 @@ function loop() {
     ctx.beginPath();
     ctx.arc(100, 75, 50, 0, 2 * Math.PI);
     ctx.stroke();
+
+
+    ctx.globalCompositeOperation = "screen"
+    ctx.drawImage(img, x-50,y-50,100,100);
+    // ctx.fillRect(x-25,y-25,50,50)
+    ctx.globalCompositeOperation = "source-over"
     requestAnimationFrame(loop)
 }
 

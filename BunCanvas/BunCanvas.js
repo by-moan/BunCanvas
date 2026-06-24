@@ -1,7 +1,14 @@
 import { lib,encoder } from "./symbols";
 import { MouseEvent } from "./MouseEvent"
 const requestedFrames = []
-const canvasPtrs = new WeakMap();
+const ptrs = new WeakMap();
+
+
+export class Image {
+	constructor(path) {
+		ptrs.set(this,lib.symbols.image_load(encoder.encode(`${path}\0`)))
+	}
+}
 
 class CanvasRenderingContext2D {
     #iptr;
@@ -22,7 +29,7 @@ class CanvasRenderingContext2D {
        	return this.#lineWidth
     }
     set globalCompositeOperation(operation) {
-        if(lib.symbols.canvas_set_composite_operation(this.#iptr,operation) == true)
+        if(lib.symbols.canvas_set_composite_operation(this.#iptr,encoder.encode(`${operation}\0`)) == true)
 			this.#compositeOperation = operation
     }
 
@@ -60,6 +67,9 @@ class CanvasRenderingContext2D {
     stroke(){
         lib.symbols.canvas_path_stroke(this.#iptr)
     }
+	drawImage(img,x,y,w,h) {
+        lib.symbols.canvas_draw_image(this.#iptr,ptrs.get(img),x,y,w,h);
+	}
     // clearRect(x,y,w,h){
     //     lib.symbols.canvas_clear_rect(x,y,w,h)
     // }
@@ -76,7 +86,7 @@ export class Canvas {
         this.#iptr = lib.symbols.canvas_create(w,h)
 		this.#dim[0] = w;
 		this.#dim[1] = h;
-		canvasPtrs.set(this,this.#iptr)
+		ptrs.set(this,this.#iptr)
     }
 
 	set width(v){
@@ -199,7 +209,7 @@ export class Window {
 	}
 
 	append(canvas){
-		const ptr = canvasPtrs.get(canvas)
+		const ptr = ptrs.get(canvas)
 		if (ptr == undefined) {
 			console.error("Canvas was not found")
 			return

@@ -183,21 +183,22 @@ std::unordered_map<std::string,SkColor4f> keywordColors{{
 
 class BunCanvas {
     public:
-    static constexpr uint64_t MAGIC = 0xBCA1155A;
-    uint64_t magic = MAGIC;
-    
-    sk_sp<SkSurface> surface;
-    SkCanvas* ctx = nullptr;
+    SkPathBuilder pathBuilder;
     SkPaint fillColor;
     SkPaint strokeColor;
     SkPaint imageColor;
-    SkPathBuilder pathBuilder;
     SkPath path;
-    
+    SkCanvas* ctx = nullptr;
+    static constexpr uint64_t MAGIC = 0xBCA1155A;
+    uint64_t magic = MAGIC;
+    sk_sp<SkSurface> surface;
+
+    SkSamplingOptions sampling;
+
     //Lock in case a sensitive state, e.g. resizing is ongoing
     bool locked = false;
     
-    BunCanvas(int w, int h) : surface(SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h))) {
+    BunCanvas(int w, int h) : surface(SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h))), sampling(SkFilterMode::kLinear) {
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
         strokeColor.setStrokeWidth(1);
@@ -308,56 +309,6 @@ extern "C" {
     
     propertyColor(canvas_set_fill_style,obj->fillColor)
     propertyColor(canvas_set_stroke_style,obj->strokeColor)
-    
-    // bool canvas_set_stroke_style(void* canvasObj, const char* c) {
-    //     if (!canvasObj) return false;  
-    //     BunCanvas* obj = validated(canvasObj);
-    //     if (obj == nullptr) return false;
-    //     if (c[0] == '#') {
-    //         unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-    //         obj->strokeColor.setColor(SkColor4f{
-    //             ((rgb >> 16) & 0xFF) / 255.f,
-    //             ((rgb >> 8) & 0xFF) / 255.f,
-    //             (rgb & 0xFF) / 255.f,
-    //             1.0f
-    //         });
-    //         return true;
-    //     }
-    //     if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {
-    //         c+=4;
-    //         int r = 0;
-    //         while (*c >= '0' && *c <= '9') {
-    //             r = r * 10 + (*c - '0');
-    //             ++c;
-    //         }
-    //         r = std::max(r,0);
-    //         r = std::min(r,255);
-    //         while (*c == ' ' || *c == ',') ++c; // skip ',' or spaces
-    //         int g = 0;
-    //         while (*c >= '0' && *c <= '9') {
-    //             g = g * 10 + (*c - '0');
-    //             ++c;
-    //         }
-    //         g = std::max(g,0);
-    //         g = std::min(g,255);
-    //         while (*c == ' ' || *c == ',') ++c; // skip ',' or spaces
-    //         int b = 0;
-    //         while (*c >= '0' && *c <= '9') {
-    //             b = b * 10 + (*c - '0');
-    //             ++c;
-    //         }
-    //         b = std::max(b,0);
-    //         b = std::min(b,255);
-    //         obj->strokeColor.setColor(SkColor4f{
-    //             (float)r / 255.f,
-    //             (float)g / 255.f,
-    //             (float)b / 255.f,
-    //             1.0f
-    //         });
-    //         return true;
-    //     }
-    //     return false;
-    // }
     
     void canvas_set_stroke_width(void* canvasObj, float w) {
         if (!canvasObj) return;
@@ -484,6 +435,16 @@ extern "C" {
         obj->pathBuilder.close();
     }
     
+    void canvas_draw_image(void* canvasObj, void* image, int x,int y,int w,int h) {
+        if (!canvasObj) return;
+        BunCanvas* obj = validated(canvasObj);
+        ImageWrapper* img = static_cast<ImageWrapper*>(image);
+        if (obj == nullptr || img == nullptr) return;
+        // void drawImageRect(const sk_sp<SkImage>& image, const SkRect& dst,
+        //                const SkSamplingOptions& sampling, const SkPaint* paint = nullptr) {
+        obj->ctx->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+    }
+    
     bool canvas_set_composite_operation(void* canvasObj, const char* name) {
         if (!canvasObj) return false;
         BunCanvas* obj = validated(canvasObj);
@@ -492,6 +453,8 @@ extern "C" {
         
         try {
             obj->fillColor.setBlendMode(compositeOperations.at(name));
+            obj->strokeColor.setBlendMode(compositeOperations.at(name));
+            obj->imageColor.setBlendMode(compositeOperations.at(name));
             return true;
         }catch(std::exception err) {
             return false;

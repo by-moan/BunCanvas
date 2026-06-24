@@ -114,6 +114,15 @@ export const lib = dlopen(path, {
 		args: ["ptr", "cstring"],
 		returns: "bool",
 	},
+	canvas_draw_image: {
+		args: ["ptr","ptr","int","int","int","int"],
+		returns: "void",
+	},
+	image_load: {
+		args: ["cstring"],
+		returns: "ptr",
+	},
+	
 });
 
 // const cnv = document.createElement("canvas")

@@ -247,12 +247,12 @@ class BunCanvas {
 
     
     BunCanvas(int w, int h){
-        // if (ctxWrapper == nullptr){
-        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        // }else {
-        //     surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        // }
+        if (ctxWrapper == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        }else {
+            surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        }
+            // surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
     }
 
     ~BunCanvas(){
@@ -273,12 +273,11 @@ class BunCanvas {
 
     void resize(int w, int h) {
         surface.reset();
-        // if (ctxWrapper == nullptr){
-        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        // }else {
-        //     surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        // }
+        if (ctxWrapper == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        }else {
+            surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        }
         // surface = SkSurfaces::Raster(
         //     SkImageInfo::MakeN32Premul(w,h)
         // );

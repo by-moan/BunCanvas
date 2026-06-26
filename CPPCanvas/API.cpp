@@ -20,16 +20,6 @@
 
 #include "include/gpu/ganesh/gl/GrGLBackendSurface.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
-
-void framebuffer_size_callback(
-    GLFWwindow* window,
-    int width,
-    int height
-) {
-    std::cout << "Window resized!\n";
-    glViewport(0, 0, width, height);
-}
-
 sk_sp<SkSurface> createSurface(
     GrDirectContext* context,
     int width,

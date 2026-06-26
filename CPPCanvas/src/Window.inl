@@ -1,15 +1,8 @@
-class Event {
-    public:
-    std::string evtType;
-    std::string values;
-    
-    // This event is data-oriented, mainly so the Bun engine can parse it and use it internally
-    Event(std::string type, std::string val) : evtType(type), values(val) {}
-};
-
-std::vector<Event> events;
-std::string events_buffer;
 bool pollingEvents = false;
+
+int32_t* wResizeViewer = nullptr;
+_Float64_t* mMoveViewer = nullptr;
+_Float64_t* mClickViewer = nullptr;
 
 void window_resize_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -22,24 +15,61 @@ void window_resize_callback(GLFWwindow* window, int width, int height) {
         height
     );
     canvas = sWrapper->surface->getCanvas();
-    if (pollingEvents == true) return;
-    events.emplace_back("wresize", "{\"width\":" + std::to_string(width) + ", \"height\": " + std::to_string(height) + "}");
+    if (pollingEvents == true || wResizeViewer == nullptr) return;
+    wResizeViewer[0] = true;
+    wResizeViewer[1] = width;
+    wResizeViewer[2] = height;
 }
 
 double prevX = 0;
 double prevY = 0;
+
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (pollingEvents == true || xpos == prevX || ypos == prevY) return;
-    events.emplace_back("mmove", "{\"xpos\":" + std::to_string(xpos) + ", \"ypos\": " + std::to_string(ypos) + ",\"movx\":" + std::to_string(xpos-prevX) + ",\"movy\":" + std::to_string(ypos-prevY) + "}");
+    if (pollingEvents == true || mMoveViewer == nullptr || xpos == prevX || ypos == prevY) return;
+    mMoveViewer[0] = true;
+    mMoveViewer[1] = xpos;
+    mMoveViewer[2] = ypos;
+    mMoveViewer[3] = xpos-prevX;
+    mMoveViewer[4] = ypos-prevY;
+    // events.emplace_back("mmove", "{\"xpos\":" + std::to_string(xpos) + ", \"ypos\": " + std::to_string(ypos) + ",\"movx\":" + std::to_string(xpos-prevX) + ",\"movy\":" + std::to_string(ypos-prevY) + "}");
     prevX = xpos;
     prevY = ypos;
 }
+    
+int buttons = 0;
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (pollingEvents == true || mClickViewer == nullptr || mMoveViewer == nullptr) return;
+    mClickViewer[0] = true;
+    mClickViewer[1] = mMoveViewer[1];
+    mClickViewer[2] = mMoveViewer[2];
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        mClickViewer[3] = 0;
+        mClickViewer[4]+=(double)0b1;
+    }
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+        mClickViewer[3] = 1;
+        mClickViewer[4]+=(double)0b10;
+    }
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        mClickViewer[3] = 2;
+        mClickViewer[4]+=(double)0b100;
+    }
+    // events.emplace_back("mmove", "{\"xpos\":" + std::to_string(currentX) + ", \"ypos\": " + std::to_string(currentY) + ",\"button\":" + std::to_string(button) + ",\"buttons\":" + std::to_string(buttons) + "}");
+
+}
+
+
+
 extern "C" {
-    void create_window(int w, int h, const char* title = "App"){
+    void create_window(int w, int h, const char* title, int32_t* wRViewer, _Float64_t* mMViewer, _Float64_t* mCViewer){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
         };
+
+        wResizeViewer = wRViewer;
+        mMoveViewer = mMViewer;
+        mClickViewer = mCViewer;
         
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -59,7 +89,6 @@ extern "C" {
         
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
-        
         #pragma endregion
         
         glfwMakeContextCurrent(window);
@@ -110,29 +139,7 @@ extern "C" {
         clearColor.setAntiAlias(1);
     }
     
-    const char* window_query_events() {
-        if (pollingEvents == true) return "[]";
-
-        pollingEvents = true;
-        events_buffer = "[";
-        
-        
-        if (events.empty() == false) {
-            for (auto item : events) {
-                events_buffer+="{\"type\":\"" + item.evtType + "\",\"values\":" + item.values + "},";
-            }
-            events_buffer.pop_back();
-        }
-        events_buffer += "]";
-        pollingEvents = false;
-        
-
-        events.clear();
-
-        return events_buffer.c_str();
-    }
-    
-    void update_window(){
+    void update_window(int32_t* wRViewer, _Float64_t* mMViewer, _Float64_t* mCViewer){
         glfwPollEvents();
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
@@ -152,6 +159,9 @@ extern "C" {
         //     );
         //     canvas = sWrapper->surface->getCanvas();
         // }
+        if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
+        if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
+        if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
 
         canvas->clear(SK_ColorTRANSPARENT);
 

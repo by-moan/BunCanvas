@@ -2,7 +2,7 @@ import { lib,encoder } from "./symbols";
 import { Event } from "./Event";
 import { MouseEvent } from "./MouseEvent"
 
-import { ptr } from "bun:ffi"
+import { ptr, toArrayBuffer } from "bun:ffi"
 
 const requestedFrames = []
 const ptrs = new WeakMap();
@@ -34,9 +34,6 @@ export class ImageData {
 		this.height = height;
 		if (data instanceof Uint8Array){
 			this.data = data;
-
-		}else {
-			console.error("Was not uintarray")
 		}
 	}
 }
@@ -94,7 +91,7 @@ class CanvasRenderingContext2D {
     }
     closePath(){
         lib.symbols.canvas_path_close(this.#iptr)
-    }
+	}
     stroke(){
         lib.symbols.canvas_path_stroke(this.#iptr)
     }
@@ -175,12 +172,13 @@ export class Window {
 		return this.#dim[1]
 	}
 
+	#wResizeViewer = new Int32Array(3);
+	#mMoveViewer = new Float64Array(5);
+	#mClickViewer = new Float64Array(5);
 
-	#lastMouseX = 0
-	#lastMouseY = 0
 
-	constructor(width, height) {
-		lib.symbols.create_window(width,height)
+	constructor(width, height, title = "App") {
+		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`),ptr(this.#wResizeViewer),ptr(this.#mMoveViewer),ptr(this.#mClickViewer),)
 		
 		setInterval(()=>{
 			if (lib.symbols.should_window_close()) {
@@ -189,31 +187,70 @@ export class Window {
 				return
 			}
 			
-			lib.symbols.update_window();
+			lib.symbols.update_window(
+				ptr(this.#wResizeViewer),
+				ptr(this.#mMoveViewer),
+				ptr(this.#mClickViewer)
+			);
 
-			const evts = JSON.parse(lib.symbols.window_query_events())
-
-			if (evts.length != 0) {
-				for (const event of evts) {
-					if (event.type == "wresize") {
-						this.#dim[0] = event.values.width
-						this.#dim[1] = event.values.height
-
-						const details = {type: "resize", target: this, timestamp: performance.now()};
-						this.onresize(details)
-						this.#rEvts.forEach((item,key)=>{
-							item.cb(details);
-						})
-					}
-					if (event.type == "mmove") {
-						const evt = new MouseEvent("move", {altKey:false, button:0, buttons:0, clientX:event.values.xpos, clientY:event.values.ypos, movementX: event.values.movx, movementY: event.values.movy, ctrlKey:false, metaKey:false, screenX:0, screenY:0, shiftKey:false})
-						this.onmousemove(evt)
-						this.#mMoveEvts.forEach((item,key)=>{
-							item.cb(evt);
-						})
-					}
-				}
+			if (this.#wResizeViewer[0] != 0) {
+				this.#wResizeViewer[0] = 0
+				// const details = {type: "resize", target: this, timestamp: performance.now()};
+				const details = new Event("resize",this);
+				
+				this.#dim[0] = this.#wResizeViewer[1]
+				this.#dim[1] = this.#wResizeViewer[2]
+				this.onresize(details)
+				this.#rEvts.forEach((item,key)=>{
+					item.cb(details);
+				})
 			}
+			if(this.#mMoveViewer[0] != 0) {
+				const evt = new MouseEvent("move",
+					{
+						altKey:false,
+						button:0,
+						buttons:0,
+						clientX:this.#mMoveViewer[1],
+						clientY:this.#mMoveViewer[2],
+						movementX: this.#mMoveViewer[3],
+						movementY: this.#mMoveViewer[4],
+						ctrlKey:false,
+						metaKey:false,
+						screenX:0,
+						screenY:0,
+						shiftKey:false
+					}
+				)
+				this.onmousemove(evt)
+				this.#mMoveEvts.forEach((item,key)=>{
+					item.cb(evt);
+				})
+			}
+
+			// const evts = JSON.parse(lib.symbols.window_query_events())
+
+			// if (evts.length != 0) {
+			// 	for (const event of evts) {
+			// 		if (event.type == "wresize") {
+			// 			this.#dim[0] = event.values.width
+			// 			this.#dim[1] = event.values.height
+
+			// 			const details = {type: "resize", target: this, timestamp: performance.now()};
+			// 			this.onresize(details)
+			// 			this.#rEvts.forEach((item,key)=>{
+			// 				item.cb(details);
+			// 			})
+			// 		}
+			// 		if (event.type == "mmove") {
+			// 			const evt = new MouseEvent("move", {altKey:false, button:0, buttons:0, clientX:event.values.xpos, clientY:event.values.ypos, movementX: event.values.movx, movementY: event.values.movy, ctrlKey:false, metaKey:false, screenX:0, screenY:0, shiftKey:false})
+			// 			this.onmousemove(evt)
+			// 			this.#mMoveEvts.forEach((item,key)=>{
+			// 				item.cb(evt);
+			// 			})
+			// 		}
+			// 	}
+			// }
 
 			const pLen = requestedFrames.length
 			for (let i = 0; i < pLen; i++) {

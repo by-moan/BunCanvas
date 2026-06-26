@@ -23,11 +23,11 @@ export const encoder = new TextEncoder();
 
 export const lib = dlopen(path, {
 	create_window: {
-		args: ["int","int"],
+		args: ["int","int", "cstring", "ptr", "ptr", "ptr"],
 		returns: "void",
 	},
 	update_window: {
-		args: [],
+		args: ["ptr", "ptr", "ptr"],
 		returns: "void",
 	},
 	should_window_close: {
@@ -37,10 +37,6 @@ export const lib = dlopen(path, {
 	destroy_window: {
 		args: [],
 		returns: "void",
-	},
-	window_query_events: {
-		args: [],
-		returns: "cstring",
 	},
 	canvas_create: {
 		args: ["int","int"],

@@ -5,8 +5,19 @@ const ctx = canvas.getContext("2d")
 
 const window = new Window(800,600)
 
-const img = new Image("./face.png");
+const img = new Image();
 
+img.onload = (evt)=>{
+    console.log("image loaded!", evt.timeStamp)
+}
+img.onerror = (evt)=>{
+    console.log("error loading image!", evt.timeStamp)
+}
+
+img.src = "./faaace.png";
+setTimeout(()=>{
+    img.src = "./face.png";
+},2000)
 window.append(canvas)
 
 let x = 0;
@@ -39,7 +50,6 @@ function loop() {
     ctx.strokeStyle = "#413b72"
     ctx.lineWidth = 2
 
-
     ctx.beginPath();
     ctx.moveTo(20, 20);
     ctx.lineTo(100, 20);
@@ -56,11 +66,15 @@ function loop() {
     ctx.arc(100, 75, 50, 0, 2 * Math.PI);
     ctx.stroke();
 
+    
 
     ctx.globalCompositeOperation = "screen"
     ctx.drawImage(img, x-100,y-50,200,100);
     // ctx.fillRect(x-25,y-25,50,50)
     ctx.globalCompositeOperation = "source-over"
+
+    let data = ctx.getImageData(10,10,100,100);
+    ctx.putImageData(data,30,200)
     requestAnimationFrame(loop)
 }
 

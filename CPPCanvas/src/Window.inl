@@ -12,6 +12,16 @@ std::string events_buffer;
 bool pollingEvents = false;
 
 void window_resize_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+            
+    ctxWrapper->context->flush();
+    sWrapper->surface.reset();
+    sWrapper->surface = createSurface(
+        ctxWrapper->context.get(),
+        width,
+        height
+    );
+    canvas = sWrapper->surface->getCanvas();
     if (pollingEvents == true) return;
     events.emplace_back("wresize", "{\"width\":" + std::to_string(width) + ", \"height\": " + std::to_string(height) + "}");
 }
@@ -127,28 +137,29 @@ extern "C" {
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         
-        if (width != currentWidth || height != currentHeight) {
-            currentWidth = width;
-            currentHeight = height;
+        // if (width != currentWidth || height != currentHeight) {
+        //     currentWidth = width;
+        //     currentHeight = height;
             
-            glViewport(0, 0, width, height);
+        //     glViewport(0, 0, width, height);
             
-            ctxWrapper->context->flush();
-            sWrapper->surface.reset();
-            sWrapper->surface = createSurface(
-                ctxWrapper->context.get(),
-                width,
-                height
-            );
-            canvas = sWrapper->surface->getCanvas();
-        }
+        //     ctxWrapper->context->flush();
+        //     sWrapper->surface.reset();
+        //     sWrapper->surface = createSurface(
+        //         ctxWrapper->context.get(),
+        //         width,
+        //         height
+        //     );
+        //     canvas = sWrapper->surface->getCanvas();
+        // }
 
         canvas->clear(SK_ColorTRANSPARENT);
 
         
         for (auto element : canvases) {
             // if (element->locked == true) continue;
-            canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
+            // canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
         
         
@@ -161,7 +172,7 @@ extern "C" {
         //     p
         // );
         
-        ctxWrapper->context->flush();
+        ctxWrapper->context->flushAndSubmit();
         glfwSwapBuffers(window);
     }
     

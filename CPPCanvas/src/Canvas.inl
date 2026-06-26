@@ -246,7 +246,14 @@ class BunCanvas {
     sk_sp<SkSurface> surface;
 
     
-    BunCanvas(int w, int h) : surface(SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h))){}
+    BunCanvas(int w, int h){
+        // if (ctxWrapper == nullptr){
+        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        // }else {
+        //     surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        // }
+            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+    }
 
     ~BunCanvas(){
         delete rendering2D;
@@ -266,9 +273,16 @@ class BunCanvas {
 
     void resize(int w, int h) {
         surface.reset();
-        surface = SkSurfaces::Raster(
-            SkImageInfo::MakeN32Premul(w,h)
-        );
+        // if (ctxWrapper == nullptr){
+        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        // }else {
+        //     surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        // }
+            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        // surface = SkSurfaces::Raster(
+        //     SkImageInfo::MakeN32Premul(w,h)
+        // );
+        // surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         if (ctxType == "2d") rendering2D->reset(surface);
     }
 };
@@ -514,5 +528,50 @@ extern "C" {
         }catch(std::exception err) {
             return false;
         }
+    }
+
+    bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
+        if (!canvasObj) return false;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        if (obj == nullptr) {
+            return false;
+        };
+
+        SkImageInfo dstInfo = SkImageInfo::Make(
+            w,h,
+            kRGBA_8888_SkColorType,
+            kPremul_SkAlphaType
+        );
+        size_t rowBytes = w * 4;
+
+        return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
+            dstInfo, 
+            out_buffer, 
+            rowBytes, 
+            x, 
+            y, 
+            SkImage::CachingHint::kDisallow_CachingHint
+        );
+    }
+
+    bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
+        if (!canvasObj) return false;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return false;
+        SkImageInfo imageInfo = SkImageInfo::Make(
+            w,h,
+            kRGBA_8888_SkColorType,
+            kPremul_SkAlphaType
+        );
+
+        SkBitmap bitmap;
+
+        if(bitmap.installPixels(imageInfo,buffer,w *4)){
+            (*obj)()->drawImage(bitmap.asImage(),x,y);
+            // std::cout << "Success " << x << " " << y << " " << w << " " << h << " " << "\n";
+            return true;
+        }
+        return false;
     }
 }

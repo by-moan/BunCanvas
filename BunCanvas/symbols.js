@@ -118,9 +118,22 @@ export const lib = dlopen(path, {
 		args: ["ptr","ptr","float","float","float","float"],
 		returns: "void",
 	},
-	image_load: {
-		args: ["cstring"],
+	canvas_get_image_data: {
+		args: ["ptr","int","int","int","int", "ptr"],
+		returns: "bool",
+	},
+	// canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer)
+	canvas_put_image_data: {
+		args: ["ptr","int","int","int","int", "ptr"],
+		returns: "bool",
+	},
+	image_create: {
+		args: [],
 		returns: "ptr",
+	},
+	image_set_src: {
+		args: ["ptr","cstring"],
+		returns: "bool",
 	},
 	
 });

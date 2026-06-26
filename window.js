@@ -13,6 +13,7 @@ let loop = setInterval(()=>{
     ctx.clearRect(0,0,1000,1000)
     ctx.fillStyle = "#ff00ff"
     ctx.fillRect(x,y,10,10)
+    // ctx.putImageData
     x+=1
     y+=1
 },10)

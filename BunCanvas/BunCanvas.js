@@ -1,12 +1,43 @@
 import { lib,encoder } from "./symbols";
+import { Event } from "./Event";
 import { MouseEvent } from "./MouseEvent"
+
+import { ptr } from "bun:ffi"
+
 const requestedFrames = []
 const ptrs = new WeakMap();
 
 
 export class Image {
-	constructor(path) {
-		ptrs.set(this,lib.symbols.image_load(encoder.encode(`${path}\0`)))
+	constructor() {
+		ptrs.set(this,lib.symbols.image_create(encoder.encode(`\0`)))
+	}
+
+	onload = ()=>{}
+	onerror = ()=>{}
+
+	set src(path){
+		if (lib.symbols.image_set_src(ptrs.get(this), encoder.encode(`${path}\0`))) {
+			this.onload(new Event("load",this));
+		}else {
+			this.onerror(new Event("error",this));
+		}
+	}
+}
+
+export class ImageData {
+	width = 0;
+	height = 0;
+	data = null;
+	constructor(width,height,data){
+		this.width = width;
+		this.height = height;
+		if (data instanceof Uint8Array){
+			this.data = data;
+
+		}else {
+			console.error("Was not uintarray")
+		}
 	}
 }
 
@@ -70,13 +101,21 @@ class CanvasRenderingContext2D {
 	drawImage(img,x,y,w,h) {
         lib.symbols.canvas_draw_image(this.#iptr,ptrs.get(img),x,y,w,h);
 	}
+	getImageData(x,y,w,h) {
+		const arr = new Uint8Array(w*h*4);
+        if (lib.symbols.canvas_get_image_data(this.#iptr,x,y,w,h, ptr(arr)) == false) console.error("unsuccessful");
+		return new ImageData(w,h,arr);
+	}
+	putImageData(data,dx,dy,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
+		lib.symbols.canvas_put_image_data(this.#iptr,dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
+	}
     // clearRect(x,y,w,h){
     //     lib.symbols.canvas_clear_rect(x,y,w,h)
     // }
     constructor(iptr) {
-		const ptr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
-		ptrs.set(this, ptr)
-        this.#iptr = ptr
+		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
+		ptrs.set(this, renderContextPtr)
+        this.#iptr = renderContextPtr
         
     }
 }
@@ -213,12 +252,12 @@ export class Window {
 	}
 
 	append(canvas){
-		const ptr = ptrs.get(canvas)
-		if (ptr == undefined) {
+		const canvasPtr = ptrs.get(canvas)
+		if (canvasPtr == undefined) {
 			console.error("Canvas was not found")
 			return
 		}
-		lib.symbols.canvas_append(ptr)
+		lib.symbols.canvas_append(canvasPtr)
 	}
 	//Other Implementations to be done...
 };

@@ -31,7 +31,6 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     mMoveViewer[2] = ypos;
     mMoveViewer[3] = xpos-prevX;
     mMoveViewer[4] = ypos-prevY;
-    // events.emplace_back("mmove", "{\"xpos\":" + std::to_string(xpos) + ", \"ypos\": " + std::to_string(ypos) + ",\"movx\":" + std::to_string(xpos-prevX) + ",\"movy\":" + std::to_string(ypos-prevY) + "}");
     prevX = xpos;
     prevY = ypos;
 }
@@ -39,7 +38,6 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 int buttons = 0;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (pollingEvents == true || mClickViewer == nullptr || mMoveViewer == nullptr) return;
-    mClickViewer[0] = true;
     mClickViewer[1] = mMoveViewer[1];
     mClickViewer[2] = mMoveViewer[2];
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -54,8 +52,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mClickViewer[3] = 2;
         mClickViewer[4]+=(double)0b100;
     }
-    // events.emplace_back("mmove", "{\"xpos\":" + std::to_string(currentX) + ", \"ypos\": " + std::to_string(currentY) + ",\"button\":" + std::to_string(button) + ",\"buttons\":" + std::to_string(buttons) + "}");
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE){
+        mClickViewer[0] = true;
 
+    }
 }
 
 
@@ -89,6 +89,8 @@ extern "C" {
         
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
+        glfwSetMouseButtonCallback(window, mouse_button_callback);
+
         #pragma endregion
         
         glfwMakeContextCurrent(window);
@@ -144,21 +146,6 @@ extern "C" {
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         
-        // if (width != currentWidth || height != currentHeight) {
-        //     currentWidth = width;
-        //     currentHeight = height;
-            
-        //     glViewport(0, 0, width, height);
-            
-        //     ctxWrapper->context->flush();
-        //     sWrapper->surface.reset();
-        //     sWrapper->surface = createSurface(
-        //         ctxWrapper->context.get(),
-        //         width,
-        //         height
-        //     );
-        //     canvas = sWrapper->surface->getCanvas();
-        // }
         if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
         if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
         if (mCViewer != mClickViewer) mClickViewer = mCViewer; 

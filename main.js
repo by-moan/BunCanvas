@@ -30,6 +30,10 @@ setInterval(()=>{
     count = 0
 },1000)
 
+window.onclick = (evt)=>{
+    console.log("click!",evt.timeStamp)
+}
+
 
 window.addEventListener("resize", (evt)=>{
     console.log(`Width: ${window.innerWidth} Height: ${window.innerHeight}`)

@@ -156,6 +156,7 @@ export class Window {
 
 	#rEvts = new Map();
 	#mMoveEvts = new Map();
+	#mClickEvts = new Map();
 
 	#evtDetails = new WeakMap();
 	
@@ -164,6 +165,7 @@ export class Window {
 
 	onresize = ()=>{}
 	onmousemove = ()=>{}
+	onclick = ()=>{}
 
 	get innerWidth(){
 		return this.#dim[0]
@@ -206,6 +208,7 @@ export class Window {
 				})
 			}
 			if(this.#mMoveViewer[0] != 0) {
+				this.#mMoveViewer[0] = 0				
 				const evt = new MouseEvent("move",
 					{
 						altKey:false,
@@ -224,6 +227,29 @@ export class Window {
 				)
 				this.onmousemove(evt)
 				this.#mMoveEvts.forEach((item,key)=>{
+					item.cb(evt);
+				})
+			}
+			if(this.#mClickViewer[0] != 0) {
+				this.#mClickViewer[0] = 0
+				const evt = new MouseEvent("click",
+					{
+						altKey:false,
+						button:this.#mClickViewer[3],
+						buttons:this.#mClickViewer[4],
+						clientX:this.#mClickViewer[1],
+						clientY:this.#mClickViewer[2],
+						movementX: 0,
+						movementY: 0,
+						ctrlKey:false,
+						metaKey:false,
+						screenX:0,
+						screenY:0,
+						shiftKey:false
+					}
+				)
+				this.onclick(evt)
+				this.#mClickEvts.forEach((item,key)=>{
 					item.cb(evt);
 				})
 			}
@@ -271,6 +297,9 @@ export class Window {
 		} else if (name == "mousemove") {
 			this.#mMoveEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "click") {
+			this.#mClickEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
 		}
 	}
 	removeEventListener(name,fn){
@@ -283,6 +312,11 @@ export class Window {
 		}else if (name == "mousemove") {
 			if (det != undefined) {
 				this.#mMoveEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
+		}else if (name == "click") {
+			if (det != undefined) {
+				this.#mClickEvts.delete(det)
 				this.#evtDetails.delete(fn)
 			}
 		}

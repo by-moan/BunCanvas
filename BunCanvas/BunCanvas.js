@@ -3,10 +3,10 @@ import { Event } from "./Event";
 import { MouseEvent } from "./MouseEvent"
 
 import { ptr, toArrayBuffer } from "bun:ffi"
+import { KeyboardEvent } from "./KeyboardEvent";
 
 const requestedFrames = []
 const ptrs = new WeakMap();
-
 
 export class Image {
 	constructor() {
@@ -110,11 +110,30 @@ class CanvasRenderingContext2D {
     //     lib.symbols.canvas_clear_rect(x,y,w,h)
     // }
     constructor(iptr) {
+		
+
 		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
 		ptrs.set(this, renderContextPtr)
         this.#iptr = renderContextPtr
         
     }
+}
+
+{
+	const proto = CanvasRenderingContext2D.prototype;
+
+	for (const key of Object.getOwnPropertyNames(proto)) {
+	    const desc = Object.getOwnPropertyDescriptor(proto, key);
+		if (key == "constructor"){
+			desc.value.toString = () =>
+	            `function ${proto.constructor.name}() { [native code] }`;
+			continue
+		}
+	    if (typeof desc?.value === "function") {
+	        desc.value.toString = () =>
+	            `function ${key}() { [native code] }`;
+	    }
+	}
 }
 
 export class Canvas {
@@ -149,6 +168,23 @@ export class Canvas {
     }
 }
 
+{
+	const proto = Canvas.prototype;
+
+	for (const key of Object.getOwnPropertyNames(proto)) {
+	    const desc = Object.getOwnPropertyDescriptor(proto, key);
+		if (key == "constructor"){
+			desc.value.toString = () =>
+	            `function ${proto.constructor.name}() { [native code] }`;
+			continue
+		}
+	    if (typeof desc?.value === "function") {
+	        desc.value.toString = () =>
+	            `function ${key}() { [native code] }`;
+	    }
+	}
+}
+
 export class Window {
 	#wndPtr;
 
@@ -157,15 +193,17 @@ export class Window {
 	#rEvts = new Map();
 	#mMoveEvts = new Map();
 	#mClickEvts = new Map();
+	#keyDownEvts = new Map();
 
 	#evtDetails = new WeakMap();
 	
 	#freeIndex = new Array();
 	#eIndex = 0
 
-	onresize = ()=>{}
-	onmousemove = ()=>{}
-	onclick = ()=>{}
+	onresize = null
+	onmousemove = null
+	onclick = null
+	onkeydown = null
 
 	get innerWidth(){
 		return this.#dim[0]
@@ -175,12 +213,24 @@ export class Window {
 	}
 
 	#wResizeViewer = new Int32Array(3);
-	#mMoveViewer = new Float64Array(5);
-	#mClickViewer = new Float64Array(5);
+	#mMoveViewer = new Float64Array(9);
+	#mClickViewer = new Float64Array(9);
+	#mDownViewer = new Float64Array(9);
+	#mUpViewer = new Float64Array(9);
 
+	#kDownViewer = new Int32Array(7);
+	#kUpViewer = new Int32Array(7);
 
 	constructor(width, height, title = "App") {
-		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`),ptr(this.#wResizeViewer),ptr(this.#mMoveViewer),ptr(this.#mClickViewer),)
+		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`),
+			ptr(this.#wResizeViewer),
+			ptr(this.#mMoveViewer),
+			ptr(this.#mClickViewer),
+			ptr(this.#mDownViewer),
+			ptr(this.#mUpViewer),
+			ptr(this.#kDownViewer),
+			ptr(this.#kUpViewer),
+		)
 		
 		setInterval(()=>{
 			if (lib.symbols.should_window_close()) {
@@ -192,7 +242,11 @@ export class Window {
 			lib.symbols.update_window(
 				ptr(this.#wResizeViewer),
 				ptr(this.#mMoveViewer),
-				ptr(this.#mClickViewer)
+				ptr(this.#mClickViewer),
+				ptr(this.#mDownViewer),
+				ptr(this.#mUpViewer),
+				ptr(this.#kDownViewer),
+				ptr(this.#kUpViewer),
 			);
 
 			if (this.#wResizeViewer[0] != 0) {
@@ -202,7 +256,7 @@ export class Window {
 				
 				this.#dim[0] = this.#wResizeViewer[1]
 				this.#dim[1] = this.#wResizeViewer[2]
-				this.onresize(details)
+				if (this.onresize) this.onresize(details)
 				this.#rEvts.forEach((item,key)=>{
 					item.cb(details);
 				})
@@ -213,7 +267,7 @@ export class Window {
 					{
 						altKey:false,
 						button:0,
-						buttons:0,
+						buttons:this.#mMoveViewer[5],
 						clientX:this.#mMoveViewer[1],
 						clientY:this.#mMoveViewer[2],
 						movementX: this.#mMoveViewer[3],
@@ -225,7 +279,7 @@ export class Window {
 						shiftKey:false
 					}
 				)
-				this.onmousemove(evt)
+				if (this.onmousemove) this.onmousemove(evt)
 				this.#mMoveEvts.forEach((item,key)=>{
 					item.cb(evt);
 				})
@@ -234,49 +288,33 @@ export class Window {
 				this.#mClickViewer[0] = 0
 				const evt = new MouseEvent("click",
 					{
-						altKey:false,
+						altKey:this.#mClickViewer[7],
 						button:this.#mClickViewer[3],
 						buttons:this.#mClickViewer[4],
 						clientX:this.#mClickViewer[1],
 						clientY:this.#mClickViewer[2],
 						movementX: 0,
 						movementY: 0,
-						ctrlKey:false,
-						metaKey:false,
-						screenX:0,
-						screenY:0,
-						shiftKey:false
+						ctrlKey:this.#mClickViewer[6],
+						metaKey:this.#mClickViewer[8],
+						screenX:this.#mClickViewer[1],
+						screenY:this.#mClickViewer[2],
+						shiftKey:this.#mClickViewer[5]
 					}
 				)
-				this.onclick(evt)
+				if (this.onclick) this.onclick(evt)
 				this.#mClickEvts.forEach((item,key)=>{
 					item.cb(evt);
 				})
 			}
-
-			// const evts = JSON.parse(lib.symbols.window_query_events())
-
-			// if (evts.length != 0) {
-			// 	for (const event of evts) {
-			// 		if (event.type == "wresize") {
-			// 			this.#dim[0] = event.values.width
-			// 			this.#dim[1] = event.values.height
-
-			// 			const details = {type: "resize", target: this, timestamp: performance.now()};
-			// 			this.onresize(details)
-			// 			this.#rEvts.forEach((item,key)=>{
-			// 				item.cb(details);
-			// 			})
-			// 		}
-			// 		if (event.type == "mmove") {
-			// 			const evt = new MouseEvent("move", {altKey:false, button:0, buttons:0, clientX:event.values.xpos, clientY:event.values.ypos, movementX: event.values.movx, movementY: event.values.movy, ctrlKey:false, metaKey:false, screenX:0, screenY:0, shiftKey:false})
-			// 			this.onmousemove(evt)
-			// 			this.#mMoveEvts.forEach((item,key)=>{
-			// 				item.cb(evt);
-			// 			})
-			// 		}
-			// 	}
-			// }
+			if(this.#kDownViewer[0] != 0) {
+				this.#kDownViewer[0] = false;
+				const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
+				if (this.onkeydown) this.onkeydown(evt)
+				this.#keyDownEvts.forEach((item,key)=>{
+					item.cb(evt);
+				})
+			}
 
 			const pLen = requestedFrames.length
 			for (let i = 0; i < pLen; i++) {
@@ -300,6 +338,9 @@ export class Window {
 		}else if (name == "click") {
 			this.#mClickEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "keydown") {
+			this.#keyDownEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
 		}
 	}
 	removeEventListener(name,fn){
@@ -319,6 +360,11 @@ export class Window {
 				this.#mClickEvts.delete(det)
 				this.#evtDetails.delete(fn)
 			}
+		}else if (name == "keydown") {
+			if (det != undefined) {
+				this.#keyDownEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
 		}
 	}
 
@@ -332,6 +378,24 @@ export class Window {
 	}
 	//Other Implementations to be done...
 };
+
+{
+	const proto = Window.prototype;
+
+	for (const key of Object.getOwnPropertyNames(proto)) {
+	    const desc = Object.getOwnPropertyDescriptor(proto, key);
+		if (key == "constructor"){
+			desc.value.toString = () =>
+	            `function ${proto.constructor.name}() { [native code] }`;
+			continue
+		}
+	    if (typeof desc?.value === "function") {
+	        desc.value.toString = () =>
+	            `function ${key}() { [native code] }`;
+	    }
+	}
+}
+
 
 export function requestAnimationFrame(callback) {
 	requestedFrames.push(callback);

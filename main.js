@@ -13,11 +13,8 @@ img.onload = (evt)=>{
 img.onerror = (evt)=>{
     console.log("error loading image!", evt.timeStamp)
 }
+img.src = "./face.png";
 
-img.src = "./faaace.png";
-setTimeout(()=>{
-    img.src = "./face.png";
-},2000)
 window.append(canvas)
 
 let x = 0;
@@ -30,20 +27,18 @@ setInterval(()=>{
     count = 0
 },1000)
 
-window.onclick = (evt)=>{
-    console.log("click!",evt.timeStamp)
-}
-
 
 window.addEventListener("resize", (evt)=>{
-    console.log(`Width: ${window.innerWidth} Height: ${window.innerHeight}`)
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 })
 window.addEventListener("mousemove", (evt)=>{
-    // console.log(`X: ${evt.clientX} Y: ${evt.clientY} mX: ${evt.movementX} mY: ${evt.movementY}`)
     x = evt.clientX
     y = evt.clientY
+})
+
+window.addEventListener("keydown", (evt)=>{
+    console.log("key pressed!", evt.code, evt.key)
 })
 
 function loop() {
@@ -73,7 +68,7 @@ function loop() {
     
 
     ctx.globalCompositeOperation = "screen"
-    ctx.drawImage(img, x-100,y-50,200,100);
+    ctx.drawImage(img, x-100,y-50,100,100);
     // ctx.fillRect(x-25,y-25,50,50)
     ctx.globalCompositeOperation = "source-over"
 

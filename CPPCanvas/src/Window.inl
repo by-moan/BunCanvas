@@ -30,7 +30,7 @@ double prevX = 0;
 double prevY = 0;
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (pollingEvents == true || mMoveViewer == nullptr || xpos == prevX || ypos == prevY) return;
+    if (pollingEvents == true || mMoveViewer == nullptr) return;
     mMoveViewer[0] = true;
     mMoveViewer[1] = xpos;
     mMoveViewer[2] = ypos;

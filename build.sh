@@ -20,17 +20,27 @@ fi
 
 if [[ "$(uname -o)" = "GNU/Linux"  ]]
 then
-clang++ -shared -fPIC ./CPPCanvas/API.cpp \
-"./CPPCanvas/Thirdparty/skia_build/skia/out/Release_$(uname -o)_$(uname -m)/libskia.a" \
--I./CPPCanvas/Thirdparty/skia_build/skia/ \
--I./CPPCanvas/Thirdparty/glad/include \
--lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.$(uname -m).so"
+    if [[ "$(uname -m)" = "x86_64" ]]
+    then
+    clang++ -shared -fPIC ./CPPCanvas/API.cpp \
+    "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
+    -I./CPPCanvas/Thirdparty/skia_build/skia/ \
+    -I./CPPCanvas/Thirdparty/glad/include \
+    -lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.x64.so"
+    elif [[ "$(uname -m)" = "arm64" ]]
+    then
+    clang++ -shared -fPIC ./CPPCanvas/API.cpp \
+    "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
+    -I./CPPCanvas/Thirdparty/skia_build/skia/ \
+    -I./CPPCanvas/Thirdparty/glad/include \
+    -lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.arm64.so"
+    fi
 elif [[ "$(uname -o)" = "Darwin" ]]
 then
     if [[ "$(uname -m)" = "x86_64" ]]
     then
     clang++ -dynamiclib -shared -fPIC ./CPPCanvas/API.cpp \
-    "./CPPCanvas/Thirdparty/skia_build/skia/out/Release_$(uname -o)_$(uname -m)/libskia.a" \
+    "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
     -std=c++17 \
     -stdlib=libc++ \
     -DGL_SILENCE_DEPRECATION \
@@ -47,7 +57,7 @@ then
     -o "./CPPCanvas/build/BunCanvas.$PLATFORM.x64.dylib"
     else
     clang++ -dynamiclib -shared -fPIC ./CPPCanvas/API.cpp \
-    "./CPPCanvas/Thirdparty/skia_build/skia/out/Release_$(uname -o)_x64/libskia.a" \
+    "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
     -std=c++17 \
     -stdlib=libc++ \
     -DGL_SILENCE_DEPRECATION \

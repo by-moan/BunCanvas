@@ -1,7 +1,12 @@
 #include <iostream>
 #include <vector>
+#include <pthread.h>
 
+#ifndef __APPLE__
 #include <GL/gl.h>
+#else
+#define _Float64_t double
+#endif
 #include <GLFW/glfw3.h>
 
 #include "include/core/SkCanvas.h"

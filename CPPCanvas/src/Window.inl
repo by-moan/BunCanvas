@@ -39,7 +39,7 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     prevX = xpos;
     prevY = ypos;
 }
-    
+
 bool clickStarted = 0;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (pollingEvents == true || mClickViewer == nullptr || mMoveViewer == nullptr) return;
@@ -73,7 +73,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         clickStarted = false;
         mClickViewer[1] = mMoveViewer[1];
         mClickViewer[2] = mMoveViewer[2];
-
+        
         //shift key pressed
         mClickViewer[5] = (mods&0b1)?true:false;
         //ctrl key pressed
@@ -90,7 +90,7 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
         kDownViewer[0] = true;
         kDownViewer[1] = false;
         kDownViewer[2] = key;
-
+        
         //shift key pressed
         kDownViewer[3] = (mods&0b1)?true:false;
         //ctrl key pressed
@@ -107,7 +107,7 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
         kUpViewer[0] = true;
         kUpViewer[1] = false;
         kUpViewer[2] = key;
-
+        
         //shift key pressed
         kUpViewer[3] = (mods&0b1)?true:false;
         //ctrl key pressed
@@ -133,13 +133,15 @@ extern "C" {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
         };
-
         wResizeViewer = wRViewer;
         mMoveViewer = mMViewer;
         mClickViewer = mCViewer;
         mDownViewer = mDViewer;
         mUpViewer = mUViewer;
 
+        // wResizeViewer[0] = w;
+        // wResizeViewer[1] = h;
+        
         kDownViewer = kDViewer;
         kUpViewer = kUViewer;
         
@@ -206,7 +208,7 @@ extern "C" {
         glfwGetFramebufferSize(window, &width, &height);
         
         canvas = sWrapper->surface->getCanvas();
-
+        
         clearColor.setColor(SK_ColorTRANSPARENT);
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
@@ -222,7 +224,6 @@ extern "C" {
         int32_t* kDViewer,
         int32_t* kUViewer
     ){
-        glfwPollEvents();
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         
@@ -231,31 +232,21 @@ extern "C" {
         if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
         if (mDViewer != mDownViewer) mDownViewer = mDViewer; 
         if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
-
+        
         if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
         if (kUViewer != kUpViewer) kUpViewer = kUViewer; 
-
+        
         canvas->clear(SK_ColorTRANSPARENT);
-
+        
         
         for (auto element : canvases) {
             // if (element->locked == true) continue;
             // canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
-        
-        
-        // SkPaint p;
-        // p.setColor(SK_ColorRED);
-        // p.setAntiAlias(true);
-        
-        // canvas->drawRect(
-        //     SkRect::MakeXYWH(400, 200, 400, 400),
-        //     p
-        // );
-        
         ctxWrapper->context->flushAndSubmit();
         glfwSwapBuffers(window);
+        glfwPollEvents();
     }
     
     

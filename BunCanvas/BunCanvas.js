@@ -231,8 +231,9 @@ export class Window {
 			ptr(this.#kDownViewer),
 			ptr(this.#kUpViewer),
 		)
-		
-		setInterval(()=>{
+		this.#dim[0] = width;
+		this.#dim[1] = height;
+		let loop = ()=>{
 			if (lib.symbols.should_window_close()) {
 				lib.symbols.destroy_window();
 				process.exit(0);
@@ -320,8 +321,10 @@ export class Window {
 			for (let i = 0; i < pLen; i++) {
 				(requestedFrames.shift())()
 			}
+			setTimeout(loop,0)
+		}
 
-		},0)
+		loop()
 	}
 
 	addEventListener(name,fn){

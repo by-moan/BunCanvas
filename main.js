@@ -42,7 +42,6 @@ window.addEventListener("keydown", (evt)=>{
 })
 
 function loop() {
-    // console.log("aaaa")
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
     ctx.fillStyle = "cornflowerblue"

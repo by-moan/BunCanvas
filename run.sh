@@ -1,17 +1,31 @@
 #!/bin/sh
 
+PLATFORM=""
+EXT=""
+ARCH=""
+
 if [[ "$(uname -o)" = "GNU/Linux"  ]]
 then
-cp ./CPPCanvas/build/BunCanvas.linux.x64.so ./build/Linux
+PLATFORM="linux"
+EXT="so"
 
-cd ./build/Linux
-bun ../../main.js
 elif [[ "$(uname -o)" = "Darwin"  ]]
 then
-cp ./CPPCanvas/build/BunCanvas.darwin.x64.dylib ./build/MacOS
+PLATFORM="darwin"
+EXT="dylib"
 
-cd ./build/MacOS
-bun ../../main.js
 else
 echo "BunCanvas is not compatible with this platform..."
+exit
 fi
+
+if [[ "$(uname -m)" = "x86_64" ]]
+then
+ARCH="x64"
+else
+ARCH="arm64"
+fi
+
+cp ./CPPCanvas/build/BunCanvas.$PLATFORM.$ARCH.$EXT ./build/
+cd ./build/
+bun ../main.js

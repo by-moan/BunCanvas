@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./Assets/logo.png" width="350">
+  <img src="./.github/Assets/logo.png" width="350">
 </p>
 
 # BunCanvas
@@ -9,6 +9,10 @@
 The project relies on [Google Skia](https://github.com/google/skia), being the graphics engine used on google chrome for its use on canvas
 
 This proyect is still in its early infancy, and it core methods from the current canvas implementation are still missing.
+
+<br>
+<br>
+<br>
 
 ## How to build and run (Linux)
 Install depot_tools on your system to build google skia, make sure to add /opt/depot_tools to your PATH. Depending on your system and desktop environment, you will need to adjust the build arguments
@@ -32,7 +36,11 @@ $ python3 tools/git-sync-deps
 $ gn gen out/Release --args='is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=true skia_use_egl=true'
 $ ninja -C out/Release
 ```
-After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `bun ./main.js`
+After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
+
+<br>
+<br>
+<br>
 
 ## How to build and run (MacOS)
 Install depot_tools on your system to build google skia, make sure to add /opt/depot_tools to your PATH. Depending on your system and desktop environment, you will need to adjust the build arguments
@@ -46,30 +54,35 @@ The following packages are needed in your system to build skia. Install them usi
 ```
 libpng glfw
 ```
+Inside CPPCanvas/Thirdparty run the following:
 
 ### For x64 (tested)
-Inside CPPCanvas/Thirdparty run the following:
 ``` sh
 $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ python3 tools/git-sync-deps
-$ gn gen out/Release_OSX_x64 --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "x64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
-$ ninja -C out/Release
+$ gn gen "out/$(uname -o)_$(uname -m)" --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "x64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
+$ ninja -C "out/$(uname -o)_$(uname -m)"
 ```
+<br>
 
-### For Apple Silicon (EXPERIMENTAL)
-Inside CPPCanvas/Thirdparty run the following:
+### For Apple Silicon (EXPERIMENTAL - Untested)
+
 ``` sh
 $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ python3 tools/git-sync-deps
-$ gn gen out/Release_OSX_ARM --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "arm64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
-$ ninja -C out/Release_OSX_ARM
+$ gn gen "out/$(uname -o)_$(uname -m)" --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "arm64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
+$ ninja -C "out/$(uname -o)_$(uname -m)"
 ```
 
-After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `bun ./main.js`
+After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
+
+<br>
+<br>
+<br>
 
 ## License & Third-Party Components
 
@@ -78,6 +91,8 @@ After doing the previous steps, the environment is ready for development. Run `b
 BunCanvas is licensed under the Apache License 2.0.
 
 See the LICENSE file for full details.
+
+
 
 ## Third-Party Dependencies
 

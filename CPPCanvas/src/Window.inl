@@ -85,6 +85,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     }
 }
 
+
 void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if(action == GLFW_PRESS || action == 2) {
         kDownViewer[0] = true;
@@ -117,6 +118,19 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
         //meta key pressed
         kUpViewer[6] = (mods&0b1000)?true:false;
     }
+}
+
+void window_refresh_callback(GLFWwindow* window) {
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    canvas->clear(SK_ColorTRANSPARENT);
+    
+    
+    for (auto element : canvases) {
+        canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+    }
+    ctxWrapper->context->flushAndSubmit();
+    glfwSwapBuffers(window);
 }
 
 extern "C" {
@@ -165,10 +179,10 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window,keyboard_key_callback);
+        glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion
         
         glfwMakeContextCurrent(window);
-        
         auto iface = GrGLMakeNativeInterface();
         
         if (!iface) {
@@ -205,8 +219,6 @@ extern "C" {
             return;
         };
         
-        glfwGetFramebufferSize(window, &width, &height);
-        
         canvas = sWrapper->surface->getCanvas();
         
         clearColor.setColor(SK_ColorTRANSPARENT);
@@ -224,9 +236,6 @@ extern "C" {
         int32_t* kDViewer,
         int32_t* kUViewer
     ){
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        
         if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
         if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
         if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
@@ -235,18 +244,18 @@ extern "C" {
         
         if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
         if (kUViewer != kUpViewer) kUpViewer = kUViewer; 
-        
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
         canvas->clear(SK_ColorTRANSPARENT);
         
         
         for (auto element : canvases) {
-            // if (element->locked == true) continue;
-            // canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
         ctxWrapper->context->flushAndSubmit();
         glfwSwapBuffers(window);
         glfwPollEvents();
+        
     }
     
     

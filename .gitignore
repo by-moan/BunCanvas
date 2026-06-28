@@ -1,6 +1,4 @@
-/build/Linux/*
-/build/Windows/*
-/build/MacOS/*
+/build/*
 /nvg_demo
 /CPPCanvas/Thirdparty/*
 /CPPCanvas/build/*

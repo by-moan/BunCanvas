@@ -311,11 +311,11 @@ BunCanvasRenderingContext2D* validatedContext(void* ptr){
 
 extern "C" {
     
-    void* canvas_create(int w, int h) {
+    WINDOWS_EXPORT void* canvas_create(int w, int h) {
         return new BunCanvas(w,h);
     }
     
-    void canvas_append(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_append(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
         if (obj->magic != BunCanvas::MAGIC)
@@ -325,7 +325,7 @@ extern "C" {
     }
     
     //Sets native internal context so it is returned if is asked again.
-    void* canvas_setup_context(void* canvasObj, const char* ctxType){
+    WINDOWS_EXPORT void* canvas_setup_context(void* canvasObj, const char* ctxType){
         if (!canvasObj) return nullptr;
         BunCanvas* obj = validated(canvasObj);
         
@@ -395,10 +395,10 @@ extern "C" {
         return false;\
     }
     
-    propertyColor(canvas_set_fill_style,obj->fillColor)
-    propertyColor(canvas_set_stroke_style,obj->strokeColor)
+    WINDOWS_EXPORT propertyColor(canvas_set_fill_style,obj->fillColor)
+    WINDOWS_EXPORT propertyColor(canvas_set_stroke_style,obj->strokeColor)
     
-    void canvas_set_stroke_width(void* canvasObj, float w) {
+    WINDOWS_EXPORT void canvas_set_stroke_width(void* canvasObj, float w) {
         if (!canvasObj) return;
         
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
@@ -408,7 +408,7 @@ extern "C" {
         obj->strokeColor.setStrokeWidth(w);
     }
     
-    void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
+    WINDOWS_EXPORT void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -417,7 +417,7 @@ extern "C" {
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
     
-    void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
+    WINDOWS_EXPORT void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
@@ -425,7 +425,7 @@ extern "C" {
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
     }
     
-    void canvas_resize(void* canvasObj, int w, int h) {
+    WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
         if (!canvasObj) return;
         BunCanvas* obj = validated(canvasObj);
         
@@ -434,7 +434,7 @@ extern "C" {
         obj->resize(w,h);
     }
     
-    void canvas_path_begin(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_path_begin(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
 
@@ -443,7 +443,7 @@ extern "C" {
         obj->pathBuilder.reset();
     }
     
-    void canvas_path_move_to(void* canvasObj, int x, int y) {
+    WINDOWS_EXPORT void canvas_path_move_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -451,7 +451,7 @@ extern "C" {
         
         obj->pathBuilder.moveTo(x,y);
     }
-    void canvas_path_line_to(void* canvasObj, int x, int y) {
+    WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -460,7 +460,7 @@ extern "C" {
         obj->pathBuilder.lineTo(x,y);
     }
     
-    void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
+    WINDOWS_EXPORT void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -469,7 +469,7 @@ extern "C" {
         obj->pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
     }
     
-    void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
+    WINDOWS_EXPORT void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -478,7 +478,7 @@ extern "C" {
         obj->pathBuilder.arcTo({x1,y1},{x2,y2},radius);
     }
     
-    void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
+    WINDOWS_EXPORT void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -486,7 +486,7 @@ extern "C" {
 
         obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
-    void canvas_path_stroke(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -496,7 +496,7 @@ extern "C" {
         (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
     }
     
-    void canvas_path_close(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -505,7 +505,7 @@ extern "C" {
         obj->pathBuilder.close();
     }
     
-    void canvas_draw_image(void* canvasObj, void* image, float x,float y,float w,float h) {
+    WINDOWS_EXPORT void canvas_draw_image(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
@@ -513,7 +513,7 @@ extern "C" {
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     
-    bool canvas_set_composite_operation(void* canvasObj, const char* name) {
+    WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
@@ -529,7 +529,7 @@ extern "C" {
         }
     }
 
-    bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
+    WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (obj == nullptr) {
@@ -553,7 +553,7 @@ extern "C" {
         );
     }
 
-    bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
+    WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         

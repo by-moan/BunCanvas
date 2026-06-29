@@ -134,7 +134,7 @@ void window_refresh_callback(GLFWwindow* window) {
 }
 
 extern "C" {
-    void create_window(int w, int h, const char* title,
+    WINDOWS_EXPORT void create_window(int w, int h, const char* title,
         int32_t* wRViewer,
         _Float64_t* mMViewer,
         _Float64_t* mCViewer,
@@ -169,6 +169,11 @@ extern "C" {
         window = glfwCreateWindow(w, h, title, NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
+            const char* desc;
+            int code = glfwGetError(&desc);
+            std::cerr << "GLFW error " << code << ": "
+              << (desc ? desc : "unknown")
+              << "\n";
             glfwTerminate();
             return;
         }
@@ -179,7 +184,7 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window,keyboard_key_callback);
-        glfwSetWindowRefreshCallback(window, window_refresh_callback);
+        // glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion
         
         glfwMakeContextCurrent(window);
@@ -225,9 +230,13 @@ extern "C" {
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
+
+        #ifdef _WIN64
+        glfwSwapInterval(0);
+        #endif
     }
     
-    void update_window(
+    WINDOWS_EXPORT void update_window(
         int32_t* wRViewer,
         _Float64_t* mMViewer,
         _Float64_t* mCViewer,
@@ -255,15 +264,30 @@ extern "C" {
         ctxWrapper->context->flushAndSubmit();
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        // #ifdef _WIN64
+        // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
+        // if (!monitor)
+        //     monitor = glfwGetPrimaryMonitor();
+            
+        // const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         
+        // int refreshRate = mode->refreshRate;
+        // std::cout << refreshRate << "\n";
+        // std::this_thread::sleep_for(
+        //     std::chrono::microseconds(
+        //         static_cast<int>(1000000.0 / refreshRate)
+        //     )
+        // );
+        // #endif
     }
     
     
-    bool should_window_close() {
+    WINDOWS_EXPORT bool should_window_close() {
         return glfwWindowShouldClose(window);
     }
     
-    void destroy_window() {
+    WINDOWS_EXPORT void destroy_window() {
         glfwDestroyWindow(window);
         glfwTerminate();
         // delete ptr;

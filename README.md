@@ -14,7 +14,7 @@ This proyect is still in its early infancy, and it core methods from the current
 <br>
 <br>
 
-## How to build and run (Linux)
+## How to build and run (Linux x64 and aarch64)
 Install depot_tools on your system to build google skia, make sure to add /opt/depot_tools to your PATH. Depending on your system and desktop environment, you will need to adjust the build arguments
 ``` sh
 $ sudo mkdir -p /opt/depot_tools
@@ -37,6 +37,8 @@ $ gn gen out/Release --args='is_official_build=true skia_use_system_expat=false 
 $ ninja -C out/Release
 ```
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
+
+**NOTE: The `./build.sh` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\Release\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
 
 <br>
 <br>
@@ -80,9 +82,58 @@ $ ninja -C "out/$(uname -o)_$(uname -m)"
 
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
 
+**NOTE: The `./build.sh` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\[OS]_[ARCH]\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
+
 <br>
 <br>
 <br>
+
+## How to build and run (Windows)
+Install depot_tools on your system to build google skia, make sure to add C:\depot_tools to your PATH. And install the following tools:
+
+```
+ - Git for Windows
+ - Visual Studio 2022
+   * Desktop development for C++
+   * clang-cl
+ - LLVM
+ - Python 3.13+
+ - Ninja build for windows.
+```
+Run the following:
+``` bat
+mkdir C:\\depot_tools
+git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\\depot_tools
+```
+**Then add C:\\depot_tools to PATH on the Edit the system environment variables**
+<br>
+
+Inside `CPPCanvas\Thirdparty` run the following:
+
+### For Windows x86_64 or AMD64 (Tested)
+``` bat
+mkdir skia_build
+cd skia_build
+fetch skia
+cd skia
+python3 tools/git-sync-deps
+gn gen out/windows_%PROCESSOR_ARCHITECTURE% --args='is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=trueskia_use_egl=true'
+ninja -C out/Release
+```
+
+### For Windows on ARM (aarch64) **UNTESTED!!**
+``` bat
+mkdir skia_build
+cd skia_build
+fetch skia
+cd skia
+python3 tools/git-sync-deps
+gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args='is_official_build=true target_cpu = \"arm64\" skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=trueskia_use_egl=true'
+ninja -C out/Release
+```
+
+**NOTE: The `.\build.bat` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\windows_[ARCHITECTURE_VARIABLE]\skia.lib`, by following the steps accordingly you will get the dev environment ready to go**
+
 
 ## License & Third-Party Components
 
@@ -133,3 +184,4 @@ Each is governed by its respective license. See THIRD_PARTY_LICENSES.txt for ful
 ## Build Notice
 
 Building BunCanvas requires downloading and compiling Skia and other dependencies. These dependencies are governed by their own licenses and are not redistributed as part of this repository.
+

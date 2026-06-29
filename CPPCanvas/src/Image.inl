@@ -21,11 +21,11 @@ ImageWrapper* validated_image(void* imagePtr){
 }
 
 extern "C" {
-    void* image_create() {
+    WINDOWS_EXPORT void* image_create() {
         return new ImageWrapper();
     }
 
-    bool image_set_src(void* imgObj, const char* path){
+    WINDOWS_EXPORT bool image_set_src(void* imgObj, const char* path){
         ImageWrapper* obj = validated_image(imgObj);
         obj->imageValid = false;
         obj->data.reset();

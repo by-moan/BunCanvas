@@ -1,12 +1,27 @@
 #include <iostream>
 #include <vector>
-#include <pthread.h>
+// #include <pthread.h>
+
+#ifdef _WIN64
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#define _Float64_t double
+#include <windows.h>
+#include <thread>
+// This... This is the worst thing humanity would create.... Why??????
+#define WINDOWS_EXPORT __declspec(dllexport)
+#else
+#define WINDOWS_EXPORT
+#endif
+
 
 #ifndef __APPLE__
 #include <GL/gl.h>
 #else
 #define _Float64_t double
 #endif
+
+
 #include <GLFW/glfw3.h>
 
 #include "include/core/SkCanvas.h"

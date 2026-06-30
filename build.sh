@@ -42,7 +42,7 @@ then
     then
     clang++ -dynamiclib -shared -fPIC ./CPPCanvas/API.cpp \
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
-    -std=c++17 \
+    -std=c++23 \
     -stdlib=libc++ \
     -DGL_SILENCE_DEPRECATION \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \
@@ -59,7 +59,7 @@ then
     else
     clang++ -dynamiclib -shared -fPIC ./CPPCanvas/API.cpp \
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
-    -std=c++17 \
+    -std=c++23 \
     -stdlib=libc++ \
     -DGL_SILENCE_DEPRECATION \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \

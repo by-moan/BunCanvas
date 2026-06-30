@@ -142,27 +142,30 @@ void processCommands() {
                 (*cmd.imageWrapperRectCmd.renderingContext)()->drawImageRect(cmd.imageWrapperRectCmd.Image->image.get(),SkRect::MakeXYWH(cmd.imageWrapperRectCmd.x,cmd.imageWrapperRectCmd.y,cmd.imageWrapperRectCmd.w,cmd.imageWrapperRectCmd.h),cmd.imageWrapperRectCmd.renderingContext->sampling,&(cmd.imageWrapperRectCmd.renderingContext->imageColor));
                 break;
             }
-            case CommandType::canvas_get_image_data : {
-                SkImageInfo dstInfo = SkImageInfo::Make(
-                    cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
-                    kRGBA_8888_SkColorType,
-                    kPremul_SkAlphaType
-                );
-                size_t rowBytes = cmd.rectBufferPtrCmd.w * 4;
-            
-                auto sfc = (*cmd.rectBufferPtrCmd.renderingContext)()->getSurface();
-                if (sfc == nullptr) return;
-                auto tmp = sfc->makeTemporaryImage();
-                tmp->readPixels(
-                    dstInfo, 
-                    cmd.rectBufferPtrCmd.ptr, 
-                    rowBytes, 
-                    cmd.rectBufferPtrCmd.x, 
-                    cmd.rectBufferPtrCmd.y, 
-                    SkImage::CachingHint::kDisallow_CachingHint
-                );
-                break;
-            }
+            // case CommandType::canvas_get_image_data : {
+            //     if (cmd.rectBufferPtrCmd.renderingContext->locked == true) break;
+            //     auto sfc = (*cmd.rectBufferPtrCmd.renderingContext)()->getSurface();
+            //     if (sfc == nullptr) break;
+            //     if(!cmd.rectBufferPtrCmd.ptr) break;
+
+            //     SkImageInfo dstInfo = SkImageInfo::Make(
+            //         cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
+            //         kRGBA_8888_SkColorType,
+            //         kPremul_SkAlphaType
+            //     );
+            //     size_t rowBytes = cmd.rectBufferPtrCmd.w * 4;
+                
+            //     auto tmp = sfc->makeTemporaryImage();
+            //     tmp->readPixels(
+            //         dstInfo, 
+            //         cmd.rectBufferPtrCmd.ptr, 
+            //         rowBytes, 
+            //         cmd.rectBufferPtrCmd.x, 
+            //         cmd.rectBufferPtrCmd.y, 
+            //         SkImage::CachingHint::kDisallow_CachingHint
+            //     );
+            //     break;
+            // }
             case CommandType::canvas_put_image_data : {
                 SkImageInfo imageInfo = SkImageInfo::Make(
                     cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
@@ -308,11 +311,10 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
 }
 
 void window_refresh_callback(GLFWwindow* window) {
-    int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     canvas->clear(SK_ColorTRANSPARENT);
     
-    
+    processCommands();
     for (auto element : canvases) {
         canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
     }
@@ -361,7 +363,7 @@ extern "C" {
         // #endif
     }
     
-    void setup_render_thread(){
+    WINDOWS_EXPORT void setup_render_thread(){
         std::cout << "Checkpoint before!\n";
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
@@ -394,7 +396,7 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window,keyboard_key_callback);
-        // glfwSetWindowRefreshCallback(window, window_refresh_callback);
+        glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion
         
         glfwMakeContextCurrent(window);

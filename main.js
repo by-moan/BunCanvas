@@ -41,7 +41,7 @@ window.addEventListener("keydown", (evt)=>{
     console.log("key pressed!", evt.code, evt.key)
 })
 
-function loop() {
+setInterval(()=>{
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
     ctx.fillStyle = "cornflowerblue"
@@ -73,7 +73,5 @@ function loop() {
 
     let data = ctx.getImageData(10,10,100,100);
     ctx.putImageData(data,30,200)
-    requestAnimationFrame(loop)
-}
-
-loop()
+    // requestAnimationFrame(loop)
+},0)

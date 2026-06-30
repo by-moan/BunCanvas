@@ -202,7 +202,7 @@ void processCommands() {
 void window_resize_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
     
-    ctxWrapper->context->flush();
+    ctxWrapper->context->flush_and_submit();
     sWrapper->surface.reset();
     sWrapper->surface = createSurface(
         ctxWrapper->context.get(),

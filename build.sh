@@ -24,6 +24,7 @@ then
     then
     clang++ -shared -fPIC ./CPPCanvas/API.cpp \
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
+    -std=c++23 \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \
     -I./CPPCanvas/Thirdparty/glad/include \
     -lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.x64.so"

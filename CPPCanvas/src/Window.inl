@@ -9,6 +9,9 @@ _Float64_t* mUpViewer = nullptr;
 int32_t* kDownViewer = nullptr;
 int32_t* kUpViewer = nullptr;
 
+
+
+
 void processCommands() {
     std::queue<Command> local;
     
@@ -140,17 +143,17 @@ void processCommands() {
             }
             case CommandType::canvas_put_image_data : {
                 SkImageInfo imageInfo = SkImageInfo::Make(
-                        cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
-                        kRGBA_8888_SkColorType,
-                        kPremul_SkAlphaType
-                    );
+                    cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
+                    kRGBA_8888_SkColorType,
+                    kPremul_SkAlphaType
+                );
                 
-                    SkBitmap bitmap;
+                SkBitmap bitmap;
                 
-                    if(bitmap.installPixels(imageInfo,cmd.rectBufferPtrCmd.ptr,cmd.rectBufferPtrCmd.w *4)){
-                        (*cmd.rectBufferPtrCmd.renderingContext)()->drawImage(bitmap.asImage(),cmd.rectBufferPtrCmd.x,cmd.rectBufferPtrCmd.y);
-                        break;
-                    }
+                if(bitmap.installPixels(imageInfo,cmd.rectBufferPtrCmd.ptr,cmd.rectBufferPtrCmd.w *4)){
+                    (*cmd.rectBufferPtrCmd.renderingContext)()->drawImage(bitmap.asImage(),cmd.rectBufferPtrCmd.x,cmd.rectBufferPtrCmd.y);
+                    break;
+                }
                 break;
             }
             case CommandType::canvas_set_composite_operation : {
@@ -294,6 +297,100 @@ void window_refresh_callback(GLFWwindow* window) {
     ctxWrapper->context->flushAndSubmit();
     glfwSwapBuffers(window);
 }
+std::string wTitle;
+
+void InitRenderThread(){
+    std::cout << "Checkpoint before!\n";
+    if (!glfwInit()) {
+        std::cerr << "Couldn't initialize GLFW...\n";
+        return;
+    };
+    std::cout << "Checkpoint after!\n";
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+    glfwWindowHint(GLFW_STENCIL_BITS, 8);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    
+    window = glfwCreateWindow(width, height, "App", NULL, NULL);
+    if (!window) {
+        std::cerr << "Couldn't initialize Window...\n";
+        const char* desc;
+        int code = glfwGetError(&desc);
+        std::cerr << "GLFW error " << code << ": "
+        << (desc ? desc : "unknown")
+        << "\n";
+        glfwTerminate();
+        return;
+    }
+    
+    #pragma region Events Setup
+    
+    glfwSetWindowSizeCallback(window, window_resize_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetKeyCallback(window,keyboard_key_callback);
+    // glfwSetWindowRefreshCallback(window, window_refresh_callback);
+    #pragma endregion
+    
+    glfwMakeContextCurrent(window);
+    auto iface = GrGLMakeNativeInterface();
+    
+    if (!iface) {
+        std::cout << "Native interface failed\n";
+        return;
+    }
+    
+    std::cout << "Native interface OK\n";
+    
+    ctxWrapper = new ContextWrapper(GrDirectContexts::MakeGL(iface));
+    if (!ctxWrapper->context) {
+        std::cout << "Context was not created!\n";
+        return;
+    };
+    
+    GrGLFramebufferInfo fbInfo;
+    fbInfo.fFBOID = 0;
+    fbInfo.fFormat = GL_RGBA8;
+    
+    
+    glfwGetFramebufferSize(window, &width, &height);
+    
+    currentWidth = width;
+    currentHeight = height;
+    
+    sWrapper = new SurfaceWrapper(createSurface(
+        ctxWrapper->context.get(),
+        width,
+        height
+    ));
+    
+    if (!sWrapper->surface) {
+        std::cout << "Surface was not created!\n";
+        return;
+    };
+    
+    canvas = sWrapper->surface->getCanvas();
+    
+    while (!glfwWindowShouldClose(window))
+    {
+        // int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        canvas->clear(SK_ColorTRANSPARENT);
+        
+        processCommands();
+        for (auto element : canvases) {
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+        }
+        ctxWrapper->context->flushAndSubmit();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title,
@@ -305,10 +402,10 @@ extern "C" {
         int32_t* kDViewer,
         int32_t* kUViewer
     ){
-        if (!glfwInit()) {
-            std::cerr << "Couldn't initialize GLFW...\n";
-            return;
-        };
+        width = w;
+        height = h;
+        
+        wTitle = title;
         wResizeViewer = wRViewer;
         mMoveViewer = mMViewer;
         mClickViewer = mCViewer;
@@ -321,78 +418,15 @@ extern "C" {
         kDownViewer = kDViewer;
         kUpViewer = kUViewer;
         
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-        glfwWindowHint(GLFW_STENCIL_BITS, 8);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(w, h, title, NULL, NULL);
-        if (!window) {
-            std::cerr << "Couldn't initialize Window...\n";
-            const char* desc;
-            int code = glfwGetError(&desc);
-            std::cerr << "GLFW error " << code << ": "
-            << (desc ? desc : "unknown")
-            << "\n";
-            glfwTerminate();
-            return;
-        }
-        
-        #pragma region Events Setup
-        
-        glfwSetWindowSizeCallback(window, window_resize_callback);
-        glfwSetCursorPosCallback(window, cursor_pos_callback);
-        glfwSetMouseButtonCallback(window, mouse_button_callback);
-        glfwSetKeyCallback(window,keyboard_key_callback);
-        // glfwSetWindowRefreshCallback(window, window_refresh_callback);
-        #pragma endregion
-        
-        glfwMakeContextCurrent(window);
-        auto iface = GrGLMakeNativeInterface();
-        
-        if (!iface) {
-            std::cout << "Native interface failed\n";
-            return;
-        }
-        
-        std::cout << "Native interface OK\n";
-        
-        ctxWrapper = new ContextWrapper(GrDirectContexts::MakeGL(iface));
-        if (!ctxWrapper->context) {
-            std::cout << "Context was not created!\n";
-            return;
-        };
-        
-        GrGLFramebufferInfo fbInfo;
-        fbInfo.fFBOID = 0;
-        fbInfo.fFormat = GL_RGBA8;
-        
-        
-        glfwGetFramebufferSize(window, &width, &height);
-        
-        currentWidth = width;
-        currentHeight = height;
-        
-        sWrapper = new SurfaceWrapper(createSurface(
-            ctxWrapper->context.get(),
-            width,
-            height
-        ));
-        
-        if (!sWrapper->surface) {
-            std::cout << "Surface was not created!\n";
-            return;
-        };
-        
-        canvas = sWrapper->surface->getCanvas();
         
         clearColor.setColor(SK_ColorTRANSPARENT);
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
         
+        // renderT = new std::thread(InitRenderThread);
+        std::thread(InitRenderThread).detach();
         #ifdef _WIN64
         glfwSwapInterval(0);
         #endif
@@ -415,17 +449,7 @@ extern "C" {
         
         if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
         if (kUViewer != kUpViewer) kUpViewer = kUViewer; 
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        canvas->clear(SK_ColorTRANSPARENT);
         
-        processCommands();
-        for (auto element : canvases) {
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
-        }
-        ctxWrapper->context->flushAndSubmit();
-        glfwSwapBuffers(window);
-        glfwPollEvents();
         
         // #ifdef _WIN64
         // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
@@ -446,12 +470,11 @@ extern "C" {
     
     
     WINDOWS_EXPORT bool should_window_close() {
-        return glfwWindowShouldClose(window);
+        // return glfwWindowShouldClose(window);
     }
     
     WINDOWS_EXPORT void destroy_window() {
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        // delete renderT;
         // delete ptr;
     }
 }

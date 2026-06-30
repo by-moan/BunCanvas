@@ -116,12 +116,12 @@ export const lib = dlopen(path, {
 	},
 	canvas_get_image_data: {
 		args: ["ptr","int","int","int","int", "ptr"],
-		returns: "bool",
+		returns: "void",
 	},
 	// canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer)
 	canvas_put_image_data: {
 		args: ["ptr","int","int","int","int", "ptr"],
-		returns: "bool",
+		returns: "void",
 	},
 	image_create: {
 		args: [],

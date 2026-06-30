@@ -4,9 +4,11 @@ import { MouseEvent } from "./MouseEvent"
 
 import { ptr, toArrayBuffer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
+import WindowThread from "./Windowthread.txt"
 
 const requestedFrames = []
 const ptrs = new WeakMap();
+let worker;
 
 export class Image {
 	constructor() {
@@ -100,7 +102,7 @@ class CanvasRenderingContext2D {
 	}
 	getImageData(x,y,w,h) {
 		const arr = new Uint8Array(w*h*4);
-        if (lib.symbols.canvas_get_image_data(this.#iptr,x,y,w,h, ptr(arr)) == false) console.error("unsuccessful");
+        lib.symbols.canvas_get_image_data(this.#iptr,x,y,w,h, ptr(arr))
 		return new ImageData(w,h,arr);
 	}
 	putImageData(data,dx,dy,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
@@ -235,6 +237,7 @@ export class Window {
 		this.#dim[1] = height;
 		let loop = ()=>{
 			if (lib.symbols.should_window_close()) {
+				console.log("exit")
 				lib.symbols.destroy_window();
 				process.exit(0);
 				return
@@ -324,6 +327,16 @@ export class Window {
 			setTimeout(loop,0)
 		}
 
+		worker = new Worker(URL.createObjectURL(new Blob([WindowThread], {
+			  type: "application/javascript",
+			}))
+		);
+		worker.onerror = ()=>{
+			console.error("error loading worker!")
+		}
+		worker.onmessage = (msg)=>{
+			console.log(msg)
+		}
 		loop()
 	}
 

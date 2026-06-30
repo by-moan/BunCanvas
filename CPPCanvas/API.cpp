@@ -84,6 +84,7 @@ class ContextWrapper {
 int currentWidth = 0;
 int currentHeight = 0;
 int width, height;
+bool ready = false;
 SkCanvas* canvas = nullptr;
 GLFWwindow* window = nullptr;
 SurfaceWrapper* sWrapper = nullptr;

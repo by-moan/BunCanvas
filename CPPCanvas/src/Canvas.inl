@@ -415,6 +415,7 @@ std::queue<Command> cmdQueue;
 std::mutex queueMutex;
 
 void enqueue(Command cmd) {
+    if (ready == false) return;
     std::lock_guard lock(queueMutex);
     cmdQueue.push(cmd);
 }
@@ -746,28 +747,24 @@ extern "C" {
         // }
     }
 
-    WINDOWS_EXPORT bool canvas_get_image_data(void* renderingContext,int x, int y, int w, int h, uint8_t* out_buffer) {
-        if (!renderingContext) return false;
+    WINDOWS_EXPORT void canvas_get_image_data(void* renderingContext,int x, int y, int w, int h, uint8_t* out_buffer) {
+        // if (ready == false) return false;
+        if (!renderingContext) return;
         BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         if (obj == nullptr) {
-            return false;
+            std::cout << "obj is nullptr\n";
+            return;
         };
 
-        SkImageInfo dstInfo = SkImageInfo::Make(
-            w,h,
-            kRGBA_8888_SkColorType,
-            kPremul_SkAlphaType
-        );
-        size_t rowBytes = w * 4;
+        if (obj == nullptr) return;
 
-        return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
-            dstInfo, 
-            out_buffer, 
-            rowBytes, 
-            x, 
-            y, 
-            SkImage::CachingHint::kDisallow_CachingHint
-        );
+        Command cmd;
+        cmd.type = CommandType::canvas_get_image_data;
+        cmd.rectBufferPtrCmd = {obj,x,y,w,h,out_buffer};
+
+        enqueue(cmd);
+
+        
     }
 
     WINDOWS_EXPORT void canvas_put_image_data(void* renderingContext, int x, int y, int w, int h, uint8_t* buffer){

@@ -1,0 +1,40 @@
+import { dlopen, FFIType } from "bun:ffi";
+
+let extension;
+
+if (process.platform === "win32") {
+	extension = "dll"
+}else if (process.platform === "darwin") {
+	extension = "dylib"
+}else if (process.platform === "linux") {
+	extension = "so"
+}
+
+const path = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+
+const exists = await Bun.file(path).exists();
+
+if(!exists) {
+	console.error(`${path} was not found in the working directory!`)
+	process.exit(-1)
+}
+
+// encoder = new TextEncoder();
+// self.postMessage("Allright");
+
+const lib = dlopen(path, {
+    setup_render_thread: {
+        args: [],
+		returns: "void",
+    }
+});
+
+
+lib.symbols.setup_render_thread();
+
+
+// const cnv = document.createElement("canvas")
+
+// let ctx= cnv.getContext("2d")
+
+// ctx.fillRect

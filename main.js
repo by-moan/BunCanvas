@@ -71,7 +71,7 @@ function loop() {
     // ctx.fillRect(x-25,y-25,50,50)
     ctx.globalCompositeOperation = "source-over"
 
-    let data = ctx.getImageData(10,10,200,200);
+    let data = ctx.getImageData(10,10,100,100);
     ctx.putImageData(data,30,200)
     requestAnimationFrame(loop)
 }

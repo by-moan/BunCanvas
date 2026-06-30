@@ -1,5 +1,7 @@
 SkPaint clearColor;
 
+
+
 std::unordered_map<std::string,SkBlendMode> compositeOperations{{
     {"source-over",SkBlendMode::kSrcOver},
     {"source-in",SkBlendMode::kSrcIn},
@@ -309,6 +311,115 @@ BunCanvasRenderingContext2D* validatedContext(void* ptr){
     return obj;
 }
 
+enum class CommandType {
+    canvas_set_fill_style,
+    canvas_set_stroke_style,
+    canvas_set_stroke_width,
+    canvas_fill_rect,
+    canvas_clear_rect,
+    canvas_resize,
+    canvas_path_begin,
+    canvas_path_move_to,
+    canvas_path_line_to,
+    canvas_path_arc,
+    canvas_path_arc_to,
+    canvas_path_bezier_to,
+    canvas_path_stroke,
+    canvas_path_close,
+    canvas_draw_image,
+    canvas_set_composite_operation,
+    canvas_get_image_data,
+    canvas_put_image_data,
+};
+
+
+
+struct ResizeCmd {
+    BunCanvas* canvas;
+    int w;
+    int h;
+};
+
+struct RectCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+struct RectBufferPtrCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    int x;
+    int y;
+    int w;
+    int h;
+    uint8_t* ptr;
+};
+
+struct StyleCmd {
+    SkPaint* color;
+    const char* c;
+};
+
+struct CompositeOperationCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    const char* operation;
+};
+
+struct StrokeWidthCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    float w;
+};
+
+struct ImageWrapperRectCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    ImageWrapper* Image;
+    float x;
+    float y;
+    float w;
+    float h;
+};
+
+struct RenderContextOnlyCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+};
+
+struct SixFloatCmd {
+    BunCanvasRenderingContext2D* renderingContext;
+    float f1;
+    float f2;
+    float f3;
+    float f4;
+    float f5;
+    float f6;
+};
+
+struct Command {
+    CommandType type;
+
+    union {
+        ResizeCmd resizeCmd;
+        RectCmd rectCmd;
+        StyleCmd styleCmd;
+        StrokeWidthCmd strokeWidthCmd;
+        ImageWrapperRectCmd imageWrapperRectCmd;
+        RenderContextOnlyCmd renderContextOnlyCmd;
+        SixFloatCmd sixFloatCmd;
+        RectBufferPtrCmd rectBufferPtrCmd;
+        CompositeOperationCmd compositeOperationCmd;
+    };
+};
+
+std::queue<Command> cmdQueue;
+std::mutex queueMutex;
+
+void enqueue(Command cmd) {
+    std::lock_guard lock(queueMutex);
+    cmdQueue.push(cmd);
+}
+
+
 extern "C" {
     
     WINDOWS_EXPORT void* canvas_create(int w, int h) {
@@ -338,200 +449,306 @@ extern "C" {
         // obj->ctx = obj->surface->getCanvas();
     }
     
-    #define propertyColor(methodName,target) bool methodName (void* renderingContext, const char* c) {\
-        if (!renderingContext) return false;\
-        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
-        if (obj == nullptr)\
-        return false;\
-        try {\
-            target.setColor(keywordColors.at(c));\
-            return true;\
-        }catch (std::exception){\
-            if (obj == nullptr) return false;\
-            if (c[0] == '#') {\
-                unsigned int rgb = std::strtoul(c+1, nullptr, 16);\
-                target.setColor(SkColor4f{\
-                    ((rgb >> 16) & 0xFF) / 255.f,\
-                    ((rgb >> 8) & 0xFF) / 255.f,\
-                    (rgb & 0xFF) / 255.f,\
-                    1.0f\
-                });\
-                return true;\
-            }\
-            if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {\
-                c+=4;\
-                int r = 0;\
-                while (*c >= '0' && *c <= '9') {\
-                    r = r * 10 + (*c - '0');\
-                    ++c;\
-                }\
-                r = std::max(r,0);\
-                r = std::min(r,255);\
-                while (*c == ' ' || *c == ',') ++c;\
-                int g = 0;\
-                while (*c >= '0' && *c <= '9') {\
-                    g = g * 10 + (*c - '0');\
-                    ++c;\
-                }\
-                g = std::max(g,0);\
-                g = std::min(g,255);\
-                while (*c == ' ' || *c == ',') ++c;\
-                int b = 0;\
-                while (*c >= '0' && *c <= '9') {\
-                    b = b * 10 + (*c - '0');\
-                    ++c;\
-                }\
-                b = std::max(b,0);\
-                b = std::min(b,255);\
-                target.setColor(SkColor4f{\
-                    (float)r / 255.f,\
-                    (float)g / 255.f,\
-                    (float)b / 255.f,\
-                    1.0f\
-                });\
-                return true;\
-            }\
-        }\
-        return false;\
+    // #define propertyColor(methodName,target) bool methodName (void* renderingContext, const char* c) {\
+    //     if (!renderingContext) return false;\
+    //     BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
+        // if (obj == nullptr)\
+        // return false;\
+        // try {\
+        //     target.setColor(keywordColors.at(c));\
+        //     return true;\
+        // }catch (std::exception){\
+        //     if (obj == nullptr) return false;\
+        //     if (c[0] == '#') {\
+        //         unsigned int rgb = std::strtoul(c+1, nullptr, 16);\
+        //         target.setColor(SkColor4f{\
+        //             ((rgb >> 16) & 0xFF) / 255.f,\
+        //             ((rgb >> 8) & 0xFF) / 255.f,\
+        //             (rgb & 0xFF) / 255.f,\
+        //             1.0f\
+        //         });\
+        //         return true;\
+        //     }\
+        //     if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {\
+        //         c+=4;\
+        //         int r = 0;\
+        //         while (*c >= '0' && *c <= '9') {\
+        //             r = r * 10 + (*c - '0');\
+        //             ++c;\
+        //         }\
+        //         r = std::max(r,0);\
+        //         r = std::min(r,255);\
+        //         while (*c == ' ' || *c == ',') ++c;\
+        //         int g = 0;\
+        //         while (*c >= '0' && *c <= '9') {\
+        //             g = g * 10 + (*c - '0');\
+        //             ++c;\
+        //         }\
+        //         g = std::max(g,0);\
+        //         g = std::min(g,255);\
+        //         while (*c == ' ' || *c == ',') ++c;\
+        //         int b = 0;\
+        //         while (*c >= '0' && *c <= '9') {\
+        //             b = b * 10 + (*c - '0');\
+        //             ++c;\
+        //         }\
+        //         b = std::max(b,0);\
+        //         b = std::min(b,255);\
+        //         target.setColor(SkColor4f{\
+        //             (float)r / 255.f,\
+        //             (float)g / 255.f,\
+        //             (float)b / 255.f,\
+        //             1.0f\
+        //         });\
+        //         return true;\
+        //     }\
+        // }\
+        // return false;\
     }
     
-    WINDOWS_EXPORT propertyColor(canvas_set_fill_style,obj->fillColor)
-    WINDOWS_EXPORT propertyColor(canvas_set_stroke_style,obj->strokeColor)
+    // WINDOWS_EXPORT propertyColor(canvas_set_fill_style,obj->fillColor)
+    // WINDOWS_EXPORT propertyColor(canvas_set_stroke_style,obj->strokeColor)
     
-    WINDOWS_EXPORT void canvas_set_stroke_width(void* canvasObj, float w) {
-        if (!canvasObj) return;
+    WINDOWS_EXPORT void canvas_set_fill_style(void* renderingContext, const char* c) {
+        if (!renderingContext) return;
         
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
+        
+        if (obj == nullptr) return;
+
+        Command cmd;
+        cmd.type = CommandType::canvas_set_fill_style;
+        cmd.styleCmd = {std::addressof(obj->fillColor),c};
+        
+        enqueue(cmd);
+    }
+
+    WINDOWS_EXPORT void canvas_set_stroke_style(void* renderingContext, const char* c) {
+        if (!renderingContext) return;
+        
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
+        
+        if (obj == nullptr) return;
+
+        Command cmd;
+        cmd.type = CommandType::canvas_set_fill_style;
+        cmd.styleCmd = {std::addressof(obj->strokeColor),c};
+        
+        enqueue(cmd);
+    }
+
+    WINDOWS_EXPORT void canvas_set_stroke_width(void* renderingContext, float w) {
+        if (!renderingContext) return;
+        
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
         
-        obj->strokeColor.setStrokeWidth(w);
+        Command cmd;
+        cmd.type = CommandType::canvas_set_stroke_width;
+        cmd.strokeWidthCmd = {obj, w};
+        
+        enqueue(cmd);
+
+        // obj->strokeColor.setStrokeWidth(w);
     }
     
-    WINDOWS_EXPORT void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_fill_rect(void* renderingContext, int x, int y, int w, int h) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
+
+        Command cmd;
+        cmd.type = CommandType::canvas_fill_rect;
+        cmd.rectCmd = {obj,x,y,w,h};
         
-        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
+        enqueue(cmd);
+        // (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
     
-    WINDOWS_EXPORT void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
-        if (!canvasObj) return;
+    WINDOWS_EXPORT void canvas_clear_rect(void* renderingContext, int x, int y, int w, int h) {
+        if (!renderingContext) return;
         
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         if (!obj) return;
-        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
+
+        Command cmd;
+        cmd.type = CommandType::canvas_clear_rect;
+        cmd.rectCmd = {obj,x,y,w,h};
+        
+        enqueue(cmd);
+        // (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
     }
     
-    WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
-        if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+    WINDOWS_EXPORT void canvas_resize(void* renderingContext, int w, int h) {
+        if (!renderingContext) return;
+        BunCanvas* obj = validated(renderingContext);
         
         if (obj == nullptr) return;
 
-        obj->resize(w,h);
+        Command cmd;
+        cmd.type = CommandType::canvas_resize;
+        cmd.resizeCmd = {obj,w,h};
+        
+        enqueue(cmd);
+        // obj->resize(w,h);
     }
     
-    WINDOWS_EXPORT void canvas_path_begin(void* canvasObj) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_path_begin(void* renderingContext) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
 
         
         if (obj == nullptr) return;
-        obj->pathBuilder.reset();
+        Command cmd;
+        cmd.type = CommandType::canvas_path_begin;
+        cmd.renderContextOnlyCmd = {obj};
+        
+        enqueue(cmd);
+        // obj->pathBuilder.reset();
     }
     
-    WINDOWS_EXPORT void canvas_path_move_to(void* canvasObj, int x, int y) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_path_move_to(void* renderingContext, int x, int y) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
+        
+        if (obj == nullptr) return;
+        Command cmd;
+        cmd.type = CommandType::canvas_path_move_to;
+        cmd.rectCmd = {obj,x,y};
+        
+        enqueue(cmd);
+        // obj->pathBuilder.moveTo(x,y);
+    }
+
+    WINDOWS_EXPORT void canvas_path_line_to(void* renderingContext, int x, int y) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
+        
+        if (obj == nullptr) return;
+        Command cmd;
+        cmd.type = CommandType::canvas_path_line_to;
+        cmd.rectCmd = {obj,x,y};
+
+        enqueue(cmd);
+        // obj->pathBuilder.lineTo(x,y);
+    }
+    
+    WINDOWS_EXPORT void canvas_path_arc(void* renderingContext, float x1, float y1, float radius, float startAngle, float sweepangle) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
         
-        obj->pathBuilder.moveTo(x,y);
+        Command cmd;
+        cmd.type = CommandType::canvas_path_arc;
+        cmd.sixFloatCmd = {obj,x1,y1,radius,startAngle,sweepangle};
+
+        enqueue(cmd);
+
+        // obj->pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
     }
-    WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    
+    WINDOWS_EXPORT void canvas_path_arc_to(void* renderingContext, float x1, float y1, float x2, float y2, float radius) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
         
-        obj->pathBuilder.lineTo(x,y);
+        Command cmd;
+        cmd.type = CommandType::canvas_path_arc_to;
+        cmd.sixFloatCmd = {obj,x1,y1,x2,y2,radius};
+
+        enqueue(cmd);
+
+
+        // obj->pathBuilder.arcTo({x1,y1},{x2,y2},radius);
     }
     
-    WINDOWS_EXPORT void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
-        
-        if (obj == nullptr) return;
-        
-        obj->pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
-    }
-    
-    WINDOWS_EXPORT void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
-        
-        if (obj == nullptr) return;
-        
-        obj->pathBuilder.arcTo({x1,y1},{x2,y2},radius);
-    }
-    
-    WINDOWS_EXPORT void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_path_bezier_to(void* renderingContext, float x1, float y1, float x2, float y2, float x3, float y3) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
 
-        obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
+        Command cmd;
+        cmd.type = CommandType::canvas_path_bezier_to;
+        cmd.sixFloatCmd = {obj,x1,y1,x2,y2,x3,y3};
+
+        enqueue(cmd);
+
+        // obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
-    WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    
+    WINDOWS_EXPORT void canvas_path_stroke(void* renderingContext) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) {
             return;
         };
-        (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
+        Command cmd;
+        cmd.type = CommandType::canvas_path_stroke;
+        cmd.renderContextOnlyCmd = {obj};
+
+        enqueue(cmd);
+        // (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
     }
     
-    WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_path_close(void* renderingContext) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
         if (obj == nullptr) return;
         
-        obj->pathBuilder.close();
+        Command cmd;
+        cmd.type = CommandType::canvas_path_close;
+        cmd.renderContextOnlyCmd = {obj};
+
+        enqueue(cmd);
+
+        // obj->pathBuilder.close();
+
     }
     
-    WINDOWS_EXPORT void canvas_draw_image(void* canvasObj, void* image, float x,float y,float w,float h) {
-        if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_draw_image(void* renderingContext, void* image, float x,float y,float w,float h) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
-        (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+
+        Command cmd;
+        cmd.type = CommandType::canvas_draw_image;
+        cmd.imageWrapperRectCmd = {obj,img,x,y,w,h};
+
+        enqueue(cmd);
+        // (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     
-    WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {
-        if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_set_composite_operation(void* renderingContext, const char* name) {
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
-        if (obj == nullptr) return false;
-        
-        try {
-            obj->fillColor.setBlendMode(compositeOperations.at(name));
-            obj->strokeColor.setBlendMode(compositeOperations.at(name));
-            obj->imageColor.setBlendMode(compositeOperations.at(name));
-            return true;
-        }catch(std::exception err) {
-            return false;
-        }
+        if (obj == nullptr) return;
+        Command cmd;
+        cmd.type = CommandType::canvas_set_composite_operation;
+        cmd.compositeOperationCmd = {obj,name};
+
+        enqueue(cmd);
+        // try {
+        //     obj->fillColor.setBlendMode(compositeOperations.at(name));
+        //     obj->strokeColor.setBlendMode(compositeOperations.at(name));
+        //     obj->imageColor.setBlendMode(compositeOperations.at(name));
+        //     return true;
+        // }catch(std::exception err) {
+        //     return false;
+        // }
     }
 
-    WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
-        if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT bool canvas_get_image_data(void* renderingContext,int x, int y, int w, int h, uint8_t* out_buffer) {
+        if (!renderingContext) return false;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         if (obj == nullptr) {
             return false;
         };
@@ -553,24 +770,30 @@ extern "C" {
         );
     }
 
-    WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
-        if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    WINDOWS_EXPORT void canvas_put_image_data(void* renderingContext, int x, int y, int w, int h, uint8_t* buffer){
+        if (!renderingContext) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
         
-        if (obj == nullptr) return false;
-        SkImageInfo imageInfo = SkImageInfo::Make(
-            w,h,
-            kRGBA_8888_SkColorType,
-            kPremul_SkAlphaType
-        );
+        if (obj == nullptr) return;
 
-        SkBitmap bitmap;
+        Command cmd;
+        cmd.type = CommandType::canvas_put_image_data;
+        cmd.rectBufferPtrCmd = {obj,x,y,w,h,buffer};
 
-        if(bitmap.installPixels(imageInfo,buffer,w *4)){
-            (*obj)()->drawImage(bitmap.asImage(),x,y);
-            // std::cout << "Success " << x << " " << y << " " << w << " " << h << " " << "\n";
-            return true;
-        }
-        return false;
+        enqueue(cmd);
+
+        // SkImageInfo imageInfo = SkImageInfo::Make(
+        //     w,h,
+        //     kRGBA_8888_SkColorType,
+        //     kPremul_SkAlphaType
+        // );
+
+        // SkBitmap bitmap;
+
+        // if(bitmap.installPixels(imageInfo,buffer,w *4)){
+        //     (*obj)()->drawImage(bitmap.asImage(),x,y);
+        //     return true;
+        // }
+        // return false;
     }
 }

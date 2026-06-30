@@ -9,9 +9,171 @@ _Float64_t* mUpViewer = nullptr;
 int32_t* kDownViewer = nullptr;
 int32_t* kUpViewer = nullptr;
 
+void processCommands() {
+    std::queue<Command> local;
+    
+    {
+        std::lock_guard lock(queueMutex);
+        std::swap(local, cmdQueue);
+    }
+    
+    while (!local.empty()) {
+        Command& cmd = local.front();
+        
+        switch (cmd.type) {
+            case CommandType::canvas_set_fill_style : {
+                try {
+                    cmd.styleCmd.color->setColor(keywordColors.at(cmd.styleCmd.c));
+                    break;
+                }catch (std::exception){
+                    const char* c = cmd.styleCmd.c;
+                    if (c[0] == '#') {
+                        unsigned int rgb = std::strtoul(c+1, nullptr, 16);
+                        cmd.styleCmd.color->setColor(SkColor4f{
+                            ((rgb >> 16) & 0xFF) / 255.f,
+                            ((rgb >> 8) & 0xFF) / 255.f,
+                            (rgb & 0xFF) / 255.f,
+                            1.0f
+                        });
+                        break;
+                    }\
+                    if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {
+                        c+=4;
+                        int r = 0;
+                        while (*c >= '0' && *c <= '9') {
+                            r = r * 10 + (*c - '0');
+                            ++c;
+                        }
+                        r = std::max(r,0);
+                        r = std::min(r,255);
+                        while (*c == ' ' || *c == ',') ++c;
+                        int g = 0;
+                        while (*c >= '0' && *c <= '9') {
+                            g = g * 10 + (*c - '0');
+                            ++c;
+                        }
+                        g = std::max(g,0);
+                        g = std::min(g,255);
+                        while (*c == ' ' || *c == ',') ++c;
+                        int b = 0;
+                        while (*c >= '0' && *c <= '9') {
+                            b = b * 10 + (*c - '0');
+                            ++c;
+                        }
+                        b = std::max(b,0);
+                        b = std::min(b,255);
+                        cmd.styleCmd.color->setColor(SkColor4f{
+                            (float)r / 255.f,
+                            (float)g / 255.f,
+                            (float)b / 255.f,
+                            1.0f
+                        });
+                        break;
+                    }
+                }
+                break;
+            }
+            case CommandType::canvas_set_stroke_width : {
+                cmd.strokeWidthCmd.renderingContext->strokeColor.setStrokeWidth(cmd.strokeWidthCmd.w);
+                break;
+            }
+            case CommandType::canvas_fill_rect : {
+                (*cmd.rectCmd.renderingContext)()->drawRect(
+                    SkRect::MakeXYWH(
+                        cmd.rectCmd.x,
+                        cmd.rectCmd.y,
+                        cmd.rectCmd.w,
+                        cmd.rectCmd.h
+                    ),
+                    cmd.rectCmd.renderingContext->fillColor
+                );
+                break;
+            }
+            
+            case CommandType::canvas_clear_rect : {
+                (*cmd.rectCmd.renderingContext)()->drawRect(
+                    SkRect::MakeXYWH(
+                        cmd.rectCmd.x,
+                        cmd.rectCmd.y,
+                        cmd.rectCmd.w,
+                        cmd.rectCmd.h
+                    ),
+                    clearColor
+                );
+                break;
+            }
+            case CommandType::canvas_resize : {
+                cmd.resizeCmd.canvas->resize(cmd.resizeCmd.w,cmd.resizeCmd.h);
+                break;
+            }
+            case CommandType::canvas_path_begin : {
+                cmd.renderContextOnlyCmd.renderingContext->pathBuilder.reset();
+                break;
+            }
+            case CommandType::canvas_path_move_to : {
+                cmd.rectCmd.renderingContext->pathBuilder.moveTo(cmd.rectCmd.x,cmd.rectCmd.y);
+                break;
+            }
+            case CommandType::canvas_path_line_to : {
+                cmd.rectCmd.renderingContext->pathBuilder.lineTo(cmd.rectCmd.x,cmd.rectCmd.y);
+                break;
+            }
+            case CommandType::canvas_path_arc : {
+                cmd.sixFloatCmd.renderingContext->pathBuilder.addArc(SkRect::MakeXYWH(cmd.sixFloatCmd.f1 - cmd.sixFloatCmd.f3,cmd.sixFloatCmd.f2 - cmd.sixFloatCmd.f3,cmd.sixFloatCmd.f3 * 2,cmd.sixFloatCmd.f3 * 2), cmd.sixFloatCmd.f4*57.29577958f, cmd.sixFloatCmd.f5*57.29577958f);
+                break;
+            }
+            case CommandType::canvas_path_arc_to : {
+                cmd.sixFloatCmd.renderingContext->pathBuilder.arcTo({cmd.sixFloatCmd.f1,cmd.sixFloatCmd.f2},{cmd.sixFloatCmd.f3,cmd.sixFloatCmd.f4},cmd.sixFloatCmd.f5);
+                break;
+            }
+            case CommandType::canvas_path_bezier_to : {
+                cmd.sixFloatCmd.renderingContext->pathBuilder.cubicTo(cmd.sixFloatCmd.f1,cmd.sixFloatCmd.f2,cmd.sixFloatCmd.f3,cmd.sixFloatCmd.f4,cmd.sixFloatCmd.f5,cmd.sixFloatCmd.f6);
+                break;
+            }
+            case CommandType::canvas_path_stroke : {
+                (*cmd.renderContextOnlyCmd.renderingContext)()->drawPath(cmd.renderContextOnlyCmd.renderingContext->pathBuilder.snapshot(),cmd.renderContextOnlyCmd.renderingContext->strokeColor);
+                break;
+            }
+            case CommandType::canvas_draw_image : {
+                (*cmd.imageWrapperRectCmd.renderingContext)()->drawImageRect(cmd.imageWrapperRectCmd.Image->image.get(),SkRect::MakeXYWH(cmd.imageWrapperRectCmd.x,cmd.imageWrapperRectCmd.y,cmd.imageWrapperRectCmd.w,cmd.imageWrapperRectCmd.h),cmd.imageWrapperRectCmd.renderingContext->sampling,&(cmd.imageWrapperRectCmd.renderingContext->imageColor));
+                break;
+            }
+            case CommandType::canvas_put_image_data : {
+                SkImageInfo imageInfo = SkImageInfo::Make(
+                        cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
+                        kRGBA_8888_SkColorType,
+                        kPremul_SkAlphaType
+                    );
+                
+                    SkBitmap bitmap;
+                
+                    if(bitmap.installPixels(imageInfo,cmd.rectBufferPtrCmd.ptr,cmd.rectBufferPtrCmd.w *4)){
+                        (*cmd.rectBufferPtrCmd.renderingContext)()->drawImage(bitmap.asImage(),cmd.rectBufferPtrCmd.x,cmd.rectBufferPtrCmd.y);
+                        break;
+                    }
+                break;
+            }
+            case CommandType::canvas_set_composite_operation : {
+                try {
+                    cmd.compositeOperationCmd.renderingContext->fillColor.setBlendMode(compositeOperations.at(cmd.compositeOperationCmd.operation));
+                    cmd.compositeOperationCmd.renderingContext->strokeColor.setBlendMode(compositeOperations.at(cmd.compositeOperationCmd.operation));
+                    cmd.compositeOperationCmd.renderingContext->imageColor.setBlendMode(compositeOperations.at(cmd.compositeOperationCmd.operation));
+                    break;
+                }catch(std::exception err) {
+                    break;
+                }
+                break;
+            }
+        }
+        
+        local.pop();
+    }
+}
+
+
 void window_resize_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
-            
+    
     ctxWrapper->context->flush();
     sWrapper->surface.reset();
     sWrapper->surface = createSurface(
@@ -152,7 +314,7 @@ extern "C" {
         mClickViewer = mCViewer;
         mDownViewer = mDViewer;
         mUpViewer = mUViewer;
-
+        
         // wResizeViewer[0] = w;
         // wResizeViewer[1] = h;
         
@@ -172,8 +334,8 @@ extern "C" {
             const char* desc;
             int code = glfwGetError(&desc);
             std::cerr << "GLFW error " << code << ": "
-              << (desc ? desc : "unknown")
-              << "\n";
+            << (desc ? desc : "unknown")
+            << "\n";
             glfwTerminate();
             return;
         }
@@ -230,7 +392,7 @@ extern "C" {
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
-
+        
         #ifdef _WIN64
         glfwSwapInterval(0);
         #endif
@@ -257,19 +419,19 @@ extern "C" {
         glfwGetFramebufferSize(window, &width, &height);
         canvas->clear(SK_ColorTRANSPARENT);
         
-        
+        processCommands();
         for (auto element : canvases) {
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
         ctxWrapper->context->flushAndSubmit();
         glfwSwapBuffers(window);
         glfwPollEvents();
-
+        
         // #ifdef _WIN64
         // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
         // if (!monitor)
         //     monitor = glfwGetPrimaryMonitor();
-            
+        
         // const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         
         // int refreshRate = mode->refreshRate;

@@ -1,5 +1,8 @@
 #include <iostream>
 #include <vector>
+#include <queue>
+#include <mutex>
+#include <thread>
 // #include <pthread.h>
 
 #ifdef _WIN64
@@ -7,7 +10,6 @@
 #define NOMINMAX
 #define _Float64_t double
 #include <windows.h>
-#include <thread>
 // This... This is the worst thing humanity would create.... Why??????
 #define WINDOWS_EXPORT __declspec(dllexport)
 #else
@@ -40,6 +42,7 @@
 
 #include "include/gpu/ganesh/gl/GrGLBackendSurface.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
+
 sk_sp<SkSurface> createSurface(
     GrDirectContext* context,
     int width,

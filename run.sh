@@ -28,4 +28,6 @@ fi
 
 cp ./CPPCanvas/build/BunCanvas.$PLATFORM.$ARCH.$EXT ./build/
 cd ./build/
+# gdb -ex "run ../main.js" bun
+
 bun ../main.js

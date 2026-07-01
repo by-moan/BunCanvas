@@ -1,4 +1,5 @@
 SkPaint clearColor;
+std::recursive_mutex g_canvas_mutex;
 
 
 
@@ -240,6 +241,8 @@ class BunCanvasRenderingContext2D {
     }
 };
 
+
+
 class BunCanvas {
     BunCanvasRenderingContext2D* rendering2D = nullptr;
     std::string ctxType;
@@ -276,6 +279,8 @@ class BunCanvas {
     }
     
     void resize(int w, int h) {
+        // std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
+        std::cout << "resize called!\n";
         surface.reset();
         if (ctxWrapper == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
@@ -287,6 +292,7 @@ class BunCanvas {
         // );
         // surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         if (ctxType == "2d") rendering2D->reset(surface);
+        // lock.~lock_guard();
     }
 };
 
@@ -412,6 +418,18 @@ struct Command {
         CompositeOperationCmd compositeOperationCmd;
     };
 };
+
+struct ReadRequest {
+    BunCanvasRenderingContext2D* context;
+    int x, y, w, h;
+    uint8_t* buffer;
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+};
+
+std::queue<ReadRequest*> readQueue;
+std::mutex readQueueMutex;
 
 std::queue<Command> cmdQueue;
 std::mutex queueMutex;
@@ -585,6 +603,8 @@ extern "C" {
     }
     
     WINDOWS_EXPORT void canvas_resize(void* renderingContext, int w, int h) {
+        // std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
+        
         if (!renderingContext) return;
         BunCanvas* obj = validated(renderingContext);
         
@@ -749,37 +769,66 @@ extern "C" {
         // }
     }
     
-    WINDOWS_EXPORT void canvas_get_image_data(void* renderingContext,int x, int y, int w, int h, uint8_t* out_buffer) {
-        // if (ready == false) return false;
-        if (!renderingContext) return;
+    // WINDOWS_EXPORT void canvas_get_image_data(void* renderingContext,int x, int y, int w, int h, uint8_t* out_buffer) {
+    //     // std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
+    
+    //     if (ready == false) return;
+    //     if (!renderingContext) return;
+    //     BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
+    //     if (obj == nullptr) {
+    //         std::cout << "obj is nullptr\n";
+    //         return;
+    //     };
+    
+    //     if (obj->locked == true) return;
+    //     auto sfc = (*obj)()->getSurface();
+    //     if (sfc == nullptr) return;
+    //     if(!out_buffer) return;
+    
+    //     SkImageInfo dstInfo = SkImageInfo::Make(
+    //         w,h,
+    //         kRGBA_8888_SkColorType,
+    //         kPremul_SkAlphaType
+    //     );
+    //     size_t rowBytes = w * 4;
+    
+    //     auto tmp = sfc->makeTemporaryImage();
+    //     // std::cout << tmp.get() << " :" << std::addressof(out_buffer) << " " << x << " " << y << ":\n";
+    //     if (!tmp) {
+    //         std::cout << "returned\n";
+    //         return;
+    //     };
+    //     tmp->readPixels(
+    //         dstInfo, 
+    //         out_buffer, 
+    //         rowBytes, 
+    //         x, 
+    //         y, 
+    //         SkImage::CachingHint::kDisallow_CachingHint
+    //     );
+    //     return;
+    // }
+    
+    WINDOWS_EXPORT void canvas_get_image_data(void* renderingContext, int x, int y, int w, int h, uint8_t* out_buffer) {
+        if (!renderingContext || !out_buffer) return;
         BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);
-        if (obj == nullptr) {
-            std::cout << "obj is nullptr\n";
-            return;
-        };
+        if (!obj) return;
         
-        if (obj->locked == true) return;
-        auto sfc = (*obj)()->getSurface();
-        if (sfc == nullptr) return;
-        if(!out_buffer) return;
+        ReadRequest req;
+        req.context = obj;
+        req.x = x; req.y = y; req.w = w; req.h = h;
+        req.buffer = out_buffer;
+        req.completed = false;
         
-        SkImageInfo dstInfo = SkImageInfo::Make(
-            w,h,
-            kRGBA_8888_SkColorType,
-            kPremul_SkAlphaType
-        );
-        size_t rowBytes = w * 4;
+        {
+            std::lock_guard<std::mutex> lock(readQueueMutex);
+            readQueue.push(&req);
+    }
         
-        auto tmp = sfc->makeTemporaryImage();
-        tmp->readPixels(
-            dstInfo, 
-            out_buffer, 
-            rowBytes, 
-            x, 
-            y, 
-            SkImage::CachingHint::kDisallow_CachingHint
-        );
-        return;
+        std::unique_lock<std::mutex> waitLock(req.mtx);
+        std::cout << "FFI: Requesting data...\n";
+        req.cv.wait(waitLock, [&] { return req.completed; });
+        std::cout << "FFI: Data received!\n";
     }
     
     WINDOWS_EXPORT void canvas_put_image_data(void* renderingContext, int x, int y, int w, int h, uint8_t* buffer){
@@ -790,7 +839,10 @@ extern "C" {
         
         Command cmd;
         cmd.type = CommandType::canvas_put_image_data;
-        cmd.rectBufferPtrCmd = {obj,x,y,w,h,buffer};
+        size_t size = w*h*4;
+        uint8_t* ptr = new uint8_t[size];
+        memcpy(ptr,buffer,size);
+        cmd.rectBufferPtrCmd = {obj,x,y,w,h,ptr};
         
         enqueue(cmd);
         

@@ -4,6 +4,8 @@ import { MouseEvent } from "./MouseEvent"
 
 import { ptr, toArrayBuffer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
+
+//Like this so it is used on a blob and it is resolved within the project and not the working directory
 import WindowThread from "./Windowthread.txt"
 
 const requestedFrames = []
@@ -107,7 +109,8 @@ class CanvasRenderingContext2D {
 	}
 	putImageData(data,dx,dy,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
 		if (!(data instanceof ImageData)) throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")
-		lib.symbols.canvas_put_image_data(this.#iptr,dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
+		// const buf = new Uint8Array(data.data); 
+		lib.symbols.canvas_put_image_data(this.#iptr,dx,dy,dirtyWidth,dirtyHeight, ptr(new Uint8Array(data.data)));
 	}
     // clearRect(x,y,w,h){
     //     lib.symbols.canvas_clear_rect(x,y,w,h)

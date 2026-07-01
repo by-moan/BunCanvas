@@ -2,7 +2,8 @@
 #include <vector>
 #include <queue>
 #include <mutex>
-#include <thread>
+// #include <thread>
+#include <condition_variable>
 // #include <pthread.h>
 
 #ifdef _WIN64
@@ -90,6 +91,6 @@ GLFWwindow* window = nullptr;
 SurfaceWrapper* sWrapper = nullptr;
 ContextWrapper* ctxWrapper = nullptr;
 
-#include "src/Image.inl"
-#include "src/Canvas.inl"
-#include "src/Window.inl"
+#include "src/Image.cpp"
+#include "src/Canvas.cpp"
+#include "src/Window.cpp"

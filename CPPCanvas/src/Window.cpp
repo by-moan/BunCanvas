@@ -10,8 +10,6 @@ int32_t* kDownViewer = nullptr;
 int32_t* kUpViewer = nullptr;
 
 
-
-
 void processCommands() {
     if(ready == false) return;
     std::queue<Command> local;
@@ -20,8 +18,11 @@ void processCommands() {
         std::lock_guard lock(queueMutex);
         std::swap(local, cmdQueue);
     }
+    std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
+    
     
     while (!local.empty()) {
+        std::cout << "Render: Drawing Commands...\n";
         Command& cmd = local.front();
         
         switch (cmd.type) {
@@ -147,14 +148,14 @@ void processCommands() {
             //     auto sfc = (*cmd.rectBufferPtrCmd.renderingContext)()->getSurface();
             //     if (sfc == nullptr) break;
             //     if(!cmd.rectBufferPtrCmd.ptr) break;
-
+            
             //     SkImageInfo dstInfo = SkImageInfo::Make(
             //         cmd.rectBufferPtrCmd.w,cmd.rectBufferPtrCmd.h,
             //         kRGBA_8888_SkColorType,
             //         kPremul_SkAlphaType
             //     );
             //     size_t rowBytes = cmd.rectBufferPtrCmd.w * 4;
-                
+            
             //     auto tmp = sfc->makeTemporaryImage();
             //     tmp->readPixels(
             //         dstInfo, 
@@ -174,11 +175,23 @@ void processCommands() {
                 );
                 
                 SkBitmap bitmap;
+                bitmap.allocPixels(imageInfo);
                 
-                if(bitmap.installPixels(imageInfo,cmd.rectBufferPtrCmd.ptr,cmd.rectBufferPtrCmd.w *4)){
-                    (*cmd.rectBufferPtrCmd.renderingContext)()->drawImage(bitmap.asImage(),cmd.rectBufferPtrCmd.x,cmd.rectBufferPtrCmd.y);
-                    break;
-                }
+                memcpy(
+                    bitmap.getPixels(),
+                    cmd.rectBufferPtrCmd.ptr,
+                    cmd.rectBufferPtrCmd.w * cmd.rectBufferPtrCmd.h * 4
+                );
+                
+                auto img = bitmap.asImage();
+                
+                (*cmd.rectBufferPtrCmd.renderingContext)()->drawImage(
+                    img,
+                    cmd.rectBufferPtrCmd.x,
+                    cmd.rectBufferPtrCmd.y
+                );
+                
+                delete[] cmd.rectBufferPtrCmd.ptr;
                 break;
             }
             case CommandType::canvas_set_composite_operation : {
@@ -200,9 +213,10 @@ void processCommands() {
 
 
 void window_resize_callback(GLFWwindow* window, int width, int height) {
+    std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
     glViewport(0, 0, width, height);
     
-    ctxWrapper->context->flush_and_submit();
+    ctxWrapper->context->flushAndSubmit();
     sWrapper->surface.reset();
     sWrapper->surface = createSurface(
         ctxWrapper->context.get(),
@@ -441,15 +455,50 @@ extern "C" {
         ready = true;
         while (!glfwWindowShouldClose(window))
         {
-            // int width, height;
             glfwGetFramebufferSize(window, &width, &height);
-            canvas->clear(SK_ColorTRANSPARENT);
             
-            processCommands();
-            for (auto element : canvases) {
-                canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+            {
+                // LOCK EVERYTHING THAT TOUCHES SKIA/GPU
+                std::lock_guard<std::recursive_mutex> lock(g_canvas_mutex);
+                
+                canvas->clear(SK_ColorTRANSPARENT);
+                
+                processCommands(); // This now also locks, which is fine because it's a recursive_mutex
+                {
+                    std::lock_guard<std::mutex> lock(readQueueMutex);
+                    while (!readQueue.empty()) {
+                        std::cout << "Render: Processing Read Queue...\n";
+                        ReadRequest* req = readQueue.front();
+                        readQueue.pop();
+                        
+                        // Now we are on the Render Thread, so we have the GL Context!
+                        std::lock_guard<std::recursive_mutex> canvasLock(g_canvas_mutex);
+                        
+                        auto sfc = (*req->context)()->getSurface();
+                        if (sfc) {
+                            SkImageInfo dstInfo = SkImageInfo::Make(req->w, req->h, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
+                            auto tmp = sfc->makeTemporaryImage();
+                            if (tmp) {
+                                tmp->readPixels(dstInfo, req->buffer, req->w * 4, req->x, req->y, SkImage::CachingHint::kDisallow_CachingHint);
+                            }
+                        }
+                        
+                        // Signal the FFI thread that data is ready
+                        {
+                            std::lock_guard<std::mutex> reqLock(req->mtx);
+                            req->completed = true;
+                        }
+                        req->cv.notify_one();
+                    }
+                }
+                
+                for (auto element : canvases) {
+                    canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+                }
+                
+                ctxWrapper->context->flushAndSubmit();
             }
-            ctxWrapper->context->flushAndSubmit();
+            
             glfwSwapBuffers(window);
             glfwPollEvents();
         }

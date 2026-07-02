@@ -1,5 +1,7 @@
 #include <iostream>
 #include <vector>
+#include <mutex>
+
 // #include <pthread.h>
 
 #ifdef _WIN64
@@ -85,6 +87,8 @@ SkCanvas* canvas = nullptr;
 GLFWwindow* window = nullptr;
 SurfaceWrapper* sWrapper = nullptr;
 ContextWrapper* ctxWrapper = nullptr;
+
+std::recursive_mutex loop_mutex;
 
 #include "src/Image.cpp"
 #include "src/Canvas.cpp"

@@ -44,35 +44,35 @@ window.addEventListener("keydown", (evt)=>{
 function loop() {
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
-    ctx.fillStyle = "cornflowerblue"
-    ctx.strokeStyle = "#413b72"
-    ctx.lineWidth = 2
+    // ctx.fillStyle = "cornflowerblue"
+    // ctx.strokeStyle = "#413b72"
+    // ctx.lineWidth = 2
 
-    ctx.beginPath();
-    ctx.moveTo(20, 20);
-    ctx.lineTo(100, 20);
-    ctx.arcTo(150, 20, 150, 70, 50);
-    ctx.lineTo(150, 120);
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo(20, 20);
+    // ctx.lineTo(100, 20);
+    // ctx.arcTo(150, 20, 150, 70, 50);
+    // ctx.lineTo(150, 120);
+    // ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(20, 20);
-    ctx.bezierCurveTo(20, 100, 200, 100, 200, 20);
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo(20, 20);
+    // ctx.bezierCurveTo(20, 100, 200, 100, 200, 20);
+    // ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(100, 75, 50, 0, 2 * Math.PI);
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.arc(100, 75, 50, 0, 2 * Math.PI);
+    // ctx.stroke();
 
     
 
-    ctx.globalCompositeOperation = "screen"
-    ctx.drawImage(img, x-75,y-75,150,150);
+    // ctx.globalCompositeOperation = "screen"
+    // ctx.drawImage(img, x-75,y-75,150,150);
     // ctx.fillRect(x-25,y-25,50,50)
-    ctx.globalCompositeOperation = "source-over"
+    // ctx.globalCompositeOperation = "source-over"
 
-    let data = ctx.getImageData(10,10,200,200);
-    ctx.putImageData(data,30,200)
+    // let data = ctx.getImageData(10,10,200,200);
+    // ctx.putImageData(data,30,200)
     requestAnimationFrame(loop)
 }
 

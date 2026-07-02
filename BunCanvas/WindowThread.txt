@@ -1,0 +1,38 @@
+import { dlopen, FFIType, JSCallback } from "bun:ffi";
+
+let extension;
+
+if (process.platform === "win32") {
+    extension = "dll"
+}else if (process.platform === "darwin") {
+    extension = "dylib"
+}else if (process.platform === "linux") {
+    extension = "so"
+}
+
+const path = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+
+const exists = await Bun.file(path).exists();
+
+if(!exists) {
+    console.error(`${path} was not found in the working directory!`)
+    process.exit(-1)
+}
+
+const MessagePost = new JSCallback(()=>{
+    self.postMessage(0);
+    },
+    {
+        args: [],
+        returns: "void"
+    }
+);
+
+const lib = dlopen(path, {
+    setup_render_thread: {
+        args: ["ptr"],
+        returns: "void",
+    }
+});
+
+lib.symbols.setup_render_thread(MessagePost.ptr);

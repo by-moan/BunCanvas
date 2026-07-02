@@ -190,6 +190,7 @@ class BunCanvasRenderingContext2D {
     SkPaint imageColor;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
+    std::recursive_mutex draw_mutex;
 
     SkSamplingOptions sampling;
     bool locked = false;
@@ -214,6 +215,7 @@ class BunCanvasRenderingContext2D {
 
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface>& surface) {
+        std::lock_guard<std::recursive_mutex> lock(draw_mutex);
         ctx = surface->getCanvas();
         ctx->resetMatrix();
         pathBuilder.reset();
@@ -283,6 +285,7 @@ class BunCanvas {
         // );
         // surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         if (ctxType == "2d") rendering2D->reset(surface);
+
     }
 };
 
@@ -343,6 +346,8 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
         if (obj == nullptr)\
         return false;\
+        std::cout << "locking!\n";\
+        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);\
         try {\
             target.setColor(keywordColors.at(c));\
             return true;\
@@ -413,6 +418,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
+        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);
         
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
@@ -422,6 +428,7 @@ extern "C" {
         
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (!obj) return;
+        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
     }
     
@@ -430,8 +437,9 @@ extern "C" {
         BunCanvas* obj = validated(canvasObj);
         
         if (obj == nullptr) return;
-
-        obj->resize(w,h);
+        {
+            obj->resize(w,h);
+        }
     }
     
     WINDOWS_EXPORT void canvas_path_begin(void* canvasObj) {
@@ -535,22 +543,24 @@ extern "C" {
         if (obj == nullptr) {
             return false;
         };
+        {
 
-        SkImageInfo dstInfo = SkImageInfo::Make(
-            w,h,
-            kRGBA_8888_SkColorType,
-            kPremul_SkAlphaType
-        );
-        size_t rowBytes = w * 4;
+            SkImageInfo dstInfo = SkImageInfo::Make(
+                w,h,
+                kRGBA_8888_SkColorType,
+                kPremul_SkAlphaType
+            );
+            size_t rowBytes = w * 4;
 
-        return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
-            dstInfo, 
-            out_buffer, 
-            rowBytes, 
-            x, 
-            y, 
-            SkImage::CachingHint::kDisallow_CachingHint
-        );
+            return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
+                dstInfo, 
+                out_buffer, 
+                rowBytes, 
+                x, 
+                y, 
+                SkImage::CachingHint::kDisallow_CachingHint
+            );
+        }
     }
 
     WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){

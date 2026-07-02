@@ -9,9 +9,11 @@ _Float64_t* mUpViewer = nullptr;
 int32_t* kDownViewer = nullptr;
 int32_t* kUpViewer = nullptr;
 
+bool shouldClose = false;
+
 void window_resize_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
-            
+    loop_mutex.lock();
     ctxWrapper->context->flush();
     sWrapper->surface.reset();
     sWrapper->surface = createSurface(
@@ -20,6 +22,7 @@ void window_resize_callback(GLFWwindow* window, int width, int height) {
         height
     );
     canvas = sWrapper->surface->getCanvas();
+    loop_mutex.unlock();
     if (pollingEvents == true || wResizeViewer == nullptr) return;
     wResizeViewer[0] = true;
     wResizeViewer[1] = width;
@@ -100,6 +103,7 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
         kDownViewer[5] = (mods&0b100)?true:false;
         //meta key pressed
         kDownViewer[6] = (mods&0b1000)?true:false;
+        
     }
     if(action == 2) {
         kDownViewer[1] = true;
@@ -133,6 +137,8 @@ void window_refresh_callback(GLFWwindow* window) {
     glfwSwapBuffers(window);
 }
 
+typedef int (*JSCallback_WRefresh)();
+
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title,
         int32_t* wRViewer,
@@ -143,21 +149,29 @@ extern "C" {
         int32_t* kDViewer,
         int32_t* kUViewer
     ){
-        if (!glfwInit()) {
-            std::cerr << "Couldn't initialize GLFW...\n";
-            return;
-        };
+        width = w;
+        height = h;
+
         wResizeViewer = wRViewer;
         mMoveViewer = mMViewer;
         mClickViewer = mCViewer;
         mDownViewer = mDViewer;
         mUpViewer = mUViewer;
-
+        
         // wResizeViewer[0] = w;
         // wResizeViewer[1] = h;
         
         kDownViewer = kDViewer;
         kUpViewer = kUViewer;
+        
+    }
+    
+    // Called in the bun worker thread.
+    WINDOWS_EXPORT void setup_render_thread(JSCallback_WRefresh onrefresh){
+        if (!glfwInit()) {
+            std::cerr << "Couldn't initialize GLFW...\n";
+            return;
+        };
         
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -166,14 +180,14 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(w, h, title, NULL, NULL);
+        window = glfwCreateWindow(width, height, "title", NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
             int code = glfwGetError(&desc);
             std::cerr << "GLFW error " << code << ": "
-              << (desc ? desc : "unknown")
-              << "\n";
+            << (desc ? desc : "unknown")
+            << "\n";
             glfwTerminate();
             return;
         }
@@ -234,6 +248,25 @@ extern "C" {
         #ifdef _WIN64
         glfwSwapInterval(0);
         #endif
+        while (!glfwWindowShouldClose(window)) {
+            loop_mutex.lock();
+            glfwGetFramebufferSize(window, &width, &height);
+            onrefresh();
+
+            glfwPollEvents();
+
+            canvas->clear(SK_ColorTRANSPARENT);
+
+            for (auto element : canvases) {
+                canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+            }
+            ctxWrapper->context->flushAndSubmit();
+            glfwSwapBuffers(window);
+            loop_mutex.unlock();
+        }
+        shouldClose = true;
+        glfwDestroyWindow(window);
+        glfwTerminate();
     }
     
     WINDOWS_EXPORT void update_window(
@@ -252,24 +285,15 @@ extern "C" {
         if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
         
         if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
-        if (kUViewer != kUpViewer) kUpViewer = kUViewer; 
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        canvas->clear(SK_ColorTRANSPARENT);
+        if (kUViewer != kUpViewer) kUpViewer = kUViewer;
         
         
-        for (auto element : canvases) {
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
-        }
-        ctxWrapper->context->flushAndSubmit();
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-
+        
         // #ifdef _WIN64
         // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
         // if (!monitor)
         //     monitor = glfwGetPrimaryMonitor();
-            
+        
         // const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         
         // int refreshRate = mode->refreshRate;
@@ -284,12 +308,11 @@ extern "C" {
     
     
     WINDOWS_EXPORT bool should_window_close() {
-        return glfwWindowShouldClose(window);
+        return shouldClose;
     }
     
     WINDOWS_EXPORT void destroy_window() {
-        glfwDestroyWindow(window);
-        glfwTerminate();
+        
         // delete ptr;
     }
 }

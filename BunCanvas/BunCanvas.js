@@ -5,6 +5,8 @@ import { MouseEvent } from "./MouseEvent"
 import { ptr, toArrayBuffer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
 
+import WindowThread from "./WindowThread.txt";
+
 const requestedFrames = []
 const ptrs = new WeakMap();
 
@@ -221,6 +223,8 @@ export class Window {
 	#kDownViewer = new Int32Array(7);
 	#kUpViewer = new Int32Array(7);
 
+	#renderThread = null;
+
 	constructor(width, height, title = "App") {
 		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`),
 			ptr(this.#wResizeViewer),
@@ -233,9 +237,15 @@ export class Window {
 		)
 		this.#dim[0] = width;
 		this.#dim[1] = height;
-		let loop = ()=>{
+
+		this.#renderThread = new Worker(URL.createObjectURL(new Blob([WindowThread], {
+			  type: "application/javascript",
+			}))
+		);
+
+		this.#renderThread.onmessage = ()=>{
 			if (lib.symbols.should_window_close()) {
-				lib.symbols.destroy_window();
+				// lib.symbols.destroy_window();
 				process.exit(0);
 				return
 			}
@@ -321,10 +331,9 @@ export class Window {
 			for (let i = 0; i < pLen; i++) {
 				(requestedFrames.shift())()
 			}
-			setTimeout(loop,0)
 		}
 
-		loop()
+		// loop()
 	}
 
 	addEventListener(name,fn){

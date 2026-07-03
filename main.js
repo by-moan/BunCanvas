@@ -22,10 +22,10 @@ let y = 0;
 
 let count = 0;
 
-// setInterval(()=>{
-//     console.log(`${count}fps`)
-//     count = 0
-// },1000)
+setInterval(()=>{
+    console.log(`${count}fps`)
+    count = 0
+},1000)
 
 
 window.addEventListener("resize", (evt)=>{
@@ -42,7 +42,7 @@ window.addEventListener("keydown", (evt)=>{
 })
 
 function loop() {
-    // count++;
+    count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
     ctx.fillStyle = "cornflowerblue"
     ctx.fillRect(x-25,y-25,50,50)

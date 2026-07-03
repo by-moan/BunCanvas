@@ -243,20 +243,6 @@ class BunCanvasRenderingContext2D {
     }
 };
 
-struct ResizeQueueCmd {
-    int w;
-    int h;
-    BunCanvas* canvas;
-};
-
-std::queue<ResizeQueueCmd> resizeQueue;
-std::recursive_mutex resizeQueueMutex;
-
-void resizeEnqueue(ResizeQueueCmd cmd){
-    std::lock_guard<std::recursive_mutex> lock(resizeQueueMutex);
-    resizeQueue.push(cmd);
-}
-
 class BunCanvas {
     std::string ctxType;
     BunCanvasRenderingContext2D* rendering2D = nullptr;
@@ -271,7 +257,7 @@ class BunCanvas {
 
     
     BunCanvas(int w, int h){
-        std::lock_guard lock(mutex);
+        nonapple(std::lock_guard lock(mutex));
         // if (renderThreadContext == nullptr){
         //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
         // }else {
@@ -403,7 +389,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
         if (obj == nullptr)\
         return false;\
-        std::lock_guard<std::mutex> lock(obj->owner->mutex);\
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex);)\
         try {\
             target.setColor(keywordColors.at(c));\
             return true;\
@@ -475,7 +461,7 @@ extern "C" {
         
         if (obj == nullptr) return;
         // std::lock_guard<std::recursive_mutex> lock(obj->owner->mutex);
-        std::lock_guard<std::mutex> lock(obj->owner->mutex);
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
     
@@ -484,7 +470,7 @@ extern "C" {
         
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (!obj) return;
-        std::lock_guard<std::mutex> lock(obj->owner->mutex);
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
     }
     
@@ -495,7 +481,7 @@ extern "C" {
         if (obj == nullptr) return;
         
         {
-            std::lock_guard<std::mutex> lock(obj->mutex);
+            nonapple(std::lock_guard<std::mutex> lock(obj->mutex));
             obj->resize(w,h);
         }
     }

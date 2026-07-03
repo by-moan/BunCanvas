@@ -55,9 +55,13 @@ export const lib = dlopen(path, {
 		returns: "void",
 	},
 	update_window: {
-		args: [],
+		args: ["ptr"],
 		returns: "void",
 	},
+	setup_render_thread: (process.platform === "darwin")?{
+		args: ["int","int","ptr"],
+		returns: "void",
+	}:undefined,
 	should_window_close: {
 		args: [],
 		returns: "bool",

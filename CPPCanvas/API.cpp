@@ -10,7 +10,6 @@
 #define NOMINMAX
 #define _Float64_t double
 #include <windows.h>
-#include <thread>
 // This... This is the worst thing humanity would create.... Why??????
 #define WINDOWS_EXPORT __declspec(dllexport)
 #else
@@ -19,9 +18,11 @@
 
 
 #ifndef __APPLE__
+#define nonapple(code) code
 #include <GL/gl.h>
 #else
 #define _Float64_t double
+#define nonapple(code)
 #endif
 
 

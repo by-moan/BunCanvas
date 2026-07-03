@@ -1,39 +1,23 @@
 bool pollingEvents = false;
 
-int32_t* wResizeViewer = nullptr;
-_Float64_t* mMoveViewer = nullptr;
-_Float64_t* mClickViewer = nullptr;
-_Float64_t* mDownViewer = nullptr;
-_Float64_t* mUpViewer = nullptr;
 
-int32_t* kDownViewer = nullptr;
-int32_t* kUpViewer = nullptr;
 
 bool shouldClose = false;
-
-void window_resize_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
-    loop_mutex.lock();
-    ctxWrapper->context->flush();
-    sWrapper->surface.reset();
-    sWrapper->surface = createSurface(
-        ctxWrapper->context.get(),
-        width,
-        height
-    );
-    canvas = sWrapper->surface->getCanvas();
-    loop_mutex.unlock();
-    if (pollingEvents == true || wResizeViewer == nullptr) return;
-    wResizeViewer[0] = true;
-    wResizeViewer[1] = width;
-    wResizeViewer[2] = height;
+bool pendingResize = false;
+int pendingW = 1;
+int pendingH = 1;
+void window_resize_callback(GLFWwindow* window, int w, int h) {
+    pendingResize = true;
+    pendingW = w;
+    pendingH = h;
+    
 }
 
 double prevX = 0;
 double prevY = 0;
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (pollingEvents == true || mMoveViewer == nullptr) return;
+    if (pollingEvents == true) return;
     mMoveViewer[0] = true;
     mMoveViewer[1] = xpos;
     mMoveViewer[2] = ypos;
@@ -45,7 +29,7 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 
 bool clickStarted = 0;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (pollingEvents == true || mClickViewer == nullptr || mMoveViewer == nullptr) return;
+    if (pollingEvents == true) return;
     
     if (action == GLFW_PRESS) { //Indicates that the mouse was pressed down.
         clickStarted = (button == GLFW_MOUSE_BUTTON_LEFT)?true:false;
@@ -131,47 +115,33 @@ void window_refresh_callback(GLFWwindow* window) {
     
     
     for (auto element : canvases) {
-        canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+        {
+            // std::lock_guard<std::mutex> lock(element->mutex);
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+        }
     }
-    ctxWrapper->context->flushAndSubmit();
+    renderThreadContext->context->flushAndSubmit();
     glfwSwapBuffers(window);
 }
 
 typedef int (*JSCallback_WRefresh)();
 
-extern "C" {
-    WINDOWS_EXPORT void create_window(int w, int h, const char* title,
-        int32_t* wRViewer,
-        _Float64_t* mMViewer,
-        _Float64_t* mCViewer,
-        _Float64_t* mDViewer, 
-        _Float64_t* mUViewer,
-        int32_t* kDViewer,
-        int32_t* kUViewer
-    ){
-        width = w;
-        height = h;
+static GrGLFuncPtr get_proc(void* ctx, const char name[]) {
+    return (GrGLFuncPtr)glfwGetProcAddress(name);
+}
 
-        wResizeViewer = wRViewer;
-        mMoveViewer = mMViewer;
-        mClickViewer = mCViewer;
-        mDownViewer = mDViewer;
-        mUpViewer = mUViewer;
-        
-        // wResizeViewer[0] = w;
-        // wResizeViewer[1] = h;
-        
-        kDownViewer = kDViewer;
-        kUpViewer = kUViewer;
-        
+extern "C" {
+    WINDOWS_EXPORT void create_window(int w, int h, const char* title){
     }
     
     // Called in the bun worker thread.
-    WINDOWS_EXPORT void setup_render_thread(JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
         };
+        width = w;
+        height = h;
         
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -180,7 +150,8 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(width, height, "title", NULL, NULL);
+        // std::cout << hiddenWindow << "\n";
+        window = glfwCreateWindow(width, height, "title", NULL, hiddenWindow);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
@@ -202,17 +173,16 @@ extern "C" {
         #pragma endregion
         
         glfwMakeContextCurrent(window);
-        auto iface = GrGLMakeNativeInterface();
-        
-        if (!iface) {
+        renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
+        if (!renderThreadInterface->interface) {
             std::cout << "Native interface failed\n";
             return;
         }
         
         std::cout << "Native interface OK\n";
         
-        ctxWrapper = new ContextWrapper(GrDirectContexts::MakeGL(iface));
-        if (!ctxWrapper->context) {
+        renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
+        if (!renderThreadContext->context) {
             std::cout << "Context was not created!\n";
             return;
         };
@@ -228,7 +198,7 @@ extern "C" {
         currentHeight = height;
         
         sWrapper = new SurfaceWrapper(createSurface(
-            ctxWrapper->context.get(),
+            renderThreadContext->context.get(),
             width,
             height
         ));
@@ -248,44 +218,74 @@ extern "C" {
         #ifdef _WIN64
         glfwSwapInterval(0);
         #endif
+        ready = true;
         while (!glfwWindowShouldClose(window)) {
-            loop_mutex.lock();
+            // loop_mutex.lock();
+
             glfwGetFramebufferSize(window, &width, &height);
-            onrefresh();
 
             glfwPollEvents();
 
+            // std::lock_guard<std::recursive_mutex> lock(loop_mutex);
+
+            
+
             canvas->clear(SK_ColorTRANSPARENT);
 
+            if (pendingResize == true){
+                pendingResize = false;
+                glViewport(0, 0, pendingW, pendingH);
+                width = pendingW;
+                height = pendingH;
+                sWrapper->surface.reset();
+                sWrapper->surface = createSurface(
+                    renderThreadContext->context.get(),
+                    pendingW,
+                    pendingH
+                );
+                canvas = sWrapper->surface->getCanvas();
+                // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                wResizeViewer[0] = true;
+                wResizeViewer[1] = pendingW;
+                wResizeViewer[2] = pendingH;
+            }
+
+            // processResizes();
+
             for (auto element : canvases) {
+                std::lock_guard<std::mutex> lock(element->mutex);
                 canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
             }
-            ctxWrapper->context->flushAndSubmit();
+            onrefresh();
+            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             glfwSwapBuffers(window);
-            loop_mutex.unlock();
+            // loop_mutex.unlock();
         }
+        ready = false;
         shouldClose = true;
         glfwDestroyWindow(window);
         glfwTerminate();
+        delete renderThreadInterface;
     }
     
     WINDOWS_EXPORT void update_window(
-        int32_t* wRViewer,
-        _Float64_t* mMViewer,
-        _Float64_t* mCViewer,
-        _Float64_t* mDViewer,
-        _Float64_t* mUViewer,
-        int32_t* kDViewer,
-        int32_t* kUViewer
+        // int32_t* wRViewer
+        // _Float64_t* mMViewer,
+        // _Float64_t* mCViewer,
+        // _Float64_t* mDViewer,
+        // _Float64_t* mUViewer,
+        // int32_t* kDViewer,
+        // int32_t* kUViewer
     ){
-        if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
-        if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
-        if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
-        if (mDViewer != mDownViewer) mDownViewer = mDViewer; 
-        if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
+        // mainThreadContext->context->flushAndSubmit();
+        // if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
+        // if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
+        // if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
+        // if (mDViewer != mDownViewer) mDownViewer = mDViewer; 
+        // if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
         
-        if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
-        if (kUViewer != kUpViewer) kUpViewer = kUViewer;
+        // if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
+        // if (kUViewer != kUpViewer) kUpViewer = kUViewer;
         
         
         
@@ -312,7 +312,6 @@ extern "C" {
     }
     
     WINDOWS_EXPORT void destroy_window() {
-        
         // delete ptr;
     }
 }

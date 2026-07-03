@@ -27,12 +27,24 @@ const MessagePost = new JSCallback(()=>{
         returns: "void"
     }
 );
+let w;
+let h;
+
+self.onmessage = (msg)=>{
+    w = msg.data.w
+    h = msg.data.h
+}
 
 const lib = dlopen(path, {
     setup_render_thread: {
-        args: ["ptr"],
+        args: ["int","int","ptr"],
         returns: "void",
     }
 });
 
-lib.symbols.setup_render_thread(MessagePost.ptr);
+
+
+setTimeout(()=>{
+    lib.symbols.setup_render_thread(w,h,MessagePost.ptr);
+    self.postMessage(1)
+},100);

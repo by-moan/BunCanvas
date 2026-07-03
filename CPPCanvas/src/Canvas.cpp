@@ -181,21 +181,26 @@ std::unordered_map<std::string,SkColor4f> keywordColors{{
     {"yellowgreen",SkColor4f{0.6039216f, 0.8039216f, 0.1960784f, 1.0f}},
 }};
 
+
+
+class BunCanvas;
+
 class BunCanvasRenderingContext2D {
     SkCanvas* ctx = nullptr;
     public:
+    BunCanvas* owner;
     SkPathBuilder pathBuilder;
     SkPaint fillColor;
     SkPaint strokeColor;
     SkPaint imageColor;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
-    std::recursive_mutex draw_mutex;
 
     SkSamplingOptions sampling;
     bool locked = false;
 
-    BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
+    BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
+        this->owner = owner;
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
         strokeColor.setStrokeWidth(1);
@@ -215,7 +220,7 @@ class BunCanvasRenderingContext2D {
 
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface>& surface) {
-        std::lock_guard<std::recursive_mutex> lock(draw_mutex);
+        // std::lock_guard<std::mutex> lock(draw_mutex);
         ctx = surface->getCanvas();
         ctx->resetMatrix();
         pathBuilder.reset();
@@ -238,23 +243,41 @@ class BunCanvasRenderingContext2D {
     }
 };
 
+struct ResizeQueueCmd {
+    int w;
+    int h;
+    BunCanvas* canvas;
+};
+
+std::queue<ResizeQueueCmd> resizeQueue;
+std::recursive_mutex resizeQueueMutex;
+
+void resizeEnqueue(ResizeQueueCmd cmd){
+    std::lock_guard<std::recursive_mutex> lock(resizeQueueMutex);
+    resizeQueue.push(cmd);
+}
+
 class BunCanvas {
-    BunCanvasRenderingContext2D* rendering2D = nullptr;
     std::string ctxType;
+    BunCanvasRenderingContext2D* rendering2D = nullptr;
     public:
     
+    friend void processResizes();
+
     static constexpr uint64_t MAGIC = 0xBCA1155A;
     uint64_t magic = MAGIC;
     sk_sp<SkSurface> surface;
+    std::mutex mutex;
 
     
     BunCanvas(int w, int h){
-        if (ctxWrapper == nullptr){
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        }else {
-            surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        }
-            // surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        std::lock_guard lock(mutex);
+        // if (renderThreadContext == nullptr){
+        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        // }else {
+        //     surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        // }
+        surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
     }
 
     ~BunCanvas(){
@@ -265,7 +288,7 @@ class BunCanvas {
     void* getContext(const char* c) {
         if (std::strcmp("2d",ctxType.c_str()) == 0) return rendering2D;
         if (std::strcmp("2d",c) == 0) {
-            if (rendering2D == nullptr) rendering2D = new BunCanvasRenderingContext2D(surface);
+            if (rendering2D == nullptr) rendering2D = new BunCanvasRenderingContext2D(surface,this);
             ctxType = c;
             return rendering2D;
         }
@@ -274,20 +297,54 @@ class BunCanvas {
     }
 
     void resize(int w, int h) {
+        if (rendering2D == nullptr) return;
+        // std::cout << "resize enqueue\n";
         surface.reset();
-        if (ctxWrapper == nullptr){
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        }else {
-            surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        }
-        // surface = SkSurfaces::Raster(
-        //     SkImageInfo::MakeN32Premul(w,h)
-        // );
-        // surface = SkSurfaces::RenderTarget(ctxWrapper->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        if (ctxType == "2d") rendering2D->reset(surface);
 
+        // std::lock_guard lock(mutex);
+        // if (renderThreadContext == nullptr){
+        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        // }else {
+        //     surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        //     std::cout << "renderThreadContext exists, using GPU Backed surface\n";
+        // }
+        surface = SkSurfaces::Raster(
+            SkImageInfo::MakeN32Premul(w,h)
+        );
+        // surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+        if (ctxType == "2d") rendering2D->reset(surface);
+        // local.pop();
+        // resizeEnqueue(cmd);
     }
 };
+
+void processResizes() {
+    // if (ready == false) return;
+    // std::queue<ResizeQueueCmd> local;
+
+    // {
+    //     std::lock_guard<std::recursive_mutex> lock(resizeQueueMutex);
+    //     std::swap(local,resizeQueue);
+    // }
+
+    // while(!local.empty()) {
+    //     ResizeQueueCmd& cmd = local.front();
+    //     std::lock_guard<std::recursive_mutex> lock(cmd.canvas->mutex);
+    //     cmd.canvas->surface.reset();
+    //     if (renderThreadContext == nullptr){
+    //         cmd.canvas->surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(cmd.w,cmd.h));
+    //     }else {
+    //         cmd.canvas->surface = SkSurfaces::RenderTarget(mainThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(cmd.w,cmd.h));
+    //     }
+    //     // cmd.canvas->surface = SkSurfaces::Raster(
+    //     //     SkImageInfo::MakeN32Premul(cmd.w,cmd.h)
+    //     // );
+    //     // surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+    //     if (cmd.canvas->ctxType == "2d") cmd.canvas->rendering2D->reset(cmd.canvas->surface);
+    //     local.pop();
+    // }
+    
+}
 
 
 
@@ -346,8 +403,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
         if (obj == nullptr)\
         return false;\
-        std::cout << "locking!\n";\
-        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);\
+        std::lock_guard<std::mutex> lock(obj->owner->mutex);\
         try {\
             target.setColor(keywordColors.at(c));\
             return true;\
@@ -418,8 +474,8 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);
-        
+        // std::lock_guard<std::recursive_mutex> lock(obj->owner->mutex);
+        std::lock_guard<std::mutex> lock(obj->owner->mutex);
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
     
@@ -428,7 +484,7 @@ extern "C" {
         
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         if (!obj) return;
-        std::lock_guard<std::recursive_mutex> lock(obj->draw_mutex);
+        std::lock_guard<std::mutex> lock(obj->owner->mutex);
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
     }
     
@@ -437,7 +493,9 @@ extern "C" {
         BunCanvas* obj = validated(canvasObj);
         
         if (obj == nullptr) return;
+        
         {
+            std::lock_guard<std::mutex> lock(obj->mutex);
             obj->resize(w,h);
         }
     }

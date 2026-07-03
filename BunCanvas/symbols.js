@@ -22,12 +22,40 @@ if(!exists) {
 export const encoder = new TextEncoder();
 
 export const lib = dlopen(path, {
+	get_wResizeViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mMoveViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mClickViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mDownViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mUpViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_kDownViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_kUpViewer:{
+		args: [],
+		returns: "ptr",
+	},
 	create_window: {
-		args: ["int","int", "cstring", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr"],
+		args: ["int","int", "cstring"],
 		returns: "void",
 	},
 	update_window: {
-		args: ["ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr"],
+		args: [],
 		returns: "void",
 	},
 	should_window_close: {

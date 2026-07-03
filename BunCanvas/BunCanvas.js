@@ -5,7 +5,7 @@ import { MouseEvent } from "./MouseEvent"
 import { ptr, toArrayBuffer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
 
-import WindowThread from "./WindowThread.txt";
+import WindowThread from "./WindowThread.js?raw";
 
 const requestedFrames = []
 const ptrs = new WeakMap();
@@ -214,27 +214,17 @@ export class Window {
 		return this.#dim[1]
 	}
 
-	#wResizeViewer = new Int32Array(3);
-	#mMoveViewer = new Float64Array(9);
-	#mClickViewer = new Float64Array(9);
-	#mDownViewer = new Float64Array(9);
-	#mUpViewer = new Float64Array(9);
-
-	#kDownViewer = new Int32Array(7);
-	#kUpViewer = new Int32Array(7);
+	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer(),0, 3 * 4));
+	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer(),0, 9 * 8));
+	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer(),0, 9 * 8));
+	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer(),0, 9 * 8));
+	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer(),0, 9 * 8));
+	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer(),0, 7 * 4));
+	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer(),0, 7 *4 ));
 
 	#renderThread = null;
 
 	constructor(width, height, title = "App") {
-		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`),
-			ptr(this.#wResizeViewer),
-			ptr(this.#mMoveViewer),
-			ptr(this.#mClickViewer),
-			ptr(this.#mDownViewer),
-			ptr(this.#mUpViewer),
-			ptr(this.#kDownViewer),
-			ptr(this.#kUpViewer),
-		)
 		this.#dim[0] = width;
 		this.#dim[1] = height;
 
@@ -243,26 +233,22 @@ export class Window {
 			}))
 		);
 
-		this.#renderThread.onmessage = ()=>{
-			if (lib.symbols.should_window_close()) {
-				// lib.symbols.destroy_window();
+		this.#renderThread.postMessage({
+			w: width,
+			h: height,
+		});
+
+		this.#renderThread.onmessage = (msg)=>{
+			if (msg.data == 1) {
+				lib.symbols.destroy_window();
 				process.exit(0);
 				return
 			}
 			
-			lib.symbols.update_window(
-				ptr(this.#wResizeViewer),
-				ptr(this.#mMoveViewer),
-				ptr(this.#mClickViewer),
-				ptr(this.#mDownViewer),
-				ptr(this.#mUpViewer),
-				ptr(this.#kDownViewer),
-				ptr(this.#kUpViewer),
-			);
+			lib.symbols.update_window();
 
 			if (this.#wResizeViewer[0] != 0) {
 				this.#wResizeViewer[0] = 0
-				// const details = {type: "resize", target: this, timestamp: performance.now()};
 				const details = new Event("resize",this);
 				
 				this.#dim[0] = this.#wResizeViewer[1]
@@ -333,7 +319,9 @@ export class Window {
 			}
 		}
 
-		// loop()
+		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
+
+
 	}
 
 	addEventListener(name,fn){

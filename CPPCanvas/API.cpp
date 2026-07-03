@@ -117,13 +117,13 @@ static int32_t kUpViewer[7]{};
 
 
 extern "C" {
-    int32_t* get_wResizeViewer(){return wResizeViewer;}
-    _Float64_t* get_mMoveViewer(){return mMoveViewer;}
-    _Float64_t* get_mClickViewer(){return mClickViewer;}
-    _Float64_t* get_mDownViewer(){return mDownViewer;}
-    _Float64_t* get_mUpViewer(){return mUpViewer;}
-    int32_t* get_kDownViewer(){return kDownViewer;}
-    int32_t* get_kUpViewer(){return kUpViewer;}
+    WINDOWS_EXPORT int32_t* get_wResizeViewer(){return wResizeViewer;}
+    WINDOWS_EXPORT _Float64_t* get_mMoveViewer(){return mMoveViewer;}
+    WINDOWS_EXPORT _Float64_t* get_mClickViewer(){return mClickViewer;}
+    WINDOWS_EXPORT _Float64_t* get_mDownViewer(){return mDownViewer;}
+    WINDOWS_EXPORT _Float64_t* get_mUpViewer(){return mUpViewer;}
+    WINDOWS_EXPORT int32_t* get_kDownViewer(){return kDownViewer;}
+    WINDOWS_EXPORT int32_t* get_kUpViewer(){return kUpViewer;}
 }
 
 

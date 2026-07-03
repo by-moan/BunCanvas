@@ -460,7 +460,6 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        // std::lock_guard<std::recursive_mutex> lock(obj->owner->mutex);
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
     }
@@ -562,6 +561,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     

@@ -117,7 +117,7 @@ void window_refresh_callback(GLFWwindow* window) {
     for (auto element : canvases) {
         {
             // std::lock_guard<std::mutex> lock(element->mutex);
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+            canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
         }
     }
     renderThreadContext->context->flushAndSubmit();
@@ -126,9 +126,6 @@ void window_refresh_callback(GLFWwindow* window) {
 
 typedef int (*JSCallback_WRefresh)();
 
-static GrGLFuncPtr get_proc(void* ctx, const char name[]) {
-    return (GrGLFuncPtr)glfwGetProcAddress(name);
-}
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title){
@@ -216,9 +213,6 @@ extern "C" {
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
         
-        #ifdef _WIN64
-        glfwSwapInterval(0);
-        #endif
         ready = true;
         while (!glfwWindowShouldClose(window)) {
             // loop_mutex.lock();
@@ -355,43 +349,7 @@ extern "C" {
     #endif
     
     #ifndef __APPLE__
-    WINDOWS_EXPORT void update_window( JSCallback_WRefresh onrefresh
-        // int32_t* wRViewer
-        // _Float64_t* mMViewer,
-        // _Float64_t* mCViewer,
-        // _Float64_t* mDViewer,
-        // _Float64_t* mUViewer,
-        // int32_t* kDViewer,
-        // int32_t* kUViewer
-    ){
-        // mainThreadContext->context->flushAndSubmit();
-        // if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
-        // if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
-        // if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
-        // if (mDViewer != mDownViewer) mDownViewer = mDViewer; 
-        // if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
-        
-        // if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
-        // if (kUViewer != kUpViewer) kUpViewer = kUViewer;
-        
-        
-        
-        // #ifdef _WIN64
-        // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
-        // if (!monitor)
-        //     monitor = glfwGetPrimaryMonitor();
-        
-        // const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        
-        // int refreshRate = mode->refreshRate;
-        // std::cout << refreshRate << "\n";
-        // std::this_thread::sleep_for(
-        //     std::chrono::microseconds(
-        //         static_cast<int>(1000000.0 / refreshRate)
-        //     )
-        // );
-        // #endif
-    }
+    WINDOWS_EXPORT void update_window( JSCallback_WRefresh onrefresh){}
     #else
     WINDOWS_EXPORT void update_window(JSCallback_WRefresh onrefresh){
         glfwGetFramebufferSize(window, &width, &height);

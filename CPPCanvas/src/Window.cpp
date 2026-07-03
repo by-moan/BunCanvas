@@ -341,6 +341,8 @@ extern "C" {
             std::cout << "Surface was not created!\n";
             return;
         };
+
+        glfwSwapInterval(0);
         
         canvas = sWrapper->surface->getCanvas();
         

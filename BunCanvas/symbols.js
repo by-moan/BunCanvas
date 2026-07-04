@@ -10,18 +10,18 @@ if (process.platform === "win32") {
 	extension = "so"
 }
 
-const path = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+export const dlPath = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
 
-const exists = await Bun.file(path).exists();
+const exists = await Bun.file(dlPath).exists();
 
 if(!exists) {
-	console.error(`${path} was not found in the working directory!`)
+	console.error(`${dlPath} was not found in the working directory!`)
 	process.exit(-1)
 }
 
 export const encoder = new TextEncoder();
 
-export const lib = dlopen(path, {
+export const lib = dlopen(dlPath, {
 	get_wResizeViewer:{
 		args: [],
 		returns: "ptr",
@@ -58,10 +58,6 @@ export const lib = dlopen(path, {
 		args: ["ptr"],
 		returns: "void",
 	},
-	setup_render_thread: (process.platform === "darwin")?{
-		args: ["int","int","ptr"],
-		returns: "void",
-	}:undefined,
 	should_window_close: {
 		args: [],
 		returns: "bool",

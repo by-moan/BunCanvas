@@ -1,8 +1,8 @@
-import { lib,encoder } from "./symbols";
+import { lib,encoder, dlPath } from "./symbols";
 import { Event } from "./Event";
 import { MouseEvent } from "./MouseEvent"
 
-import { ptr, toArrayBuffer, JSCallback } from "bun:ffi"
+import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
 
 import WindowThread from "./WindowThread.js?raw";
@@ -398,6 +398,12 @@ export class Window {
 			},{
 				args:[],
 				returns: "void"
+			});
+			aaplLib = dlopen(dlPath, {
+				setup_render_thread: {
+					args: ["int","int","ptr"],
+					returns: "void",
+				}
 			});
 			lib.symbols.setup_render_thread(width,height,cb.ptr)
 			setInterval(()=>{

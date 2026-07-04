@@ -44,8 +44,8 @@ window.addEventListener("keydown", (evt)=>{
 function loop() {
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
-    ctx.fillStyle = "cornflowerblue"
-    ctx.fillRect(x-25,y-25,50,50)
+    // ctx.fillStyle = "cornflowerblue"
+    // ctx.fillRect(x-25,y-25,50,50)
     // ctx.strokeStyle = "#413b72"
     // ctx.lineWidth = 2
 
@@ -68,7 +68,10 @@ function loop() {
     
 
     // ctx.globalCompositeOperation = "screen"
-    // ctx.drawImage(img, x-75,y-75,150,150);
+    ctx.drawImage(img, x-75,y-75,150,150);
+    ctx.drawImage(img, x-175,y-75,150,150);
+    ctx.drawImage(img, x-275,y-75,150,150);
+    ctx.drawImage(img, x-375,y-75,150,150);
     // ctx.globalCompositeOperation = "source-over"
 
     // let data = ctx.getImageData(10,10,200,200);

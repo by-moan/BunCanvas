@@ -247,8 +247,6 @@ class BunCanvas {
     std::string ctxType;
     BunCanvasRenderingContext2D* rendering2D = nullptr;
     public:
-    
-    friend void processResizes();
 
     static constexpr uint64_t MAGIC = 0xBCA1155A;
     uint64_t magic = MAGIC;
@@ -258,12 +256,21 @@ class BunCanvas {
     
     BunCanvas(int w, int h){
         nonapple(std::lock_guard lock(mutex));
-        // if (renderThreadContext == nullptr){
-        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        // }else {
-        //     surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        // }
-        surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        #ifdef __APPLE__
+        if (renderThreadContext == nullptr){
+            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        }else {
+            GrGLFramebufferInfo fbInfo;
+            fbInfo.fFBOID = 0;
+            fbInfo.fFormat = GL_RGBA8;
+            surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+            std::cout << "GPU surface used!\n"; 
+        }
+        #else
+        surface = SkSurfaces::Raster(
+            SkImageInfo::MakeN32Premul(w,h)
+        );
+        #endif
     }
 
     ~BunCanvas(){
@@ -288,50 +295,25 @@ class BunCanvas {
         surface.reset();
 
         // std::lock_guard lock(mutex);
-        // if (renderThreadContext == nullptr){
-        //     surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
-        // }else {
-        //     surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-        //     std::cout << "renderThreadContext exists, using GPU Backed surface\n";
-        // }
+        #ifdef __APPLE__
+        if (renderThreadContext == nullptr){
+            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+        }else {
+            surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+            std::cout << "GPU surface used!\n"; 
+        }
+        #else
         surface = SkSurfaces::Raster(
             SkImageInfo::MakeN32Premul(w,h)
         );
+        #endif
+        
         // surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         if (ctxType == "2d") rendering2D->reset(surface);
         // local.pop();
         // resizeEnqueue(cmd);
     }
 };
-
-void processResizes() {
-    // if (ready == false) return;
-    // std::queue<ResizeQueueCmd> local;
-
-    // {
-    //     std::lock_guard<std::recursive_mutex> lock(resizeQueueMutex);
-    //     std::swap(local,resizeQueue);
-    // }
-
-    // while(!local.empty()) {
-    //     ResizeQueueCmd& cmd = local.front();
-    //     std::lock_guard<std::recursive_mutex> lock(cmd.canvas->mutex);
-    //     cmd.canvas->surface.reset();
-    //     if (renderThreadContext == nullptr){
-    //         cmd.canvas->surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(cmd.w,cmd.h));
-    //     }else {
-    //         cmd.canvas->surface = SkSurfaces::RenderTarget(mainThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(cmd.w,cmd.h));
-    //     }
-    //     // cmd.canvas->surface = SkSurfaces::Raster(
-    //     //     SkImageInfo::MakeN32Premul(cmd.w,cmd.h)
-    //     // );
-    //     // surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-    //     if (cmd.canvas->ctxType == "2d") cmd.canvas->rendering2D->reset(cmd.canvas->surface);
-    //     local.pop();
-    // }
-    
-}
-
 
 
 std::vector<BunCanvas*> canvases;

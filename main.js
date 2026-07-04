@@ -1,9 +1,11 @@
 import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas";
 
-const canvas = new Canvas(600,500)
-const ctx = canvas.getContext("2d")
+
 
 const window = new Window(800,600)
+
+const canvas = new Canvas(window.innerWidth,window.innerHeight)
+const ctx = canvas.getContext("2d")
 
 const img = new Image();
 
@@ -65,7 +67,37 @@ function loop() {
     // ctx.arc(100, 75, 50, 0, 2 * Math.PI);
     // ctx.stroke();
 
-    
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
+    console.log("loop")
 
     // ctx.globalCompositeOperation = "screen"
     ctx.drawImage(img, x-75,y-75,150,150);

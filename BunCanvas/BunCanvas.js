@@ -399,13 +399,13 @@ export class Window {
 				args:[],
 				returns: "void"
 			});
-			aaplLib = dlopen(dlPath, {
+			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {
 					args: ["int","int","ptr"],
 					returns: "void",
 				}
 			});
-			lib.symbols.setup_render_thread(width,height,cb.ptr)
+			aaplLib.symbols.setup_render_thread(width,height,cb.ptr)
 			setInterval(()=>{
 				lib.symbols.update_window(cb.ptr);
 			},0);

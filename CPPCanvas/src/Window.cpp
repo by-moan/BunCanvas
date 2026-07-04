@@ -10,7 +10,7 @@ void window_resize_callback(GLFWwindow* window, int w, int h) {
     pendingResize = true;
     pendingW = w;
     pendingH = h;
-    
+    std::cout << "resize\n"; 
 }
 
 double prevX = 0;
@@ -112,7 +112,7 @@ void window_refresh_callback(GLFWwindow* window) {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     canvas->clear(SK_ColorTRANSPARENT);
-    
+    std::cout << "refresh\n"; 
     
     for (auto element : canvases) {
         {
@@ -379,10 +379,10 @@ extern "C" {
         
         for (auto element : canvases) {
             nonapple(std::lock_guard<std::mutex> lock(element->mutex));
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+            canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
         }
         onrefresh();
-        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+        renderThreadContext->context->flushAndSubmit();
         glfwSwapBuffers(window);
     }
     #endif

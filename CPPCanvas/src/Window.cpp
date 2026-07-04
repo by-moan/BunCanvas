@@ -117,10 +117,10 @@ void window_refresh_callback(GLFWwindow* window) {
     for (auto element : canvases) {
         {
             // std::lock_guard<std::mutex> lock(element->mutex);
-            canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
     }
-    renderThreadContext->context->flushAndSubmit();
+    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
     glfwSwapBuffers(window);
 }
 
@@ -376,13 +376,12 @@ extern "C" {
         }
         
         // processResizes();
+        onrefresh();
         
         for (auto element : canvases) {
-            nonapple(std::lock_guard<std::mutex> lock(element->mutex));
-            canvas->drawImage(element->surface->makeImageSnapshot(),0,0);
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
-        onrefresh();
-        renderThreadContext->context->flushAndSubmit();
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
         glfwSwapBuffers(window);
     }
     #endif

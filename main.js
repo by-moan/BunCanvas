@@ -97,7 +97,7 @@ function loop() {
     ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
     ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
     ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
-    console.log("loop")
+    ctx.drawImage(img, window.innerWidth*Math.random(),window.innerHeight*Math.random(),150,150);
 
     // ctx.globalCompositeOperation = "screen"
     ctx.drawImage(img, x-75,y-75,150,150);

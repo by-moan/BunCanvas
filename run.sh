@@ -28,4 +28,7 @@ fi
 
 cp ./CPPCanvas/build/BunCanvas.$PLATFORM.$ARCH.$EXT ./build/
 cd ./build/
-bun ../main.js
+
+# bun ../main.js
+
+gdb -q -batch -ex "set pagination off" -ex "run" --args bun ../main.js

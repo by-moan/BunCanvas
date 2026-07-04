@@ -26,14 +26,14 @@ then
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \
     -I./CPPCanvas/Thirdparty/glad/include \
-    -lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.x64.so"
+    -lGL -lEGL -lglfw -lGLEW -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.x64.so"
     elif [[ "$(uname -m)" = "arm64" ]]
     then
     clang++ -shared -fPIC ./CPPCanvas/API.cpp \
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \
     -I./CPPCanvas/Thirdparty/glad/include \
-    -lGL -lEGL -lglfw -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.arm64.so"
+    -lGL -lEGL -lglfw -lGLEW -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg -o "./CPPCanvas/build/BunCanvas.$PLATFORM.arm64.so"
     fi
 elif [[ "$(uname -o)" = "Darwin" ]]
 then

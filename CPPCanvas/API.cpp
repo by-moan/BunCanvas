@@ -19,6 +19,7 @@
 
 #ifndef __APPLE__
 #define nonapple(code) code
+#include <GL/glew.h>
 #include <GL/gl.h>
 #else
 #define _Float64_t double
@@ -38,7 +39,6 @@
 #include "include/core/SkColorSpace.h"
 
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
-#include "include/gpu/ganesh/gl/GrGLAssembleInterface.h"
 #include "include/gpu/ganesh/SkImageGanesh.h"
 #include "include/gpu/ganesh/GrDirectContext.h"
 #include "include/gpu/ganesh/GrBackendSurface.h"
@@ -100,10 +100,16 @@ int currentHeight = 0;
 int width, height;
 SkCanvas* canvas = nullptr;
 GLFWwindow* window = nullptr;
-GLFWwindow* hiddenWindow = nullptr;
 SurfaceWrapper* sWrapper = nullptr;
 bool ready = false;
 bool mainThreadReady = false;
+
+#ifndef __APPLE__
+GLFWwindow* sharedWindow = nullptr;
+ContextWrapper* mainThreadCtx = nullptr;
+InterfaceWrapper* mainThreadIface = nullptr;
+bool gpuContextReady = false;
+#endif
 
 std::recursive_mutex loop_mutex;
 

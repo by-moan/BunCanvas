@@ -195,10 +195,10 @@ class BunCanvasRenderingContext2D {
     SkPaint imageColor;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
-
+    
     SkSamplingOptions sampling;
     bool locked = false;
-
+    
     BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
         this->owner = owner;
         strokeColor.setColor(SK_ColorBLACK);
@@ -217,7 +217,7 @@ class BunCanvasRenderingContext2D {
         fillColor.setAntiAlias(1);
         fillColor.setBlendMode(compositeOperations.at("source-over"));
     }
-
+    
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface>& surface) {
         // std::lock_guard<std::mutex> lock(draw_mutex);
@@ -228,7 +228,7 @@ class BunCanvasRenderingContext2D {
         fillColor.setColor(SK_ColorBLACK);
         fillColor.setStyle(SkPaint::kFill_Style);
         fillColor.setAntiAlias(1);
-
+        
         strokeColor.setBlendMode(compositeOperations.at("source-over"));
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
@@ -237,22 +237,33 @@ class BunCanvasRenderingContext2D {
         
         imageColor.setBlendMode(compositeOperations.at("source-over"));
     }
-
+    
     SkCanvas* operator()() {
         return ctx;
     }
+};
+
+struct RetiredTexture {
+    GrBackendTexture tex;
+    int framesLeft;
 };
 
 class BunCanvas {
     std::string ctxType;
     BunCanvasRenderingContext2D* rendering2D = nullptr;
     public:
-
+    
     static constexpr uint64_t MAGIC = 0xBCA1155A;
     uint64_t magic = MAGIC;
     sk_sp<SkSurface> surface;
     std::mutex mutex;
-
+    
+    #ifndef __APPLE__
+    GrBackendTexture backendTex;
+    bool hasBackendTex = false;
+    std::vector<RetiredTexture> retiredTextures;
+    #endif
+    
     
     BunCanvas(int w, int h){
         nonapple(std::lock_guard lock(mutex));
@@ -260,24 +271,62 @@ class BunCanvas {
         if (renderThreadContext == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
         }else {
-            GrGLFramebufferInfo fbInfo;
-            fbInfo.fFBOID = 0;
-            fbInfo.fFormat = GL_RGBA8;
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-            std::cout << "GPU surface used!\n"; 
         }
         #else
-        surface = SkSurfaces::Raster(
-            SkImageInfo::MakeN32Premul(w,h)
-        );
+        if (gpuContextReady) {
+            backendTex = mainThreadCtx->context->createBackendTexture(
+                w, h,
+                kN32_SkColorType,
+                skgpu::Mipmapped::kNo,
+                GrRenderable::kYes,
+                GrProtected::kNo
+            );
+            
+            if (backendTex.isValid()) {
+                surface = SkSurfaces::WrapBackendTexture(
+                    mainThreadCtx->context.get(),
+                    backendTex,
+                    kTopLeft_GrSurfaceOrigin,
+                    1,
+                    kN32_SkColorType,
+                    nullptr,
+                    nullptr
+                );
+                hasBackendTex = true;
+            }
+        }
+        if (!surface) {
+            surface = SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            hasBackendTex = false;
+        }
+        #endif
+    }
+    
+    //Maybe future support for webGPU rendering context if possible
+    ~BunCanvas(){
+        delete rendering2D;
+        surface.reset();
+        
+        #ifndef __APPLE__
+        // Flush to ensure no pending operations on the current texture
+        if (hasBackendTex && mainThreadCtx) {
+            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+            mainThreadCtx->context->deleteBackendTexture(backendTex);
+        }
+        // Clean up any retired textures immediately
+        for (auto& r : retiredTextures) {
+            GrGLTextureInfo info;
+            if (GrBackendTextures::GetGLTextureInfo(r.tex, &info)) {
+                glDeleteTextures(1, &info.fID);
+            }
+        }
+        retiredTextures.clear();
         #endif
     }
 
-    ~BunCanvas(){
-        delete rendering2D;
-    }
-
-    //Maybe future support for webGPU rendering context if possible
     void* getContext(const char* c) {
         if (std::strcmp("2d",ctxType.c_str()) == 0) return rendering2D;
         if (std::strcmp("2d",c) == 0) {
@@ -285,33 +334,64 @@ class BunCanvas {
             ctxType = c;
             return rendering2D;
         }
-
         return nullptr;
     }
 
     void resize(int w, int h) {
         if (rendering2D == nullptr) return;
-        // std::cout << "resize enqueue\n";
+
+        #ifndef __APPLE__
+        // Flush main thread GPU commands and wait for completion
+        // before retiring the old texture
+        if (hasBackendTex && mainThreadCtx) {
+            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+            // Retire the texture instead of deleting it immediately.
+            // The render thread might still have pending draw commands
+            // that reference this texture from the previous frame.
+            retiredTextures.push_back({backendTex, 3});
+            hasBackendTex = false;
+        }
+        #endif
+        
         surface.reset();
 
-        // std::lock_guard lock(mutex);
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
         }else {
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
-            std::cout << "GPU surface used!\n"; 
         }
         #else
-        surface = SkSurfaces::Raster(
-            SkImageInfo::MakeN32Premul(w,h)
-        );
+        if (gpuContextReady) {
+            backendTex = mainThreadCtx->context->createBackendTexture(
+                w, h,
+                kN32_SkColorType,
+                skgpu::Mipmapped::kNo,
+                GrRenderable::kYes,
+                GrProtected::kNo
+            );
+            if (backendTex.isValid()) {
+                surface = SkSurfaces::WrapBackendTexture(
+                    mainThreadCtx->context.get(),
+                    backendTex,
+                    kTopLeft_GrSurfaceOrigin,
+                    1,
+                    kN32_SkColorType,
+                    nullptr,
+                    nullptr
+                );
+                hasBackendTex = true;
+            }
+        }
+        if (!surface) {
+            surface = SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            hasBackendTex = false;
+        }
         #endif
         
-        // surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         if (ctxType == "2d") rendering2D->reset(surface);
-        // local.pop();
-        // resizeEnqueue(cmd);
     }
 };
 
@@ -360,7 +440,7 @@ extern "C" {
         if (obj == nullptr) return nullptr;
         
         void* ptr = obj->getContext(ctxType);
-
+        
         return ptr;
         
         // obj->ctx = obj->surface->getCanvas();
@@ -470,7 +550,7 @@ extern "C" {
     WINDOWS_EXPORT void canvas_path_begin(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
-
+        
         
         if (obj == nullptr) return;
         obj->pathBuilder.reset();
@@ -516,7 +596,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-
+        
         obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
@@ -562,7 +642,7 @@ extern "C" {
             return false;
         }
     }
-
+    
     WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
@@ -570,14 +650,14 @@ extern "C" {
             return false;
         };
         {
-
+            
             SkImageInfo dstInfo = SkImageInfo::Make(
                 w,h,
                 kRGBA_8888_SkColorType,
                 kPremul_SkAlphaType
             );
             size_t rowBytes = w * 4;
-
+            
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
                 dstInfo, 
                 out_buffer, 
@@ -588,7 +668,7 @@ extern "C" {
             );
         }
     }
-
+    
     WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
@@ -599,9 +679,9 @@ extern "C" {
             kRGBA_8888_SkColorType,
             kPremul_SkAlphaType
         );
-
+        
         SkBitmap bitmap;
-
+        
         if(bitmap.installPixels(imageInfo,buffer,w *4)){
             (*obj)()->drawImage(bitmap.asImage(),x,y);
             // std::cout << "Success " << x << " " << y << " " << w << " " << h << " " << "\n";

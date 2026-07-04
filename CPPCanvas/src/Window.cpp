@@ -10,7 +10,6 @@ void window_resize_callback(GLFWwindow* window, int w, int h) {
     pendingResize = true;
     pendingW = w;
     pendingH = h;
-    std::cout << "resize\n"; 
 }
 
 double prevX = 0;
@@ -148,8 +147,7 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        // std::cout << hiddenWindow << "\n";
-        window = glfwCreateWindow(width, height, "title", NULL, hiddenWindow);
+        window = glfwCreateWindow(width, height, "title", NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
@@ -159,6 +157,11 @@ extern "C" {
             << "\n";
             glfwTerminate();
             return;
+        }
+        
+        sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, window);
+        if (sharedWindow) {
+            glfwHideWindow(sharedWindow);
         }
         
         #pragma region Events Setup
@@ -221,9 +224,6 @@ extern "C" {
             
             glfwPollEvents();
             
-            // std::lock_guard<std::recursive_mutex> lock(loop_mutex);
-            
-            
             
             canvas->clear(SK_ColorTRANSPARENT);
             
@@ -245,14 +245,48 @@ extern "C" {
                 wResizeViewer[2] = pendingH;
             }
             
-            // processResizes();
-            
             for (auto element : canvases) {
                 std::lock_guard<std::mutex> lock(element->mutex);
-                canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+                #ifndef __APPLE__
+                if (element->hasBackendTex) {
+                    auto img = SkImages::BorrowTextureFrom(
+                        renderThreadContext->context.get(),
+                        element->backendTex,
+                        kTopLeft_GrSurfaceOrigin,
+                        kN32_SkColorType,
+                        kPremul_SkAlphaType,
+                        nullptr
+                    );
+                    if (img) {
+                        canvas->drawImage(img, 0, 0);
+                    }
+                } else {
+                    canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+                }
+                
+                // Clean up retired textures after the frame delay
+                // ensures the render thread has finished using them
+                auto& retired = element->retiredTextures;
+                for (auto it = retired.begin(); it != retired.end(); ) {
+                    it->framesLeft--;
+                    if (it->framesLeft <= 0) {
+                        GrGLTextureInfo info;
+                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
+                            glDeleteTextures(1, &info.fID);
+                        }
+                        it = retired.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                #else
+                canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+                #endif
             }
             onrefresh();
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+            
+            // Remove GrSyncCpu::kYes to prevent full GPU stalls
+            renderThreadContext->context->flushAndSubmit();
             glfwSwapBuffers(window);
             // loop_mutex.unlock();
         }
@@ -261,6 +295,25 @@ extern "C" {
         glfwDestroyWindow(window);
         glfwTerminate();
         delete renderThreadInterface;
+    }
+    
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {
+        if (!sharedWindow) return false;
+        glfwMakeContextCurrent(sharedWindow);
+        mainThreadIface = new InterfaceWrapper(GrGLMakeNativeInterface());
+        if (!mainThreadIface->interface) return false;
+        mainThreadCtx = new ContextWrapper(
+            GrDirectContexts::MakeGL(mainThreadIface->interface)
+        );
+        gpuContextReady = (mainThreadCtx && mainThreadCtx->context);
+        return gpuContextReady;
+    }
+    
+    WINDOWS_EXPORT void canvas_flush_gpu() {
+        if (!gpuContextReady) return;
+        // Block the JS thread until the GPU finishes drawing.
+        // This guarantees the render thread can read the textures safely.
+        mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
     }
     #else
     WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
@@ -278,8 +331,7 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        // std::cout << hiddenWindow << "\n";
-        window = glfwCreateWindow(width, height, "title", NULL, hiddenWindow);
+        window = glfwCreateWindow(width, height, "title", NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
@@ -335,7 +387,7 @@ extern "C" {
             std::cout << "Surface was not created!\n";
             return;
         };
-
+        
         glfwSwapInterval(0);
         
         canvas = sWrapper->surface->getCanvas();
@@ -346,6 +398,9 @@ extern "C" {
         clearColor.setAntiAlias(1);
         ready = true;
     }
+    
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {}
+    WINDOWS_EXPORT void canvas_flush_gpu() {}
     #endif
     
     #ifndef __APPLE__

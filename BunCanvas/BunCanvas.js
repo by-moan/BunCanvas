@@ -229,13 +229,12 @@ export class Window {
 		this.#dim[1] = height;
 		
 		if (process.platform !== "darwin") {
-			this.#renderThread = new Worker(URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"})));
-		
-			this.#renderThread.postMessage({
-				w: width,
-				h: height,
-			});
-
+			let gpuInitialized = false;
+			this.#renderThread = new Worker(
+				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
+			);
+			this.#renderThread.postMessage({ w: width, h: height });
+			
 			this.#renderThread.onmessage = (msg)=>{
 				if (msg.data == 1) {
 					lib.symbols.destroy_window();
@@ -243,12 +242,17 @@ export class Window {
 					return
 				}
 
+				if (!gpuInitialized) {
+        		    gpuInitialized = true;
+        		    lib.symbols.canvas_init_gpu_context();
+        		}
+				
 				lib.symbols.update_window();
-
+				
 				if (this.#wResizeViewer[0] != 0) {
 					this.#wResizeViewer[0] = 0
 					const details = new Event("resize",this);
-
+					
 					this.#dim[0] = this.#wResizeViewer[1]
 					this.#dim[1] = this.#wResizeViewer[2]
 					if (this.onresize) this.onresize(details)
@@ -310,11 +314,13 @@ export class Window {
 						item.cb(evt);
 					})
 				}
-
+				
 				const pLen = requestedFrames.length
 				for (let i = 0; i < pLen; i++) {
 					(requestedFrames.shift())()
 				}
+
+				lib.symbols.canvas_flush_gpu();
 			}
 		} else {
 			let cb = new JSCallback(()=>{
@@ -323,12 +329,12 @@ export class Window {
 					process.exit(0);
 					return
 				}
-
-
+				
+				
 				if (this.#wResizeViewer[0] != 0) {
 					this.#wResizeViewer[0] = 0
 					const details = new Event("resize",this);
-
+					
 					this.#dim[0] = this.#wResizeViewer[1]
 					this.#dim[1] = this.#wResizeViewer[2]
 					if (this.onresize) this.onresize(details)
@@ -390,7 +396,7 @@ export class Window {
 						item.cb(evt);
 					})
 				}
-
+				
 				const pLen = requestedFrames.length
 				for (let i = 0; i < pLen; i++) {
 					(requestedFrames.shift())()
@@ -413,12 +419,12 @@ export class Window {
 		
 		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 	}
-
+	
 	addEventListener(name,fn){
 		const pop = this.#freeIndex.pop()
 		const usedIndex = pop!=undefined?pop:this.#eIndex;
 		if (usedIndex == this.#eIndex) this.#eIndex++;
-
+		
 		if (name == "resize") {
 			this.#rEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
@@ -457,7 +463,7 @@ export class Window {
 			}
 		}
 	}
-
+	
 	append(canvas){
 		const canvasPtr = ptrs.get(canvas)
 		if (canvasPtr == undefined) {

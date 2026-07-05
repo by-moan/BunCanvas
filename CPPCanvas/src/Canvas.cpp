@@ -1,4 +1,5 @@
 SkPaint clearColor;
+SkPaint pImageDataColor;
 
 std::unordered_map<std::string,SkBlendMode> compositeOperations{{
     {"source-over",SkBlendMode::kSrcOver},
@@ -203,17 +204,20 @@ class BunCanvasRenderingContext2D {
         this->owner = owner;
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
+        strokeColor.setAlpha(255);
         strokeColor.setStrokeWidth(1);
         strokeColor.setAntiAlias(1);
         strokeColor.setBlendMode(compositeOperations.at("source-over"));
         
         imageColor.setColor(SK_ColorWHITE);
+        imageColor.setAlpha(255);
         imageColor.setStyle(SkPaint::kFill_Style);
         imageColor.setAntiAlias(1);
         imageColor.setBlendMode(compositeOperations.at("source-over"));
         
         fillColor.setColor(SK_ColorBLACK);
         fillColor.setStyle(SkPaint::kFill_Style);
+        fillColor.setAlpha(255);
         fillColor.setAntiAlias(1);
         fillColor.setBlendMode(compositeOperations.at("source-over"));
     }
@@ -297,6 +301,7 @@ class BunCanvas {
             }
         }
         if (!surface) {
+            std::cout << "rasted used!\n";
             surface = SkSurfaces::Raster(
                 SkImageInfo::MakeN32Premul(w,h)
             );
@@ -513,7 +518,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->strokeColor.setStrokeWidth(w);
     }
     
@@ -553,6 +558,7 @@ extern "C" {
         
         
         if (obj == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.reset();
     }
     
@@ -561,7 +567,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.moveTo(x,y);
     }
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
@@ -569,7 +575,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.lineTo(x,y);
     }
     
@@ -578,7 +584,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
     }
     
@@ -587,7 +593,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.arcTo({x1,y1},{x2,y2},radius);
     }
     
@@ -596,7 +602,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
@@ -606,6 +612,7 @@ extern "C" {
         if (obj == nullptr) {
             return;
         };
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
     }
     
@@ -614,7 +621,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->pathBuilder.close();
     }
     
@@ -632,7 +639,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return false;
-        
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         try {
             obj->fillColor.setBlendMode(compositeOperations.at(name));
             obj->strokeColor.setBlendMode(compositeOperations.at(name));
@@ -650,7 +657,7 @@ extern "C" {
             return false;
         };
         {
-            
+            nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
             SkImageInfo dstInfo = SkImageInfo::Make(
                 w,h,
                 kRGBA_8888_SkColorType,
@@ -674,6 +681,7 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return false;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         SkImageInfo imageInfo = SkImageInfo::Make(
             w,h,
             kRGBA_8888_SkColorType,
@@ -683,10 +691,55 @@ extern "C" {
         SkBitmap bitmap;
         
         if(bitmap.installPixels(imageInfo,buffer,w *4)){
-            (*obj)()->drawImage(bitmap.asImage(),x,y);
+            
+            (*obj)()->drawImage(bitmap.asImage(),x,y,obj->sampling,&pImageDataColor);
             // std::cout << "Success " << x << " " << y << " " << w << " " << h << " " << "\n";
             return true;
         }
         return false;
+    }
+    WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
+        int _a = 255*std::max(std::min(a,1.f),0.f);
+        if (!canvasObj) return _a;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return _a;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        obj->fillColor.setAlpha(_a);
+        obj->strokeColor.setAlpha(_a);
+        obj->imageColor.setAlpha(_a);
+        return _a;
+    }
+    WINDOWS_EXPORT void canvas_save(void* canvasObj){
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        (*obj)()->save();
+    }
+    WINDOWS_EXPORT void canvas_restore(void* canvasObj){
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        (*obj)()->restore();
+    }
+    WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        (*obj)()->translate(x,y);
+    }
+    WINDOWS_EXPORT void canvas_rotate(void* canvasObj, float deg){
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        (*obj)()->rotate(deg);
     }
 }

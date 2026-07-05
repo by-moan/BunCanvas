@@ -43,6 +43,7 @@ export class ImageData {
 class CanvasRenderingContext2D {
 	#iptr;
 	#lineWidth;
+	#globalAlpha;
 	#compositeOperation;
 	
 	set fillStyle(style) {
@@ -61,6 +62,10 @@ class CanvasRenderingContext2D {
 	set globalCompositeOperation(operation) {
 		if(lib.symbols.canvas_set_composite_operation(this.#iptr,encoder.encode(`${operation}\0`)) == true)
 			this.#compositeOperation = operation
+	}
+
+	set globalAlpha(a) {
+		this.#globalAlpha = lib.symbols.canvas_set_global_alpha(this.#iptr,a)
 	}
 	
 	get globalCompositeOperation(){
@@ -107,6 +112,18 @@ class CanvasRenderingContext2D {
 	}
 	putImageData(data,dx,dy,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
 		lib.symbols.canvas_put_image_data(this.#iptr,dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
+	}
+	save(){
+		lib.symbols.canvas_save(this.#iptr)
+	}
+	restore(){
+		lib.symbols.canvas_restore(this.#iptr)
+	}
+	translate(x,y){
+		lib.symbols.canvas_translate(this.#iptr,x,y)
+	}
+	rotate(deg){
+		lib.symbols.canvas_rotate(this.#iptr,deg)
 	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)

@@ -215,6 +215,7 @@ extern "C" {
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
+        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
         
         ready = true;
         while (!glfwWindowShouldClose(window)) {
@@ -396,6 +397,8 @@ extern "C" {
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
+        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
+
         ready = true;
     }
     

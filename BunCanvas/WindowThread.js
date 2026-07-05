@@ -33,18 +33,14 @@ let h;
 self.onmessage = (msg)=>{
     w = msg.data.w
     h = msg.data.h
-}
 
-const lib = dlopen(path, {
-    setup_render_thread: {
-        args: ["int","int","ptr"],
-        returns: "void",
-    }
-});
-
-
-
-setTimeout(()=>{
+    const lib = dlopen(path, {
+        setup_render_thread: {
+            args: ["int","int","ptr"],
+            returns: "void",
+        }
+    });
     lib.symbols.setup_render_thread(w,h,MessagePost.ptr);
     self.postMessage(1)
-},100);
+}
+

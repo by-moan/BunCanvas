@@ -159,6 +159,26 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","int","int","int","int", "ptr"],
 		returns: "bool",
 	},
+	canvas_set_global_alpha: {
+		args: ["ptr","float"],
+		returns: "float",
+	},
+	canvas_save: {
+		args: ["ptr"],
+		returns: "float",
+	},
+	canvas_restore: {
+		args: ["ptr"],
+		returns: "float",
+	},
+	canvas_translate: {
+		args: ["ptr","float","float"],
+		returns: "float",
+	},
+	canvas_rotate: {
+		args: ["ptr","float"],
+		returns: "float",
+	},
 	image_create: {
 		args: [],
 		returns: "ptr",

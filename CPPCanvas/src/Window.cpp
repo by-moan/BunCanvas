@@ -1,36 +1,22 @@
 bool pollingEvents = false;
 
-int32_t* wResizeViewer = nullptr;
-_Float64_t* mMoveViewer = nullptr;
-_Float64_t* mClickViewer = nullptr;
-_Float64_t* mDownViewer = nullptr;
-_Float64_t* mUpViewer = nullptr;
 
-int32_t* kDownViewer = nullptr;
-int32_t* kUpViewer = nullptr;
 
-void window_resize_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
-            
-    ctxWrapper->context->flush();
-    sWrapper->surface.reset();
-    sWrapper->surface = createSurface(
-        ctxWrapper->context.get(),
-        width,
-        height
-    );
-    canvas = sWrapper->surface->getCanvas();
-    if (pollingEvents == true || wResizeViewer == nullptr) return;
-    wResizeViewer[0] = true;
-    wResizeViewer[1] = width;
-    wResizeViewer[2] = height;
+bool shouldClose = false;
+bool pendingResize = false;
+int pendingW = 1;
+int pendingH = 1;
+void window_resize_callback(GLFWwindow* window, int w, int h) {
+    pendingResize = true;
+    pendingW = w;
+    pendingH = h;
 }
 
 double prevX = 0;
 double prevY = 0;
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (pollingEvents == true || mMoveViewer == nullptr) return;
+    if (pollingEvents == true) return;
     mMoveViewer[0] = true;
     mMoveViewer[1] = xpos;
     mMoveViewer[2] = ypos;
@@ -42,7 +28,7 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 
 bool clickStarted = 0;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (pollingEvents == true || mClickViewer == nullptr || mMoveViewer == nullptr) return;
+    if (pollingEvents == true) return;
     
     if (action == GLFW_PRESS) { //Indicates that the mouse was pressed down.
         clickStarted = (button == GLFW_MOUSE_BUTTON_LEFT)?true:false;
@@ -100,6 +86,7 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
         kDownViewer[5] = (mods&0b100)?true:false;
         //meta key pressed
         kDownViewer[6] = (mods&0b1000)?true:false;
+        
     }
     if(action == 2) {
         kDownViewer[1] = true;
@@ -124,40 +111,34 @@ void window_refresh_callback(GLFWwindow* window) {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     canvas->clear(SK_ColorTRANSPARENT);
-    
+    std::cout << "refresh\n"; 
     
     for (auto element : canvases) {
-        canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+        {
+            // std::lock_guard<std::mutex> lock(element->mutex);
+            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
+        }
     }
-    ctxWrapper->context->flushAndSubmit();
+    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
     glfwSwapBuffers(window);
 }
 
+typedef int (*JSCallback_WRefresh)();
+
+
 extern "C" {
-    WINDOWS_EXPORT void create_window(int w, int h, const char* title,
-        int32_t* wRViewer,
-        _Float64_t* mMViewer,
-        _Float64_t* mCViewer,
-        _Float64_t* mDViewer, 
-        _Float64_t* mUViewer,
-        int32_t* kDViewer,
-        int32_t* kUViewer
-    ){
+    WINDOWS_EXPORT void create_window(int w, int h, const char* title){
+    }
+    
+    #ifndef __APPLE__
+    // Called in the bun worker thread.
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
         };
-        wResizeViewer = wRViewer;
-        mMoveViewer = mMViewer;
-        mClickViewer = mCViewer;
-        mDownViewer = mDViewer;
-        mUpViewer = mUViewer;
-
-        // wResizeViewer[0] = w;
-        // wResizeViewer[1] = h;
-        
-        kDownViewer = kDViewer;
-        kUpViewer = kUViewer;
+        width = w;
+        height = h;
         
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -166,16 +147,21 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(w, h, title, NULL, NULL);
+        window = glfwCreateWindow(width, height, "title", NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
             int code = glfwGetError(&desc);
             std::cerr << "GLFW error " << code << ": "
-              << (desc ? desc : "unknown")
-              << "\n";
+            << (desc ? desc : "unknown")
+            << "\n";
             glfwTerminate();
             return;
+        }
+        
+        sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, window);
+        if (sharedWindow) {
+            glfwHideWindow(sharedWindow);
         }
         
         #pragma region Events Setup
@@ -188,17 +174,16 @@ extern "C" {
         #pragma endregion
         
         glfwMakeContextCurrent(window);
-        auto iface = GrGLMakeNativeInterface();
-        
-        if (!iface) {
+        renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
+        if (!renderThreadInterface->interface) {
             std::cout << "Native interface failed\n";
             return;
         }
         
         std::cout << "Native interface OK\n";
         
-        ctxWrapper = new ContextWrapper(GrDirectContexts::MakeGL(iface));
-        if (!ctxWrapper->context) {
+        renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
+        if (!renderThreadContext->context) {
             std::cout << "Context was not created!\n";
             return;
         };
@@ -214,7 +199,7 @@ extern "C" {
         currentHeight = height;
         
         sWrapper = new SurfaceWrapper(createSurface(
-            ctxWrapper->context.get(),
+            renderThreadContext->context.get(),
             width,
             height
         ));
@@ -230,66 +215,257 @@ extern "C" {
         clearColor.setStyle(SkPaint::kFill_Style);
         clearColor.setBlendMode(SkBlendMode::kClear);
         clearColor.setAntiAlias(1);
-
-        #ifdef _WIN64
-        glfwSwapInterval(0);
-        #endif
+        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
+        
+        ready = true;
+        while (!glfwWindowShouldClose(window)) {
+            // loop_mutex.lock();
+            
+            glfwGetFramebufferSize(window, &width, &height);
+            
+            glfwPollEvents();
+            
+            
+            canvas->clear(SK_ColorTRANSPARENT);
+            
+            if (pendingResize == true){
+                pendingResize = false;
+                glViewport(0, 0, pendingW, pendingH);
+                width = pendingW;
+                height = pendingH;
+                sWrapper->surface.reset();
+                sWrapper->surface = createSurface(
+                    renderThreadContext->context.get(),
+                    pendingW,
+                    pendingH
+                );
+                canvas = sWrapper->surface->getCanvas();
+                // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                wResizeViewer[0] = true;
+                wResizeViewer[1] = pendingW;
+                wResizeViewer[2] = pendingH;
+            }
+            
+            for (auto element : canvases) {
+                std::lock_guard<std::mutex> lock(element->mutex);
+                #ifndef __APPLE__
+                if (element->hasBackendTex) {
+                    auto img = SkImages::BorrowTextureFrom(
+                        renderThreadContext->context.get(),
+                        element->backendTex,
+                        kTopLeft_GrSurfaceOrigin,
+                        kN32_SkColorType,
+                        kPremul_SkAlphaType,
+                        nullptr
+                    );
+                    if (img) {
+                        canvas->drawImage(img, 0, 0);
+                    }
+                } else {
+                    canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+                }
+                
+                // Clean up retired textures after the frame delay
+                // ensures the render thread has finished using them
+                auto& retired = element->retiredTextures;
+                for (auto it = retired.begin(); it != retired.end(); ) {
+                    it->framesLeft--;
+                    if (it->framesLeft <= 0) {
+                        GrGLTextureInfo info;
+                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
+                            glDeleteTextures(1, &info.fID);
+                        }
+                        it = retired.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                #else
+                canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+                #endif
+            }
+            onrefresh();
+            
+            // Remove GrSyncCpu::kYes to prevent full GPU stalls
+            renderThreadContext->context->flushAndSubmit();
+            glfwSwapBuffers(window);
+            // loop_mutex.unlock();
+        }
+        ready = false;
+        shouldClose = true;
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        delete renderThreadInterface;
     }
     
-    WINDOWS_EXPORT void update_window(
-        int32_t* wRViewer,
-        _Float64_t* mMViewer,
-        _Float64_t* mCViewer,
-        _Float64_t* mDViewer,
-        _Float64_t* mUViewer,
-        int32_t* kDViewer,
-        int32_t* kUViewer
-    ){
-        if (wRViewer != wResizeViewer) wResizeViewer = wRViewer;
-        if (mMViewer != mMoveViewer) mMoveViewer = mMViewer;
-        if (mCViewer != mClickViewer) mClickViewer = mCViewer; 
-        if (mDViewer != mDownViewer) mDownViewer = mDViewer; 
-        if (mUViewer != mUpViewer) mUpViewer = mUViewer; 
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {
+        if (!sharedWindow) return false;
+        glfwMakeContextCurrent(sharedWindow);
+        mainThreadIface = new InterfaceWrapper(GrGLMakeNativeInterface());
+        if (!mainThreadIface->interface) return false;
+        mainThreadCtx = new ContextWrapper(
+            GrDirectContexts::MakeGL(mainThreadIface->interface)
+        );
+        gpuContextReady = (mainThreadCtx && mainThreadCtx->context);
+        return gpuContextReady;
+    }
+    
+    WINDOWS_EXPORT void canvas_flush_gpu() {
+        if (!gpuContextReady) return;
+        // Block the JS thread until the GPU finishes drawing.
+        // This guarantees the render thread can read the textures safely.
+        mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+    }
+    #else
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
+        if (!glfwInit()) {
+            std::cerr << "Couldn't initialize GLFW...\n";
+            return;
+        };
+        width = w;
+        height = h;
         
-        if (kDViewer != kDownViewer) kDownViewer = kDViewer; 
-        if (kUViewer != kUpViewer) kUpViewer = kUViewer; 
-        int width, height;
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_STENCIL_BITS, 8);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+        
+        window = glfwCreateWindow(width, height, "title", NULL, NULL);
+        if (!window) {
+            std::cerr << "Couldn't initialize Window...\n";
+            const char* desc;
+            int code = glfwGetError(&desc);
+            std::cerr << "GLFW error " << code << ": "
+            << (desc ? desc : "unknown")
+            << "\n";
+            glfwTerminate();
+            return;
+        }
+        
+        #pragma region Events Setup
+        
+        glfwSetWindowSizeCallback(window, window_resize_callback);
+        glfwSetCursorPosCallback(window, cursor_pos_callback);
+        glfwSetMouseButtonCallback(window, mouse_button_callback);
+        glfwSetKeyCallback(window,keyboard_key_callback);
+        glfwSetWindowRefreshCallback(window, window_refresh_callback);
+        #pragma endregion
+        
+        glfwMakeContextCurrent(window);
+        renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
+        if (!renderThreadInterface->interface) {
+            std::cout << "Native interface failed\n";
+            return;
+        }
+        
+        std::cout << "Native interface OK\n";
+        
+        renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
+        if (!renderThreadContext->context) {
+            std::cout << "Context was not created!\n";
+            return;
+        };
+        
+        GrGLFramebufferInfo fbInfo;
+        fbInfo.fFBOID = 0;
+        fbInfo.fFormat = GL_RGBA8;
+        
+        
         glfwGetFramebufferSize(window, &width, &height);
+        
+        currentWidth = width;
+        currentHeight = height;
+        
+        sWrapper = new SurfaceWrapper(createSurface(
+            renderThreadContext->context.get(),
+            width,
+            height
+        ));
+        
+        if (!sWrapper->surface) {
+            std::cout << "Surface was not created!\n";
+            return;
+        };
+        
+        glfwSwapInterval(0);
+        
+        canvas = sWrapper->surface->getCanvas();
+        
+        clearColor.setColor(SK_ColorTRANSPARENT);
+        clearColor.setStyle(SkPaint::kFill_Style);
+        clearColor.setBlendMode(SkBlendMode::kClear);
+        clearColor.setAntiAlias(1);
+        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
+
+        ready = true;
+    }
+    
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {}
+    WINDOWS_EXPORT void canvas_flush_gpu() {}
+    #endif
+    
+    #ifndef __APPLE__
+    WINDOWS_EXPORT void update_window( JSCallback_WRefresh onrefresh){}
+    #else
+    WINDOWS_EXPORT void update_window(JSCallback_WRefresh onrefresh){
+        glfwGetFramebufferSize(window, &width, &height);
+        
+        glfwPollEvents();
         canvas->clear(SK_ColorTRANSPARENT);
         
+        if (pendingResize == true){
+            pendingResize = false;
+            glViewport(0, 0, pendingW, pendingH);
+            width = pendingW;
+            height = pendingH;
+            sWrapper->surface.reset();
+            sWrapper->surface = createSurface(
+                renderThreadContext->context.get(),
+                pendingW,
+                pendingH
+            );
+            canvas = sWrapper->surface->getCanvas();
+            // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+            wResizeViewer[0] = true;
+            wResizeViewer[1] = pendingW;
+            wResizeViewer[2] = pendingH;
+        }
+        
+        // processResizes();
+        onrefresh();
         
         for (auto element : canvases) {
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
         }
-        ctxWrapper->context->flushAndSubmit();
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
         glfwSwapBuffers(window);
-        glfwPollEvents();
-
-        // #ifdef _WIN64
-        // GLFWmonitor* monitor = glfwGetWindowMonitor(window);
-        // if (!monitor)
-        //     monitor = glfwGetPrimaryMonitor();
-            
-        // const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        
-        // int refreshRate = mode->refreshRate;
-        // std::cout << refreshRate << "\n";
-        // std::this_thread::sleep_for(
-        //     std::chrono::microseconds(
-        //         static_cast<int>(1000000.0 / refreshRate)
-        //     )
-        // );
-        // #endif
     }
+    #endif
     
     
+    
+    
+    
+    
+    #ifndef __APPLE__
+    WINDOWS_EXPORT bool should_window_close() {
+        return shouldClose;
+    }
+    WINDOWS_EXPORT void destroy_window() {
+        // delete ptr;
+    }
+    #else
     WINDOWS_EXPORT bool should_window_close() {
         return glfwWindowShouldClose(window);
     }
-    
     WINDOWS_EXPORT void destroy_window() {
+        ready = false;
         glfwDestroyWindow(window);
         glfwTerminate();
-        // delete ptr;
+        delete renderThreadInterface;
     }
+    
+    #endif
 }

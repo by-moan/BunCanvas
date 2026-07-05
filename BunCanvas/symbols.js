@@ -10,24 +10,52 @@ if (process.platform === "win32") {
 	extension = "so"
 }
 
-const path = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+export const dlPath = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
 
-const exists = await Bun.file(path).exists();
+const exists = await Bun.file(dlPath).exists();
 
 if(!exists) {
-	console.error(`${path} was not found in the working directory!`)
+	console.error(`${dlPath} was not found in the working directory!`)
 	process.exit(-1)
 }
 
 export const encoder = new TextEncoder();
 
-export const lib = dlopen(path, {
+export const lib = dlopen(dlPath, {
+	get_wResizeViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mMoveViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mClickViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mDownViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_mUpViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_kDownViewer:{
+		args: [],
+		returns: "ptr",
+	},
+	get_kUpViewer:{
+		args: [],
+		returns: "ptr",
+	},
 	create_window: {
-		args: ["int","int", "cstring", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr"],
+		args: ["int","int", "cstring"],
 		returns: "void",
 	},
 	update_window: {
-		args: ["ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr", "ptr"],
+		args: ["ptr"],
 		returns: "void",
 	},
 	should_window_close: {
@@ -35,6 +63,14 @@ export const lib = dlopen(path, {
 		returns: "bool",
 	},
 	destroy_window: {
+		args: [],
+		returns: "void",
+	},
+	canvas_init_gpu_context: {
+		args: [],
+		returns: "bool",
+	},
+	canvas_flush_gpu: {
 		args: [],
 		returns: "void",
 	},
@@ -122,6 +158,26 @@ export const lib = dlopen(path, {
 	canvas_put_image_data: {
 		args: ["ptr","int","int","int","int", "ptr"],
 		returns: "bool",
+	},
+	canvas_set_global_alpha: {
+		args: ["ptr","float"],
+		returns: "float",
+	},
+	canvas_save: {
+		args: ["ptr"],
+		returns: "float",
+	},
+	canvas_restore: {
+		args: ["ptr"],
+		returns: "float",
+	},
+	canvas_translate: {
+		args: ["ptr","float","float"],
+		returns: "float",
+	},
+	canvas_rotate: {
+		args: ["ptr","float"],
+		returns: "float",
 	},
 	image_create: {
 		args: [],

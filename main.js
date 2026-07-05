@@ -1,9 +1,11 @@
 import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas";
 
-const canvas = new Canvas(600,500)
-const ctx = canvas.getContext("2d")
+
 
 const window = new Window(800,600)
+
+const canvas = new Canvas(window.innerWidth,window.innerHeight)
+const ctx = canvas.getContext("2d")
 
 const img = new Image();
 
@@ -45,6 +47,7 @@ function loop() {
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
     ctx.fillStyle = "cornflowerblue"
+    // ctx.fillRect(x-25,y-25,50,50)
     ctx.strokeStyle = "#413b72"
     ctx.lineWidth = 2
 
@@ -64,15 +67,22 @@ function loop() {
     ctx.arc(100, 75, 50, 0, 2 * Math.PI);
     ctx.stroke();
 
-    
 
     ctx.globalCompositeOperation = "screen"
     ctx.drawImage(img, x-75,y-75,150,150);
-    // ctx.fillRect(x-25,y-25,50,50)
-    ctx.globalCompositeOperation = "source-over"
-
+    ctx.globalAlpha = 0.5;
+    ctx.save();
+    ctx.translate(x-150,y);
+    ctx.rotate(45);
+    ctx.drawImage(img, -75,-75,150,150);
+    ctx.restore();
+    ctx.globalAlpha = 1;
     let data = ctx.getImageData(10,10,200,200);
     ctx.putImageData(data,30,200)
+
+    ctx.globalCompositeOperation = "source-over"
+
+    
     requestAnimationFrame(loop)
 }
 

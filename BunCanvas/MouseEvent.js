@@ -16,6 +16,24 @@ export class MouseEvent extends Event {
     type = ""
 
 
+    /**
+    * @param {string} type
+    * @param {{
+    *   altKey?: any,
+    *   button?: any,
+    *   buttons?: any,
+    *   clientX?: any,
+    *   clientY?: any,
+    *   movementX?: any,
+    *   movementY?: any,
+    *   ctrlKey?: any,
+    *   metaKey?: any,
+    *   screenX?: any,
+    *   screenY?: any,
+    *   shiftKey?: any,
+    *   target?: any
+    * }} [args]
+    */
     constructor(type, args = {altKey:false, button:0, buttons:0, clientX:0, clientY:0, movementX: 0, movementY: 0, ctrlKey:false, metaKey:false, screenX:0, screenY:0, shiftKey:false, target:null}){
         super(type,args.target)
         this.altKey = args.altKey

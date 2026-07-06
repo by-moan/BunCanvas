@@ -286,7 +286,6 @@ extern "C" {
             }
             onrefresh();
             
-            // Remove GrSyncCpu::kYes to prevent full GPU stalls
             renderThreadContext->context->flushAndSubmit();
             glfwSwapBuffers(window);
             // loop_mutex.unlock();

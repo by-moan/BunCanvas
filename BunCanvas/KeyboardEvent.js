@@ -245,7 +245,17 @@ export class KeyboardEvent extends Event {
 	altKey = false
 	metaKey = false
 	
-	
+	/**
+    * @param {string} type
+    * @param {any} args
+	* @param {any} kcode
+	* @param {any} target
+	* @param {any} repeat
+	* @param {any} shiftKey
+	* @param {any} ctrlKey
+	* @param {any} altKey
+	* @param {any} metaKey
+    */
 	constructor(type, args = {
 		target: null,
 		key: "",

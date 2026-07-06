@@ -1,7 +1,9 @@
 .DS_Store
+*_ignore.*
 /build/*
 /nvg_demo
 /CPPCanvas/Thirdparty/*
 /CPPCanvas/build/*
 *.BAK
 *_BAK
+node_modules

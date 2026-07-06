@@ -1,4 +1,5 @@
 SkPaint clearColor;
+SkPaint noAlphaClearColor;
 SkPaint pImageDataColor;
 
 std::unordered_map<std::string,SkBlendMode> compositeOperations{{
@@ -186,6 +187,10 @@ std::unordered_map<std::string,SkColor4f> keywordColors{{
 
 class BunCanvas;
 
+enum Rendering2DContextSettings {
+    A = 0
+};
+
 class BunCanvasRenderingContext2D {
     SkCanvas* ctx = nullptr;
     public:
@@ -199,6 +204,8 @@ class BunCanvasRenderingContext2D {
     
     SkSamplingOptions sampling;
     bool locked = false;
+
+    float globalAlpha = 1.f;
     
     BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
         this->owner = owner;
@@ -463,12 +470,70 @@ extern "C" {
         }catch (std::exception){\
             if (obj == nullptr) return false;\
             if (c[0] == '#') {\
-                unsigned int rgb = std::strtoul(c+1, nullptr, 16);\
+                if (std::strlen(c) == 7) {\
+                    unsigned int rgb = std::strtoul(c+1, nullptr, 16);\
+                    target.setColor(SkColor4f{\
+                        ((rgb >> 16) & 0xFF) / 255.f,\
+                        ((rgb >> 8) & 0xFF) / 255.f,\
+                        (rgb & 0xFF) / 255.f,\
+                        1.0f\
+                    });\
+                    return true;\
+                }\
+                if (std::strlen(c) == 9) {\
+                    unsigned int rgb = std::strtoul(c+1, nullptr, 16);\
+                    target.setColor(SkColor4f{\
+                        ((rgb >> 24) & 0xFF) / 255.f,\
+                        ((rgb >> 16) & 0xFF) / 255.f,\
+                        ((rgb >> 8) & 0xFF) / 255.f,\
+                        (rgb & 0xFF) / 255.f\
+                    });\
+                    return true;\
+                }\
+                return false;\
+            }\
+            if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == 'a' && c[4] == '(') {\
+                c+=5;\
+                int r = 0;\
+                while (*c >= '0' && *c <= '9') {\
+                    r = r * 10 + (*c - '0');\
+                    ++c;\
+                }\
+                r = std::max(r,0);\
+                r = std::min(r,255);\
+                while (*c == ' ' || *c == ',') ++c;\
+                int g = 0;\
+                while (*c >= '0' && *c <= '9') {\
+                    g = g * 10 + (*c - '0');\
+                    ++c;\
+                }\
+                g = std::max(g,0);\
+                g = std::min(g,255);\
+                while (*c == ' ' || *c == ',') ++c;\
+                int b = 0;\
+                while (*c >= '0' && *c <= '9') {\
+                    b = b * 10 + (*c - '0');\
+                    ++c;\
+                }\
+                b = std::min(std::max(b,0),255);\
                 target.setColor(SkColor4f{\
-                    ((rgb >> 16) & 0xFF) / 255.f,\
-                    ((rgb >> 8) & 0xFF) / 255.f,\
-                    (rgb & 0xFF) / 255.f,\
+                    (float)r / 255.f,\
+                    (float)g / 255.f,\
+                    (float)b / 255.f,\
                     1.0f\
+                });\
+                while (*c == ' ' || *c == ',') ++c;\
+                int a = 0;\
+                while (*c >= '0' && *c <= '9') {\
+                    a = a * 10 + (*c - '0');\
+                    ++c;\
+                }\
+                a = std::min(std::max(a,0),255);\
+                target.setColor(SkColor4f{\
+                    (float)r / 255.f,\
+                    (float)g / 255.f,\
+                    (float)b / 255.f,\
+                    (float)a / 255.f,\
                 });\
                 return true;\
             }\
@@ -527,8 +592,9 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->fillColor);
+        SkPaint fColor = obj->fillColor;
+        fColor.setAlphaf(obj->fillColor.getAlphaf()*obj->globalAlpha);
+        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), fColor);
     }
     
     WINDOWS_EXPORT void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
@@ -613,7 +679,10 @@ extern "C" {
             return;
         };
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->drawPath(obj->pathBuilder.snapshot(), obj->strokeColor);
+
+        SkPaint sColor = obj->strokeColor;
+        sColor.setAlphaf(obj->strokeColor.getAlphaf()*obj->globalAlpha);
+        (*obj)()->drawPath(obj->pathBuilder.snapshot(), sColor);
     }
     
     WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
@@ -625,13 +694,38 @@ extern "C" {
         obj->pathBuilder.close();
     }
     
-    WINDOWS_EXPORT void canvas_draw_image(void* canvasObj, void* image, float x,float y,float w,float h) {
+    WINDOWS_EXPORT void canvas_draw_image_imageType(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+    }
+
+    WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float x,float y,float w,float h) {
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvas* img = validated(image);
+        if (obj == nullptr || img == nullptr) return;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(std::lock_guard<std::mutex> lock2(img->mutex));
+        if (img->hasBackendTex) {
+            auto _img = SkImages::BorrowTextureFrom(
+                renderThreadContext->context.get(),
+                img->backendTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
+            if (_img) {
+                (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+            }
+        } else {
+            auto _img = img->surface->makeTemporaryImage();
+            (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+        }
     }
     
     WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {
@@ -664,6 +758,9 @@ extern "C" {
                 kPremul_SkAlphaType
             );
             size_t rowBytes = w * 4;
+
+
+            // if (obj->owner->hasBackendTex) renderThreadContext->context->flushAndSubmit();
             
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
                 dstInfo, 
@@ -675,6 +772,59 @@ extern "C" {
             );
         }
     }
+
+    // WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
+    //     if (!canvasObj) return false;
+    //     BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    //     if (obj == nullptr) {
+    //         return false;
+    //     };
+    //     {
+    //         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+    //         SkImageInfo dstInfo = SkImageInfo::Make(
+    //             w,h,
+    //             kRGBA_8888_SkColorType,
+    //             kPremul_SkAlphaType
+    //         );
+    //         size_t rowBytes = w * 4;
+            
+    //         if (obj->owner->hasBackendTex) {
+    //             auto _img = SkImages::BorrowTextureFrom(
+    //                 renderThreadContext->context.get(),
+    //                 obj->owner->backendTex,
+    //                 kTopLeft_GrSurfaceOrigin,
+    //                 kN32_SkColorType,
+    //                 kPremul_SkAlphaType,
+    //                 nullptr
+    //             );
+    //             if (_img) return _img->makeNonTextureImage()->readPixels(
+    //                     dstInfo, 
+    //                     out_buffer, 
+    //                     rowBytes, 
+    //                     x, 
+    //                     y, 
+    //                     SkImage::CachingHint::kDisallow_CachingHint
+    //                 );
+    //             return false;
+    //         } else {
+    //             auto _img = obj->owner->surface->makeTemporaryImage();
+    //             // (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+    //             if (_img) return _img->readPixels(
+    //                 dstInfo, 
+    //                 out_buffer, 
+    //                 rowBytes, 
+    //                 x, 
+    //                 y, 
+    //                 SkImage::CachingHint::kDisallow_CachingHint
+    //             );
+
+    //             return false;
+    //         }
+            
+            
+    //     }
+    // }
+    
     
     WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
         if (!canvasObj) return false;
@@ -689,6 +839,7 @@ extern "C" {
         );
         
         SkBitmap bitmap;
+
         
         if(bitmap.installPixels(imageInfo,buffer,w *4)){
             
@@ -699,15 +850,16 @@ extern "C" {
         return false;
     }
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
-        int _a = 255*std::max(std::min(a,1.f),0.f);
+        float _a = std::max(std::min(a,1.f),0.f);
         if (!canvasObj) return _a;
         BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
         
         if (obj == nullptr) return _a;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        obj->fillColor.setAlpha(_a);
-        obj->strokeColor.setAlpha(_a);
-        obj->imageColor.setAlpha(_a);
+        obj->globalAlpha = _a;
+        // obj->fillColor.setAlpha(_a);
+        // obj->strokeColor.setAlpha(_a);
+        obj->imageColor.setAlphaf(_a);
         return _a;
     }
     WINDOWS_EXPORT void canvas_save(void* canvasObj){

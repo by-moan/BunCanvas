@@ -146,7 +146,11 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "cstring"],
 		returns: "bool",
 	},
-	canvas_draw_image: {
+	canvas_draw_image_imageType: {
+		args: ["ptr","ptr","float","float","float","float"],
+		returns: "void",
+	},
+	canvas_draw_image_canvasType: {
 		args: ["ptr","ptr","float","float","float","float"],
 		returns: "void",
 	},

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "types": ["bun", "node"],
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "exclude": [
+    "BunCanvas_BAK",
+    "CPPCanvas/Thirdparty",
+    "node_modules"
+  ]
+}

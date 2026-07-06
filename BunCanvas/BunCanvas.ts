@@ -1,62 +1,62 @@
-import { lib,encoder, dlPath } from "./symbols";
-import { Event } from "./Event";
-import { MouseEvent } from "./MouseEvent"
+import { lib,encoder, dlPath } from "./symbols.js";
+import { Event } from "./Event.js";
+import { MouseEvent } from "./MouseEvent.js"
 
-import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
+import { dlopen, ptr, toArrayBuffer, JSCallback, FFIType, Pointer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
 
 import WindowThread from "./WindowThread.js?raw";
 
-const requestedFrames = []
+
+const requestedFrames : any[] = []
 const ptrs = new WeakMap();
 
 export class Image {
 	constructor() {
-		ptrs.set(this,lib.symbols.image_create(encoder.encode(`\0`)))
+		ptrs.set(this,lib.symbols.image_create())
 	}
 	
-	onload = ()=>{}
-	onerror = ()=>{}
+	onload: ((this: Image, evt: Event) => any) | null = null;
+	onerror: ((this: Image, evt: Event) => any) | null = null;
 	
-	set src(path){
+	set src(path : string){
 		if (lib.symbols.image_set_src(ptrs.get(this), encoder.encode(`${path}\0`))) {
-			this.onload(new Event("load",this));
+			this.onload instanceof Function ? this.onload(new Event("load",this)):undefined;
 		}else {
-			this.onerror(new Event("error",this));
+			this.onerror instanceof Function ? this.onerror(new Event("error",this)):undefined;
 		}
 	}
 }
 
 export class ImageData {
-	width = 0;
-	height = 0;
-	data = null;
-	constructor(width,height,data){
+	width : number;
+	height : number;
+	data : Uint8Array;
+	constructor(width : number,height : number,data : Uint8Array){
 		this.width = width;
 		this.height = height;
-		if (data instanceof Uint8Array){
-			this.data = data;
-		}
+		this.data = data;
+
 	}
 }
 
 class CanvasRenderingContext2D {
-	#iptr;
-	#lineWidth;
-	#globalAlpha;
-	#compositeOperation;
+	#iptr : Pointer | null;
+	#lineWidth = 0;
+	#globalAlpha = 1;
+	#compositeOperation = "source-over";
 	
-	set fillStyle(style) {
-		lib.symbols.canvas_set_fill_style(this.#iptr,encoder.encode(`${style}\0`))
+	set fillStyle(style : string) {
+		lib.symbols.canvas_set_fill_style(this.#iptr,encoder.encode(`${style.trim()}\0`))
 	}
-	set strokeStyle(style) {
-		lib.symbols.canvas_set_stroke_style(this.#iptr,encoder.encode(`${style}\0`))
+	set strokeStyle(style : string) {
+		lib.symbols.canvas_set_stroke_style(this.#iptr,encoder.encode(`${style.trim()}\0`))
 	}
-	set lineWidth(width) {
+	set lineWidth(width : number) {
 		lib.symbols.canvas_set_stroke_width(this.#iptr,width)
 		this.#lineWidth = width
 	}
-	get lineWidth() {
+	get lineWidth() : number {
 		return this.#lineWidth
 	}
 	set globalCompositeOperation(operation) {
@@ -64,7 +64,7 @@ class CanvasRenderingContext2D {
 			this.#compositeOperation = operation
 	}
 
-	set globalAlpha(a) {
+	set globalAlpha(a : number) {
 		this.#globalAlpha = lib.symbols.canvas_set_global_alpha(this.#iptr,a)
 	}
 	
@@ -72,28 +72,28 @@ class CanvasRenderingContext2D {
 		return this.#compositeOperation
 	}
 	
-	fillRect(x,y,w,h){
+	fillRect(x : number,y : number,w : number,h : number){
 		lib.symbols.canvas_fill_rect(this.#iptr,x,y,w,h)
 	}
-	clearRect(x,y,w,h){
+	clearRect(x : number, y : number, w : number, h : number){
 		lib.symbols.canvas_clear_rect(this.#iptr,x,y,w,h)
 	}
-	beginPath(x,y,w,h){
+	beginPath(){
 		lib.symbols.canvas_path_begin(this.#iptr)
 	}
-	moveTo(x,y){
+	moveTo(x : number,y : number){
 		lib.symbols.canvas_path_move_to(this.#iptr,x,y)
 	}
-	lineTo(x,y){
+	lineTo(x : number,y : number){
 		lib.symbols.canvas_path_line_to(this.#iptr,x,y)
 	}
-	arc(x, y, radius, startAngle, endAngle){
+	arc(x : number, y : number, radius : number, startAngle : number, endAngle : number){
 		lib.symbols.canvas_path_arc(this.#iptr,x, y, radius, startAngle, endAngle)
 	}
-	arcTo(x1, y1, x2, y2, radius){
+	arcTo(x1 : number, y1 : number, x2 : number, y2 : number, radius : number){
 		lib.symbols.canvas_path_arc_to(this.#iptr,x1, y1, x2, y2, radius)
 	}
-	bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y){
+	bezierCurveTo(cp1x : number, cp1y : number, cp2x : number, cp2y : number, x : number, y : number){
 		lib.symbols.canvas_path_bezier_to(this.#iptr,cp1x, cp1y, cp2x, cp2y, x, y)
 	}
 	closePath(){
@@ -102,15 +102,28 @@ class CanvasRenderingContext2D {
 	stroke(){
 		lib.symbols.canvas_path_stroke(this.#iptr)
 	}
-	drawImage(img,x,y,w,h) {
-		lib.symbols.canvas_draw_image(this.#iptr,ptrs.get(img),x,y,w,h);
+
+	drawImage(img : Image, x : number, y : number, w : number,h : number) : void;
+	drawImage(img : Canvas, x : number, y : number, w : number,h : number) : void;
+
+	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) {
+		if (img instanceof Image) {
+			lib.symbols.canvas_draw_image_imageType(this.#iptr,ptrs.get(img),Number(x),Number(y),Number(w),Number(h))
+			return;
+		}
+		if (img instanceof Canvas) {
+			lib.symbols.canvas_draw_image_canvasType(this.#iptr,ptrs.get(img),Number(x),Number(y),Number(w),Number(h))
+			return;
+		}
+
+		throw new TypeError("Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(Image or Canvas)'.")
 	}
-	getImageData(x,y,w,h) {
+	getImageData(x : number, y : number, w : number,h : number) {
 		const arr = new Uint8Array(w*h*4);
-		if (lib.symbols.canvas_get_image_data(this.#iptr,x,y,w,h, ptr(arr)) == false) console.error("unsuccessful");
+		lib.symbols.canvas_get_image_data(this.#iptr,x,y,w,h, ptr(arr));
 		return new ImageData(w,h,arr);
 	}
-	putImageData(data,dx,dy,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
+	putImageData(data : ImageData,dx : number,dy : number ,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
 		lib.symbols.canvas_put_image_data(this.#iptr,dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
 	}
 	save(){
@@ -119,16 +132,16 @@ class CanvasRenderingContext2D {
 	restore(){
 		lib.symbols.canvas_restore(this.#iptr)
 	}
-	translate(x,y){
+	translate(x : number,y : number){
 		lib.symbols.canvas_translate(this.#iptr,x,y)
 	}
-	rotate(deg){
+	rotate(deg : number){
 		lib.symbols.canvas_rotate(this.#iptr,deg)
 	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr) {
+	constructor(iptr : Pointer | null) {
 		
 		
 		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
@@ -144,8 +157,7 @@ class CanvasRenderingContext2D {
 	for (const key of Object.getOwnPropertyNames(proto)) {
 		const desc = Object.getOwnPropertyDescriptor(proto, key);
 		if (key == "constructor"){
-			desc.value.toString = () =>
-				`function ${proto.constructor.name}() { [native code] }`;
+			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
 			continue
 		}
 		if (typeof desc?.value === "function") {
@@ -180,7 +192,7 @@ export class Canvas {
 		return this.#dim[1]
 	}
 	
-	getContext(contextType) {
+	getContext(contextType : string) {
 		if (contextType == "2d") {
 			return new CanvasRenderingContext2D(this.#iptr)
 		}
@@ -193,8 +205,7 @@ export class Canvas {
 	for (const key of Object.getOwnPropertyNames(proto)) {
 		const desc = Object.getOwnPropertyDescriptor(proto, key);
 		if (key == "constructor"){
-			desc.value.toString = () =>
-				`function ${proto.constructor.name}() { [native code] }`;
+			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
 			continue
 		}
 		if (typeof desc?.value === "function") {
@@ -205,8 +216,6 @@ export class Canvas {
 }
 
 export class Window {
-	#wndPtr;
-	
 	#dim = new Float64Array(2);
 	
 	#rEvts = new Map();
@@ -219,10 +228,10 @@ export class Window {
 	#freeIndex = new Array();
 	#eIndex = 0
 	
-	onresize = null
-	onmousemove = null
-	onclick = null
-	onkeydown = null
+	onresize : ((this: Window, evt: Event) => any) | null = null;
+	onmousemove : ((evt: MouseEvent) => any) | null = null;
+	onclick : ((evt: MouseEvent) => any) | null = null;
+	onkeydown : ((evt: KeyboardEvent) => any) | null = null;
 	
 	get innerWidth(){
 		return this.#dim[0]
@@ -231,17 +240,17 @@ export class Window {
 		return this.#dim[1]
 	}
 	
-	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer(),0, 3 * 4));
-	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer(),0, 9 * 8));
-	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer(),0, 9 * 8));
-	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer(),0, 9 * 8));
-	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer(),0, 9 * 8));
-	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer(),0, 7 * 4));
-	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer(),0, 7 *4 ));
+	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer()!,0, 3 * 4));
+	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
+	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
+	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
+	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
+	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
+	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 *4 ));
 	
-	#renderThread = null;
+	#renderThread : Worker | null;
 	
-	constructor(width, height, title = "App") {
+	constructor(width : number, height : number, title = "App") {
 		this.#dim[0] = width;
 		this.#dim[1] = height;
 		
@@ -324,7 +333,7 @@ export class Window {
 					})
 				}
 				if(this.#kDownViewer[0] != 0) {
-					this.#kDownViewer[0] = false;
+					this.#kDownViewer[0] = 0;
 					const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
 					if (this.onkeydown) this.onkeydown(evt)
 						this.#keyDownEvts.forEach((item,key)=>{
@@ -340,6 +349,7 @@ export class Window {
 				lib.symbols.canvas_flush_gpu();
 			}
 		} else {
+			this.#renderThread  = null;
 			let cb = new JSCallback(()=>{
 				if (lib.symbols.should_window_close()) {
 					lib.symbols.destroy_window();
@@ -354,15 +364,19 @@ export class Window {
 					
 					this.#dim[0] = this.#wResizeViewer[1]
 					this.#dim[1] = this.#wResizeViewer[2]
-					if (this.onresize) this.onresize(details)
+					if (this.onresize) {
+						this.onresize(details)
+
 						this.#rEvts.forEach((item,key)=>{
-						item.cb(details);
-					})
+							item.cb(details);
+						})
+					}
 				}
 				if(this.#mMoveViewer[0] != 0) {
-					this.#mMoveViewer[0] = 0				
+					this.#mMoveViewer[0] = 0	
 					const evt = new MouseEvent("move",
 						{
+							target: this,
 							altKey:false,
 							button:0,
 							buttons:this.#mMoveViewer[5],
@@ -378,7 +392,7 @@ export class Window {
 						}
 					)
 					if (this.onmousemove) this.onmousemove(evt)
-						this.#mMoveEvts.forEach((item,key)=>{
+					this.#mMoveEvts.forEach((item,key)=>{
 						item.cb(evt);
 					})
 				}
@@ -406,7 +420,7 @@ export class Window {
 					})
 				}
 				if(this.#kDownViewer[0] != 0) {
-					this.#kDownViewer[0] = false;
+					this.#kDownViewer[0] = 0;
 					const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
 					if (this.onkeydown) this.onkeydown(evt)
 						this.#keyDownEvts.forEach((item,key)=>{
@@ -437,7 +451,7 @@ export class Window {
 		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 	}
 	
-	addEventListener(name,fn){
+	addEventListener(name : string,fn : ((event:any)=>void)){
 		const pop = this.#freeIndex.pop()
 		const usedIndex = pop!=undefined?pop:this.#eIndex;
 		if (usedIndex == this.#eIndex) this.#eIndex++;
@@ -456,7 +470,7 @@ export class Window {
 			this.#evtDetails.set(fn,usedIndex)
 		}
 	}
-	removeEventListener(name,fn){
+	removeEventListener(name : string,fn : ((event:any)=>void)){
 		const det = this.#evtDetails.get(fn)
 		if (name == "resize") {
 			if (det != undefined) {
@@ -481,7 +495,7 @@ export class Window {
 		}
 	}
 	
-	append(canvas){
+	append(canvas : Canvas){
 		const canvasPtr = ptrs.get(canvas)
 		if (canvasPtr == undefined) {
 			console.error("Canvas was not found")
@@ -498,8 +512,7 @@ export class Window {
 	for (const key of Object.getOwnPropertyNames(proto)) {
 		const desc = Object.getOwnPropertyDescriptor(proto, key);
 		if (key == "constructor"){
-			desc.value.toString = () =>
-				`function ${proto.constructor.name}() { [native code] }`;
+			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
 			continue
 		}
 		if (typeof desc?.value === "function") {
@@ -510,6 +523,6 @@ export class Window {
 }
 
 
-export function requestAnimationFrame(callback) {
+export function requestAnimationFrame(callback :(cb : any)=>void) : void {
 	requestedFrames.push(callback);
 }

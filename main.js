@@ -1,4 +1,4 @@
-import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas";
+import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas.ts";
 
 
 
@@ -6,6 +6,13 @@ const window = new Window(800,600)
 
 const canvas = new Canvas(window.innerWidth,window.innerHeight)
 const ctx = canvas.getContext("2d")
+
+
+const canvas2 = new Canvas(100,100)
+const ctx2 = canvas2.getContext("2d")
+
+ctx2.fillStyle = "#ff0000";
+ctx2.fillRect(0,0,100,100)
 
 const img = new Image();
 
@@ -46,10 +53,12 @@ window.addEventListener("keydown", (evt)=>{
 function loop() {
     count++;
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
-    ctx.fillStyle = "cornflowerblue"
+    ctx.fillStyle = "rgba(200,200,0,100)"
     // ctx.fillRect(x-25,y-25,50,50)
     ctx.strokeStyle = "#413b72"
     ctx.lineWidth = 2
+
+    ctx.drawImage(canvas2,400,100,100,100)
 
     ctx.beginPath();
     ctx.moveTo(20, 20);
@@ -71,6 +80,7 @@ function loop() {
     ctx.globalCompositeOperation = "screen"
     ctx.drawImage(img, x-75,y-75,150,150);
     ctx.globalAlpha = 0.5;
+    ctx.fillRect(500,10,100,100)
     ctx.save();
     ctx.translate(x-150,y);
     ctx.rotate(45);

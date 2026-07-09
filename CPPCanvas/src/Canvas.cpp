@@ -201,6 +201,9 @@ class BunCanvasRenderingContext2D {
     SkPaint imageColor;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
+    std::string cssFont;
+    SkFont font;
+    int fontSize = 0;
     
     SkSamplingOptions sampling;
     bool locked = false;
@@ -247,6 +250,40 @@ class BunCanvasRenderingContext2D {
         strokeColor.setAntiAlias(1);
         
         imageColor.setBlendMode(compositeOperations.at("source-over"));
+
+        cssFont = "10px sans-serif";               // e.g. "20px 700 italic Arial, sans-serif"
+        
+        
+        sk_sp<SkTypeface> tf;
+        SkFontStyle style;
+        {
+            std::lock_guard<std::mutex> lk(fontCacheMtx);
+            auto it = fontCache.find(cssFont);
+            if (it != fontCache.end()) {
+                tf = it->second;
+            } else {
+                // Ask the platform FontMgr for the best match.
+                // We reuse the same parsing helpers used above.
+                // inside the cache‑miss branch
+                style = parseCssToSkFontStyle(cssFont);
+                std::string family = parseCssFamilyList(cssFont);
+                            
+                // Use a harmless default character (space) when no particular glyph is required.
+                const SkUnichar kDefaultChar = 0x20;   // ' '
+                            
+                tf = fontMgr->matchFamilyStyleCharacter(
+                        family.c_str(),
+                        style,
+                        nullptr,   // bcp47 array
+                        0,         // bcp47Count
+                        kDefaultChar);   // <-- added 5th argument
+                if (!tf) tf = fontMgr->matchFamilyStyle(nullptr, style); // fallback
+                fontCache.emplace(cssFont, tf);
+            }
+        }
+        // ---- 3.3 Install into the SkFont used for drawing ----
+        font.setTypeface(tf);
+        font.setSize(/*sizePx parsed from key*/ parseCssFontSize(cssFont)); // placeholder – real parse needed
     }
     
     SkCanvas* operator()() {
@@ -410,24 +447,24 @@ class BunCanvas {
 
 std::vector<BunCanvas*> canvases;
 
-BunCanvas* validated(void* ptr){
-    BunCanvas* obj = static_cast<BunCanvas*>(ptr);
+// BunCanvas* validated<BunCanvas>(void* ptr){
+//     BunCanvas* obj = static_cast<BunCanvas*>(ptr);
     
-    if (obj->magic != BunCanvas::MAGIC)
-    return nullptr;
-    
-    
-    return obj;
-}
-BunCanvasRenderingContext2D* validatedContext(void* ptr){
-    BunCanvasRenderingContext2D* obj = static_cast<BunCanvasRenderingContext2D*>(ptr);
-    
-    if (obj->magic != BunCanvasRenderingContext2D::MAGIC)
-    return nullptr;
+//     if (obj->magic != BunCanvas::MAGIC)
+//     return nullptr;
     
     
-    return obj;
-}
+//     return obj;
+// }
+// BunCanvasRenderingContext2D* validated<BunCanvasRenderingContext2D>(void* ptr){
+//     BunCanvasRenderingContext2D* obj = static_cast<BunCanvasRenderingContext2D*>(ptr);
+    
+//     if (obj->magic != BunCanvasRenderingContext2D::MAGIC)
+//     return nullptr;
+    
+    
+//     return obj;
+// }
 
 extern "C" {
     
@@ -447,7 +484,7 @@ extern "C" {
     //Sets native internal context so it is returned if is asked again.
     WINDOWS_EXPORT void* canvas_setup_context(void* canvasObj, const char* ctxType){
         if (!canvasObj) return nullptr;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
         if (obj == nullptr) return nullptr;
         
@@ -460,7 +497,7 @@ extern "C" {
     
     #define propertyColor(methodName,target) bool methodName (void* renderingContext, const char* c) {\
         if (!renderingContext) return false;\
-        BunCanvasRenderingContext2D* obj = validatedContext(renderingContext);\
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);\
         if (obj == nullptr)\
         return false;\
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex);)\
@@ -580,7 +617,7 @@ extern "C" {
     WINDOWS_EXPORT void canvas_set_stroke_width(void* canvasObj, float w) {
         if (!canvasObj) return;
         
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -589,7 +626,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         SkPaint fColor = obj->fillColor;
@@ -600,7 +637,7 @@ extern "C" {
     WINDOWS_EXPORT void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (!obj) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
@@ -608,7 +645,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated(canvasObj);
+        BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
         if (obj == nullptr) return;
         
@@ -620,7 +657,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_begin(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         
         if (obj == nullptr) return;
@@ -630,7 +667,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_move_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -638,7 +675,7 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -647,7 +684,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -656,7 +693,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -665,7 +702,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -673,7 +710,7 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) {
             return;
@@ -687,7 +724,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -696,7 +733,7 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_draw_image_imageType(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -705,8 +742,8 @@ extern "C" {
 
     WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
-        BunCanvas* img = validated(image);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        BunCanvas* img = validated<BunCanvas>(image);
         if (obj == nullptr || img == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         nonapple(std::lock_guard<std::mutex> lock2(img->mutex));
@@ -730,7 +767,7 @@ extern "C" {
     
     WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {
         if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return false;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -746,7 +783,7 @@ extern "C" {
     
     WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
         if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) {
             return false;
         };
@@ -775,7 +812,7 @@ extern "C" {
 
     // WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
     //     if (!canvasObj) return false;
-    //     BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+    //     BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
     //     if (obj == nullptr) {
     //         return false;
     //     };
@@ -828,7 +865,7 @@ extern "C" {
     
     WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
         if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return false;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -852,7 +889,7 @@ extern "C" {
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
         float _a = std::max(std::min(a,1.f),0.f);
         if (!canvasObj) return _a;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return _a;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -864,7 +901,7 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_save(void* canvasObj){
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -872,7 +909,7 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_restore(void* canvasObj){
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -880,7 +917,7 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
@@ -888,10 +925,85 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_rotate(void* canvasObj, float deg){
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validatedContext(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->rotate(deg);
+    }
+    WINDOWS_EXPORT void canvas_set_font(void* ctxPtr, const char* cssString) {
+        if (!ctxPtr) return;
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        if(ctx->cssFont == cssString) return;
+        std::string key = cssString;
+        
+        std::cout << parseCssFamilyList(cssString) << "\n";
+        
+        sk_sp<SkTypeface> tf;
+        SkFontStyle style;
+        {
+            std::lock_guard<std::mutex> lk(fontCacheMtx);
+            try {
+                style = parseCssToSkFontStyle(key);
+                std::string family = parseCssFamilyList(key);
+                std::transform(family.begin(), family.end(), family.begin(), tolower);
+                const SkUnichar kDefaultChar = 0x20;
+                            
+                tf = fontRegistry.at(family);
+                if (!tf) {
+                    tf = fontMgr->matchFamilyStyle(nullptr, style);
+                    std::cout << "Fallback used!\n";
+                } // fallback
+                fontCache.emplace(key, tf);
+                std::cout << "Registry used!\n";
+            }catch(std::exception e) {
+                auto it = fontCache.find(key);
+                if (it != fontCache.end()) {
+                    tf = it->second;
+                } else {
+                    style = parseCssToSkFontStyle(key);
+                    std::string family = parseCssFamilyList(key);
+
+                    const SkUnichar kDefaultChar = 0x20;
+
+                    tf = fontMgr->matchFamilyStyleCharacter(
+                            family.c_str(),
+                            style,
+                            nullptr,
+                            0,
+                            kDefaultChar);
+                    if (!tf) tf = fontMgr->matchFamilyStyle(nullptr, style); // fallback
+                    fontCache.emplace(key, tf);
+                    std::cout << "Cache used!\n";
+                }
+            }
+        }
+        ctx->font.setTypeface(tf);
+        ctx->font.setSize(parseCssFontSize(cssString));
+        ctx->cssFont = key;
+    }
+    WINDOWS_EXPORT void canvas_fill_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        float width = ctx->font.measureText(
+            txt,
+            std::strlen(txt),
+            SkTextEncoding::kUTF8
+        );
+        if (width > maxWidth && maxWidth > -1) {
+            float scale = maxWidth / width;
+        
+            (*ctx)()->save();
+            (*ctx)()->translate(x, y);
+            (*ctx)()->scale(scale, 1.0f);
+            (*ctx)()->drawString(txt, x, y, ctx->font, ctx->fillColor);
+            (*ctx)()->restore();
+        } else {
+            (*ctx)()->drawString(txt, x, y, ctx->font, ctx->fillColor);
+        }
     }
 }

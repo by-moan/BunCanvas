@@ -1,5 +1,5 @@
 import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/BunCanvas.ts";
-
+import { FontFace } from "./BunCanvas/FontFace.js";
 
 
 const window = new Window(800,600)
@@ -26,6 +26,12 @@ img.src = "./face.png";
 
 window.append(canvas)
 
+const addedFont = new FontFace("YuyuShort","./YuyuShort-Regular.ttf");
+
+await addedFont.load();
+
+window.fonts.add(addedFont)
+
 let x = 0;
 let y = 0;
 
@@ -40,6 +46,8 @@ setInterval(()=>{
 window.addEventListener("resize", (evt)=>{
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    console.log("resize!")
+    ctx.font = "60px regular YuyuShort"
 })
 window.addEventListener("mousemove", (evt)=>{
     x = evt.clientX
@@ -49,6 +57,7 @@ window.addEventListener("mousemove", (evt)=>{
 window.addEventListener("keydown", (evt)=>{
     console.log("key pressed!", evt.code, evt.key)
 })
+
 
 function loop() {
     count++;
@@ -92,6 +101,7 @@ function loop() {
 
     ctx.globalCompositeOperation = "source-over"
 
+    ctx.fillText("Hello World!gg", 10,500);
     
     requestAnimationFrame(loop)
 }

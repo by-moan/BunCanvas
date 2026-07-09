@@ -183,6 +183,14 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","float"],
 		returns: "float",
 	},
+	canvas_set_font: {
+		args: ["ptr","cstring"],
+		returns: "bool",
+	},
+	canvas_fill_text: {
+		args: ["ptr","cstring","float","float","float"],
+		returns: "void",
+	},
 	image_create: {
 		args: [],
 		returns: "ptr",
@@ -191,7 +199,18 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","cstring"],
 		returns: "bool",
 	},
-	
+	font_load:{
+		args: ["ptr"],
+		returns: "bool",
+	},
+	font_create_from_face: {
+		args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
+		returns: "ptr",
+	},
+	add_font_to_registry: {
+		args: ["cstring","ptr"],
+		returns: "void",
+	},
 });
 
 // const cnv = document.createElement("canvas")

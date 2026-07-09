@@ -1,17 +1,25 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
+#include <cctype>
+#include <regex>
+#include <algorithm>
 #include <queue>
 
 // #include <pthread.h>
 
 #ifdef _WIN64
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #define _Float64_t double
 #include <windows.h>
+
+
+
 // This... This is the worst thing humanity would create.... Why??????
 #define WINDOWS_EXPORT __declspec(dllexport)
+
 #else
 #define WINDOWS_EXPORT
 #endif
@@ -26,17 +34,26 @@
 #define nonapple(code)
 #endif
 
-
 #include <GLFW/glfw3.h>
 
+#include "include/core/SkFontScanner.h"
+#include "include/core/SkFontArguments.h"
+#include "include/core/SkFontMetrics.h"
+#include "include/core/SkFourByteTag.h"
+#include "include/core/SkFontMgr.h"
+#include "include/core/SkTypeface.h"
+#include "include/core/SkFont.h"
+#include "include/core/SkFontStyle.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkPath.h"
+#include "include/core/SkSpan.h"
 #include "include/core/SkPathBuilder.h"
 #include "include/core/SkData.h"
 #include "include/core/SkBitmap.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkColorSpace.h"
+#include "include/core/SkStream.h"
 
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/gpu/ganesh/SkImageGanesh.h"
@@ -46,6 +63,56 @@
 
 #include "include/gpu/ganesh/gl/GrGLBackendSurface.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
+
+#ifdef __linux__
+#include "include/ports/SkFontMgr_fontconfig.h"   // Linux
+#include "include/ports/SkFontScanner_FreeType.h"
+#elif __APPLE__
+#include "include/ports/SkFontMgr_mac_ct.h"
+#elif _WIN64
+#include "include/ports/SkFontMgr_win.h"
+#else
+#error "Platform is not supported by BunCanvas"
+#endif
+
+sk_sp<SkFontMgr> CreateFontManager() {
+#ifdef __linux__
+    return SkFontMgr_New_FontConfig(
+        nullptr,
+        SkFontScanner_Make_FreeType());
+
+#elif defined(__APPLE__)
+    CTFontCollectionRef collection =
+        CTFontCollectionCreateFromAvailableFonts(nullptr);
+
+    auto mgr = SkFontMgr_New_CoreText(collection);
+
+    CFRelease(collection);
+
+    return mgr;
+
+#elif defined(_WIN64)
+    IDWriteFactory* factory = nullptr;
+
+    DWriteCreateFactory(
+        DWRITE_FACTORY_TYPE_SHARED,
+        __uuidof(IDWriteFactory),
+        reinterpret_cast<IUnknown**>(&factory));
+
+    IDWriteFontCollection* collection = nullptr;
+    factory->GetSystemFontCollection(&collection);
+
+    auto mgr = SkFontMgr_New_DirectWrite(factory, collection);
+
+    collection->Release();
+    factory->Release();
+
+    return mgr;
+
+#else
+#endif
+}
+
 sk_sp<SkSurface> createSurface(
     GrDirectContext* context,
     int width,
@@ -101,6 +168,7 @@ int width, height;
 SkCanvas* canvas = nullptr;
 GLFWwindow* window = nullptr;
 SurfaceWrapper* sWrapper = nullptr;
+sk_sp<SkFontMgr> fontMgr = CreateFontManager();
 bool ready = false;
 bool mainThreadReady = false;
 
@@ -132,8 +200,22 @@ extern "C" {
     WINDOWS_EXPORT int32_t* get_kUpViewer(){return kUpViewer;}
 }
 
+// For this function to compile the object to convert MUST have the following components: static constexpr uint64_t MAGIC and uint64_t magic
+template <typename targetPtr>
+targetPtr* validated(void* ptr){
+    if (!ptr) return nullptr;
+    targetPtr* obj = static_cast<targetPtr*>(ptr);
+        
+    if (obj->magic != targetPtr::MAGIC)
+    return nullptr;
+        
+        
+    return obj;
+}
 
-
+// #include "src/FontFace/FontCache.cpp"
+// #include "src/FontFace/FontFaceSet.cpp"
+#include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Canvas.cpp"
 #include "src/Window.cpp"

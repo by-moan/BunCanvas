@@ -4,9 +4,9 @@ import { MouseEvent } from "./MouseEvent.js"
 
 import { dlopen, ptr, toArrayBuffer, JSCallback, FFIType, Pointer } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
+import { FontFace } from "./FontFace.js";
 
-import WindowThread from "./WindowThread.js?raw";
-
+import WindowThread from "./WindowThread.js" with { type:"text" };
 
 const requestedFrames : any[] = []
 const ptrs = new WeakMap();
@@ -36,7 +36,7 @@ export class ImageData {
 		this.width = width;
 		this.height = height;
 		this.data = data;
-
+		
 	}
 }
 
@@ -44,7 +44,19 @@ class CanvasRenderingContext2D {
 	#iptr : Pointer | null;
 	#lineWidth = 0;
 	#globalAlpha = 1;
+	#fillStyle = "#000000";
+	#strokeStyle = "#000000";
 	#compositeOperation = "source-over";
+	#fontCss = "10px sans-serif";
+
+	
+	
+	set font(css: string) {
+		this.#fontCss = css.trim();
+		// The native side will parse the CSS string, resolve a typeface and cache it.
+		lib.symbols.canvas_set_font(this.#iptr, encoder.encode(`${this.#fontCss}\0`));
+	}
+	get font(): string { return this.#fontCss; }
 	
 	set fillStyle(style : string) {
 		lib.symbols.canvas_set_fill_style(this.#iptr,encoder.encode(`${style.trim()}\0`))
@@ -63,7 +75,7 @@ class CanvasRenderingContext2D {
 		if(lib.symbols.canvas_set_composite_operation(this.#iptr,encoder.encode(`${operation}\0`)) == true)
 			this.#compositeOperation = operation
 	}
-
+	
 	set globalAlpha(a : number) {
 		this.#globalAlpha = lib.symbols.canvas_set_global_alpha(this.#iptr,a)
 	}
@@ -77,6 +89,9 @@ class CanvasRenderingContext2D {
 	}
 	clearRect(x : number, y : number, w : number, h : number){
 		lib.symbols.canvas_clear_rect(this.#iptr,x,y,w,h)
+	}
+	fillText(text:string,x:number,y:number, maxWidth = -1){
+		lib.symbols.canvas_fill_text(this.#iptr,encoder.encode(`${text}\0`),x,y,maxWidth)
 	}
 	beginPath(){
 		lib.symbols.canvas_path_begin(this.#iptr)
@@ -102,10 +117,10 @@ class CanvasRenderingContext2D {
 	stroke(){
 		lib.symbols.canvas_path_stroke(this.#iptr)
 	}
-
+	
 	drawImage(img : Image, x : number, y : number, w : number,h : number) : void;
 	drawImage(img : Canvas, x : number, y : number, w : number,h : number) : void;
-
+	
 	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) {
 		if (img instanceof Image) {
 			lib.symbols.canvas_draw_image_imageType(this.#iptr,ptrs.get(img),Number(x),Number(y),Number(w),Number(h))
@@ -115,7 +130,7 @@ class CanvasRenderingContext2D {
 			lib.symbols.canvas_draw_image_canvasType(this.#iptr,ptrs.get(img),Number(x),Number(y),Number(w),Number(h))
 			return;
 		}
-
+		
 		throw new TypeError("Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(Image or Canvas)'.")
 	}
 	getImageData(x : number, y : number, w : number,h : number) {
@@ -227,6 +242,12 @@ export class Window {
 	
 	#freeIndex = new Array();
 	#eIndex = 0
+
+	fonts = {
+		add(font : FontFace){
+			lib.symbols.add_font_to_registry(encoder.encode(`${font.family.toLowerCase()}\0`),font._nativePtr())
+		}
+	}
 	
 	onresize : ((this: Window, evt: Event) => any) | null = null;
 	onmousemove : ((evt: MouseEvent) => any) | null = null;
@@ -267,11 +288,11 @@ export class Window {
 					process.exit(0);
 					return
 				}
-
+				
 				if (!gpuInitialized) {
-        		    gpuInitialized = true;
-        		    lib.symbols.canvas_init_gpu_context();
-        		}
+					gpuInitialized = true;
+					lib.symbols.canvas_init_gpu_context();
+				}
 				
 				lib.symbols.update_window();
 				
@@ -345,7 +366,7 @@ export class Window {
 				for (let i = 0; i < pLen; i++) {
 					(requestedFrames.shift())()
 				}
-
+				
 				lib.symbols.canvas_flush_gpu();
 			}
 		} else {
@@ -366,7 +387,7 @@ export class Window {
 					this.#dim[1] = this.#wResizeViewer[2]
 					if (this.onresize) {
 						this.onresize(details)
-
+						
 						this.#rEvts.forEach((item,key)=>{
 							item.cb(details);
 						})
@@ -392,7 +413,7 @@ export class Window {
 						}
 					)
 					if (this.onmousemove) this.onmousemove(evt)
-					this.#mMoveEvts.forEach((item,key)=>{
+						this.#mMoveEvts.forEach((item,key)=>{
 						item.cb(evt);
 					})
 				}

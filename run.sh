@@ -30,5 +30,9 @@ cp ./CPPCanvas/build/BunCanvas.$PLATFORM.$ARCH.$EXT ./build/
 cd ./build/
 
 # bun ../main.js
-
+if [[ "$(uname -o)" = "Darwin"  ]]
+then
+bun ../main.js
+else
 gdb -q -batch -ex "set pagination off" -ex "run" --args bun ../main.js
+fi

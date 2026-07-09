@@ -32,6 +32,8 @@ await addedFont.load();
 
 window.fonts.add(addedFont)
 
+ctx.font = "60px regular YuyuShort"
+
 let x = 0;
 let y = 0;
 
@@ -46,7 +48,7 @@ setInterval(()=>{
 window.addEventListener("resize", (evt)=>{
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    console.log("resize!")
+    console.log("resize javascript!")
     ctx.font = "60px regular YuyuShort"
 })
 window.addEventListener("mousemove", (evt)=>{

@@ -747,6 +747,7 @@ extern "C" {
         if (obj == nullptr || img == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         nonapple(std::lock_guard<std::mutex> lock2(img->mutex));
+        #ifndef __APPLE__
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
                 renderThreadContext->context.get(),
@@ -763,6 +764,10 @@ extern "C" {
             auto _img = img->surface->makeTemporaryImage();
             (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
         }
+        #else
+        auto _img = img->surface->makeTemporaryImage();
+        (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+        #endif
     }
     
     WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {

@@ -162,7 +162,7 @@ class CanvasRenderingContext2D {
 		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
 		ptrs.set(this, renderContextPtr)
 		this.#iptr = renderContextPtr
-		
+		lib.symbols.canvas_set_font(this.#iptr, encoder.encode(`${this.#fontCss}\0`))
 	}
 }
 
@@ -201,6 +201,7 @@ export class Canvas {
 		lib.symbols.canvas_resize(this.#iptr,this.#dim[0],this.#dim[1])
 	}
 	get width(){
+		console.log("setter!")
 		return this.#dim[0]
 	}
 	get height(){
@@ -381,17 +382,17 @@ export class Window {
 				
 				if (this.#wResizeViewer[0] != 0) {
 					this.#wResizeViewer[0] = 0
+					console.log("wresize!")
 					const details = new Event("resize",this);
 					
 					this.#dim[0] = this.#wResizeViewer[1]
 					this.#dim[1] = this.#wResizeViewer[2]
 					if (this.onresize) {
 						this.onresize(details)
-						
-						this.#rEvts.forEach((item,key)=>{
+					}
+					this.#rEvts.forEach((item,key)=>{
 							item.cb(details);
 						})
-					}
 				}
 				if(this.#mMoveViewer[0] != 0) {
 					this.#mMoveViewer[0] = 0	
@@ -412,8 +413,8 @@ export class Window {
 							shiftKey:false
 						}
 					)
-					if (this.onmousemove) this.onmousemove(evt)
-						this.#mMoveEvts.forEach((item,key)=>{
+					if (this.onmousemove) {this.onmousemove(evt)}
+					this.#mMoveEvts.forEach((item,key)=>{
 						item.cb(evt);
 					})
 				}
@@ -464,6 +465,7 @@ export class Window {
 				}
 			});
 			aaplLib.symbols.setup_render_thread(width,height,cb.ptr)
+			
 			setInterval(()=>{
 				lib.symbols.update_window(cb.ptr);
 			},0);

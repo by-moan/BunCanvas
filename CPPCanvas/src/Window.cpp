@@ -111,7 +111,6 @@ void window_refresh_callback(GLFWwindow* window) {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     canvas->clear(SK_ColorTRANSPARENT);
-    std::cout << "refresh\n"; 
     
     for (auto element : canvases) {
         {

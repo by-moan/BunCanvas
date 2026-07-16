@@ -200,14 +200,14 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	font_load:{
-		args: ["ptr"],
-		returns: "bool",
-	},
-	font_create_from_face: {
-		args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
+		args: ["cstring"],
 		returns: "ptr",
 	},
-	add_font_to_registry: {
+	// font_create_from_face: {
+	// 	args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
+	// 	returns: "ptr",
+	// },
+	font_add_to_registry: {
 		args: ["cstring","ptr"],
 		returns: "void",
 	},

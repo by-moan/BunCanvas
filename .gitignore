@@ -1,5 +1,5 @@
 .DS_Store
-*_ignore.*
+*.ignore*
 /build/*
 /nvg_demo
 /CPPCanvas/Thirdparty/*

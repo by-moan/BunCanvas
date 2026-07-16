@@ -133,70 +133,76 @@ private:
     }
     
     ParsedFont parseFontShorthand(const std::string& css) {
-        Tokenizer tok(css);
-        ParsedFont out;
-        
-        while (tok.hasMore()) {
-            std::string t = tok.next();
-            std::string low = t;
-            std::transform(low.begin(), low.end(), low.begin(),
-                           [](unsigned char c){ return std::tolower(c); });
-        
-            // style
-            if (std::find(STYLE_KW.begin(), STYLE_KW.end(), low) != STYLE_KW.end()) {
-                if (low == "italic" || low == "oblique")
-                    out.slant = styleKeywordToEnum(low);
-                if (low == "oblique" && tok.hasMore()) {
-                    std::string nxt = tok.next();
-                }
-                continue;
+    Tokenizer tok(css);
+    ParsedFont out;
+
+    while (tok.hasMore()) {
+        std::string t = tok.next();
+        std::string low = t;
+        std::transform(low.begin(), low.end(), low.begin(),
+                      [](unsigned char c){ return std::tolower(c); });
+
+        // style
+        if (std::find(STYLE_KW.begin(), STYLE_KW.end(), low) != STYLE_KW.end()) {
+            if (low == "italic" || low == "oblique")
+                out.slant = styleKeywordToEnum(low);
+            if (low == "oblique" && tok.hasMore()) {
+                std::string nxt = tok.next(); // consume optional style modifier
             }
-        
-            if (std::find(VARIANT_KW.begin(), VARIANT_KW.end(), low) != VARIANT_KW.end()) {
-                continue;
-            }
-        
-            if (std::find(WEIGHT_KW.begin(), WEIGHT_KW.end(), low) != WEIGHT_KW.end()) {
-                out.weight = weightKeywordToEnum(low);
-                continue;
-            }
-        
-            if (std::regex_match(low, std::regex("^(100|200|300|400|500|600|700|800|900)$"))) {
-                out.weight = static_cast<SkFontStyle::Weight>(std::stoi(low));
-                continue;
-            }
-        
-            if (std::find(STRETCH_KW.begin(), STRETCH_KW.end(), low) != STRETCH_KW.end()) {
-                out.width = stretchKeywordToEnum(low);
-                continue;
-            }
-        
-            size_t consumed = css.size() - (tok.hasMore() ? 0 : 0);
-        
-            std::string sizeTok = t;
-        
-            auto slashPos = sizeTok.find('/');
-            if (slashPos != std::string::npos) {
-                sizeTok = sizeTok.substr(0, slashPos);
-            } else if (tok.hasMore() && tok.next() == "/") {
-                if (tok.hasMore()) tok.next();
-            }
-        
-            out.sizePx = cssSizeToPixels(sizeTok);
-        
-            std::string family;
-            while (tok.hasMore()) {
-                std::string part = tok.next();
-                if (!family.empty()) family += ' ';
-                family += part;
-            }
-            out.family = family;
-            return out;
+            continue;
         }
-    
-        throw std::runtime_error("parseFont: no font-size found in \"" + css + "\"");
+
+        if (std::find(VARIANT_KW.begin(), VARIANT_KW.end(), low) != VARIANT_KW.end()) {
+            continue;
+        }
+
+        if (std::find(WEIGHT_KW.begin(), WEIGHT_KW.end(), low) != WEIGHT_KW.end()) {
+            out.weight = weightKeywordToEnum(low);
+            continue;
+        }
+
+        if (std::regex_match(low, std::regex("^(100|200|300|400|500|600|700|800|900)$"))) {
+            out.weight = static_cast<SkFontStyle::Weight>(std::stoi(low));
+            continue;
+        }
+
+        if (std::find(STRETCH_KW.begin(), STRETCH_KW.end(), low) != STRETCH_KW.end()) {
+            out.width = stretchKeywordToEnum(low);
+            continue;
+        }
+
+        // If we reach here, 't' is assumed to be the font-size
+        std::string sizeTok = t;
+        std::string family; // Declare family here so we can populate it early
+
+        auto slashPos = sizeTok.find('/');
+        if (slashPos != std::string::npos) {
+            sizeTok = sizeTok.substr(0, slashPos);
+        } else if (tok.hasMore()) {
+            std::string nxt = tok.next(); 
+            if (nxt == "/") {
+                // It was a slash; consume the line-height value that follows
+                if (tok.hasMore()) tok.next();
+            } else {
+                // It wasn't a slash; it's the first part of the family name
+                family = nxt;
+            }
+        }
+
+        out.sizePx = cssSizeToPixels(sizeTok);
+
+        // Collect remaining tokens as family
+        while (tok.hasMore()) {
+            std::string part = tok.next();
+            if (!family.empty()) family += ' ';
+            family += part;
+        }
+        out.family = family;
+        return out;
     }
-    
+
+    throw std::runtime_error("parseFont: no font-size found in " + css);
+}
     std::string cleanFamilyList(const std::string& raw) {
         std::string out;
         bool inQuote = false;

@@ -19,11 +19,11 @@ if(!exists) {
     process.exit(-1)
 }
 
-const MessagePost = new JSCallback(()=>{
-    self.postMessage(0);
+const MessagePost = new JSCallback((instruction)=>{
+    self.postMessage(instruction);
     },
     {
-        args: [],
+        args: ["int"],
         returns: "void"
     }
 );
@@ -41,6 +41,7 @@ self.onmessage = (msg)=>{
         }
     });
     lib.symbols.setup_render_thread(w,h,MessagePost.ptr);
-    self.postMessage(1)
+    self.postMessage(2)
+    process.exit(0)
 }
 

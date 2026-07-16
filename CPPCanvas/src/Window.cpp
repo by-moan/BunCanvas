@@ -122,7 +122,8 @@ void window_refresh_callback(GLFWwindow* window) {
     glfwSwapBuffers(window);
 }
 
-typedef int (*JSCallback_WRefresh)();
+typedef int (*JSCallback_WRefresh)(int);
+typedef int (*JSCallback_WClose)();
 
 
 extern "C" {
@@ -161,6 +162,7 @@ extern "C" {
         sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, window);
         if (sharedWindow) {
             glfwHideWindow(sharedWindow);
+            onrefresh(1);
         }
         
         #pragma region Events Setup
@@ -283,7 +285,7 @@ extern "C" {
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
             }
-            onrefresh();
+            onrefresh(0);
             
             renderThreadContext->context->flushAndSubmit();
             glfwSwapBuffers(window);

@@ -202,8 +202,8 @@ class BunCanvasRenderingContext2D {
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
     std::string cssFont;
-    SkFont font;
-    int fontSize = 0;
+    CanvasFontCache font_cache;
+    SkFont font_current;
     
     SkSamplingOptions sampling;
     bool locked = false;
@@ -252,38 +252,42 @@ class BunCanvasRenderingContext2D {
         imageColor.setBlendMode(compositeOperations.at("source-over"));
 
         cssFont = "10px sans-serif";               // e.g. "20px 700 italic Arial, sans-serif"
-        
-        
-        sk_sp<SkTypeface> tf;
-        SkFontStyle style;
-        {
-            std::lock_guard<std::mutex> lk(fontCacheMtx);
-            auto it = fontCache.find(cssFont);
-            if (it != fontCache.end()) {
-                tf = it->second;
-            } else {
-                // Ask the platform FontMgr for the best match.
-                // We reuse the same parsing helpers used above.
-                // inside the cache‑miss branch
-                style = parseCssToSkFontStyle(cssFont);
-                std::string family = parseCssFamilyList(cssFont);
-                            
-                // Use a harmless default character (space) when no particular glyph is required.
-                const SkUnichar kDefaultChar = 0x20;   // ' '
-                            
-                tf = fontMgr->matchFamilyStyleCharacter(
-                        family.c_str(),
-                        style,
-                        nullptr,   // bcp47 array
-                        0,         // bcp47Count
-                        kDefaultChar);   // <-- added 5th argument
-                if (!tf) tf = fontMgr->matchFamilyStyle(nullptr, style); // fallback
-                fontCache.emplace(cssFont, tf);
-            }
+
+        if (!font_cache.setFont(cssFont.c_str(),font_current)){
+            std::cout << "This somehow failed! (It shouldn't because it is the default)\n";
         }
+        
+        
+        // sk_sp<SkTypeface> tf;
+        // SkFontStyle style;
+        // {
+        //     std::lock_guard<std::mutex> lk(fontCacheMtx);
+        //     auto it = fontCache.find(cssFont);
+        //     if (it != fontCache.end()) {
+        //         tf = it->second;
+        //     } else {
+        //         // Ask the platform FontMgr for the best match.
+        //         // We reuse the same parsing helpers used above.
+        //         // inside the cache‑miss branch
+        //         style = parseCssToSkFontStyle(cssFont);
+        //         std::string family = parseCssFamilyList(cssFont);
+                            
+        //         // Use a harmless default character (space) when no particular glyph is required.
+        //         const SkUnichar kDefaultChar = 0x20;   // ' '
+                            
+        //         tf = fontMgr->matchFamilyStyleCharacter(
+        //                 family.c_str(),
+        //                 style,
+        //                 nullptr,   // bcp47 array
+        //                 0,         // bcp47Count
+        //                 kDefaultChar);   // <-- added 5th argument
+        //         if (!tf) tf = fontMgr->matchFamilyStyle(nullptr, style); // fallback
+        //         fontCache.emplace(cssFont, tf);
+        //     }
+        // }
         // ---- 3.3 Install into the SkFont used for drawing ----
-        font.setTypeface(tf);
-        font.setSize(/*sizePx parsed from key*/ parseCssFontSize(cssFont)); // placeholder – real parse needed
+        // font.setTypeface(tf);
+        // font.setSize(/*sizePx parsed from key*/ parseCssFontSize(cssFont)); // placeholder – real parse needed
     }
     
     SkCanvas* operator()() {
@@ -446,25 +450,6 @@ class BunCanvas {
 
 
 std::vector<BunCanvas*> canvases;
-
-// BunCanvas* validated<BunCanvas>(void* ptr){
-//     BunCanvas* obj = static_cast<BunCanvas*>(ptr);
-    
-//     if (obj->magic != BunCanvas::MAGIC)
-//     return nullptr;
-    
-    
-//     return obj;
-// }
-// BunCanvasRenderingContext2D* validated<BunCanvasRenderingContext2D>(void* ptr){
-//     BunCanvasRenderingContext2D* obj = static_cast<BunCanvasRenderingContext2D*>(ptr);
-    
-//     if (obj->magic != BunCanvasRenderingContext2D::MAGIC)
-//     return nullptr;
-    
-    
-//     return obj;
-// }
 
 extern "C" {
     
@@ -718,7 +703,8 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
 
         SkPaint sColor = obj->strokeColor;
-        sColor.setAlphaf(obj->strokeColor.getAlphaf()*obj->globalAlpha);
+        auto alphaf = obj->strokeColor.getAlphaf()*obj->globalAlpha;
+        sColor.setAlphaf(alphaf);
         (*obj)()->drawPath(obj->pathBuilder.snapshot(), sColor);
     }
     
@@ -892,10 +878,9 @@ extern "C" {
         return false;
     }
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
-        float _a = std::max(std::min(a,1.f),0.f);
+        float _a = std::clamp(a, 0.0f, 1.0f);
         if (!canvasObj) return _a;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        
         if (obj == nullptr) return _a;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         obj->globalAlpha = _a;
@@ -936,65 +921,19 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         (*obj)()->rotate(deg);
     }
-    WINDOWS_EXPORT void canvas_set_font(void* ctxPtr, const char* cssString) {
-        if (!ctxPtr) return;
+    
+    WINDOWS_EXPORT bool canvas_set_font(void* ctxPtr, const char* cssString) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return;
-        
+        if (!ctx) return false;
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
-        if(ctx->cssFont == cssString) return;
-        std::string key = cssString;
-        
-        std::cout << parseCssFamilyList(cssString) << "\n";
-        
-        sk_sp<SkTypeface> tf;
-        SkFontStyle style;
-        {
-            std::lock_guard<std::mutex> lk(fontCacheMtx);
-            try {
-                style = parseCssToSkFontStyle(key);
-                std::string family = parseCssFamilyList(key);
-                std::transform(family.begin(), family.end(), family.begin(), tolower);
-                const SkUnichar kDefaultChar = 0x20;
-                            
-                tf = fontRegistry.at(family);
-                if (!tf) {
-                    tf = fontMgr->matchFamilyStyle(nullptr, style);
-                    std::cout << "Fallback used!\n";
-                } // fallback
-                fontCache.emplace(key, tf);
-                std::cout << "Registry used!\n";
-            }catch(std::exception e) {
-                auto it = fontCache.find(key);
-                if (it != fontCache.end()) {
-                    tf = it->second;
-                } else {
-                    style = parseCssToSkFontStyle(key);
-                    std::string family = parseCssFamilyList(key);
-
-                    const SkUnichar kDefaultChar = 0x20;
-
-                    tf = fontMgr->matchFamilyStyleCharacter(
-                            family.c_str(),
-                            style,
-                            nullptr,
-                            0,
-                            kDefaultChar);
-                    if (!tf) tf = fontMgr->matchFamilyStyle(nullptr, style); // fallback
-                    fontCache.emplace(key, tf);
-                    std::cout << "Cache used!\n";
-                }
-            }
-        }
-        ctx->font.setTypeface(tf);
-        ctx->font.setSize(parseCssFontSize(cssString));
-        ctx->cssFont = key;
+        return ctx->font_cache.setFont(cssString,ctx->font_current);
     }
+
     WINDOWS_EXPORT void canvas_fill_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
-        float width = ctx->font.measureText(
+        float width = ctx->font_current.measureText(
             txt,
             std::strlen(txt),
             SkTextEncoding::kUTF8
@@ -1005,10 +944,10 @@ extern "C" {
             (*ctx)()->save();
             (*ctx)()->translate(x, y);
             (*ctx)()->scale(scale, 1.0f);
-            (*ctx)()->drawString(txt, x, y, ctx->font, ctx->fillColor);
+            (*ctx)()->drawString(txt, x, y, ctx->font_current, ctx->fillColor);
             (*ctx)()->restore();
         } else {
-            (*ctx)()->drawString(txt, x, y, ctx->font, ctx->fillColor);
+            (*ctx)()->drawString(txt, x, y, ctx->font_current, ctx->fillColor);
         }
     }
 }

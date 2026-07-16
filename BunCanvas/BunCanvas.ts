@@ -8,7 +8,7 @@ import { FontFace } from "./FontFace.js";
 
 import WindowThread from "./WindowThread.js" with { type:"text" };
 
-const requestedFrames : any[] = []
+let requestedFrames : any[] = []
 const ptrs = new WeakMap();
 
 export class Image {
@@ -52,7 +52,7 @@ class CanvasRenderingContext2D {
 	
 	
 	set font(css: string) {
-		this.#fontCss = css.trim();
+		this.#fontCss = css.trim().toLowerCase();
 		// The native side will parse the CSS string, resolve a typeface and cache it.
 		lib.symbols.canvas_set_font(this.#iptr, encoder.encode(`${this.#fontCss}\0`));
 	}
@@ -246,7 +246,8 @@ export class Window {
 
 	fonts = {
 		add(font : FontFace){
-			lib.symbols.add_font_to_registry(encoder.encode(`${font.family.toLowerCase()}\0`),font._nativePtr())
+			if (!font._nativePtr) throw new TypeError("Font was not loaded");
+			lib.symbols.font_add_to_registry(encoder.encode(`${font.family}\0`),font._nativePtr)
 		}
 	}
 	
@@ -268,7 +269,7 @@ export class Window {
 	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
 	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
 	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
-	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 *4 ));
+	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
 	
 	#renderThread : Worker | null;
 	
@@ -282,17 +283,21 @@ export class Window {
 				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
 			);
 			this.#renderThread.postMessage({ w: width, h: height });
-			
+
+			let pendingFrame = false;
+
 			this.#renderThread.onmessage = (msg)=>{
-				if (msg.data == 1) {
+				if (msg.data == 2) {
 					lib.symbols.destroy_window();
 					process.exit(0);
-					return
 				}
+				if (pendingFrame) return;
+				pendingFrame = true;
 				
-				if (!gpuInitialized) {
-					gpuInitialized = true;
-					lib.symbols.canvas_init_gpu_context();
+				
+				if (msg.data == 1){
+					gpuInitialized = lib.symbols.canvas_init_gpu_context();
+					lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 				}
 				
 				lib.symbols.update_window();
@@ -363,11 +368,20 @@ export class Window {
 					})
 				}
 				
-				const pLen = requestedFrames.length
-				for (let i = 0; i < pLen; i++) {
-					(requestedFrames.shift())()
-				}
-				
+				// const pLen = requestedFrames.length
+				// for (let i = 0; i < pLen; i++) {
+				// 	(requestedFrames.shift())()
+				// }
+				setImmediate(()=>{
+					const end = requestedFrames.length;
+
+					for (let i = 0; i < end; i++) {
+					    requestedFrames[i]();
+					}
+
+					requestedFrames.splice(0, end);
+					pendingFrame = false;
+				});
 				lib.symbols.canvas_flush_gpu();
 			}
 		} else {
@@ -465,13 +479,15 @@ export class Window {
 				}
 			});
 			aaplLib.symbols.setup_render_thread(width,height,cb.ptr)
+
+			lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
+
 			
 			setInterval(()=>{
 				lib.symbols.update_window(cb.ptr);
 			},0);
 		}
 		
-		lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 	}
 	
 	addEventListener(name : string,fn : ((event:any)=>void)){

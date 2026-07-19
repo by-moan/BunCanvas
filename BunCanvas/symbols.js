@@ -96,15 +96,19 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_set_fill_style_gradient: {
 		args: ["ptr","ptr"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_set_stroke_style: {
 		args: ["ptr","cstring"],
 		returns: "bool",
 	},
+	canvas_set_stroke_style_gradient: {
+		args: ["ptr","ptr"],
+		returns: "bool",
+	},
 	canvas_set_stroke_width: {
 		args: ["ptr","float"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_fill_rect: {
 		args: ["ptr","int","int","int","int"],
@@ -225,7 +229,7 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_gradient_add_color_stop: {
 		args: ["ptr", "float", "cstring"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_gradient_destroy: {
 		args: ["ptr"],

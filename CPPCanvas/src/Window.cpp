@@ -132,7 +132,7 @@ extern "C" {
     
     #ifndef __APPLE__
     // Called in the bun worker thread.
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
@@ -147,7 +147,7 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(width, height, "title", NULL, NULL);
+        window = glfwCreateWindow(width, height, title, NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
@@ -317,7 +317,7 @@ extern "C" {
         mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
     }
     #else
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
@@ -332,7 +332,7 @@ extern "C" {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
-        window = glfwCreateWindow(width, height, "title", NULL, NULL);
+        window = glfwCreateWindow(width, height, title, NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;

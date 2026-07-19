@@ -22,15 +22,16 @@ class CanvasGradient {
 
 	addColorStop(offset : number, color : string) {
 		if (offset < 0 || offset > 1) throw new RangeError(`Failed to execute 'addColorStop' on 'CanvasGradient': The provided value (${offset}) is outside the range (0.0, 1.0).`)
-		let ptr = lib.symbols.canvas_gradient_add_color_stop(ptrs.get(this),offset,encoder.encode(`${color}\0`))
+		let res = lib.symbols.canvas_gradient_add_color_stop(ptrs.get(this),offset,encoder.encode(`${color}\0`))
+		if (!res) throw new SyntaxError(`Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('${color}') could not be parsed as a color.`)
 	}
 };
 
 class CanvasRenderingContext2D {
 	#lineWidth = 0;
 	#globalAlpha = 1;
-	#fillStyle = "#000000";
-	#strokeStyle = "#000000";
+	#fillStyle : string | CanvasGradient = "#000000";
+	#strokeStyle : string | CanvasGradient = "#000000";
 	#compositeOperation = "source-over";
 	#fontCss = "10px sans-serif";
 
@@ -44,15 +45,38 @@ class CanvasRenderingContext2D {
 	get font(): string { return this.#fontCss; }
 	
 	set fillStyle(style : string | CanvasGradient) {
-		if (style.constructor.name == String.name ) lib.symbols.canvas_set_fill_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
-		if (style instanceof CanvasGradient )lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),ptrs.get(style))
+		if (style == this.#fillStyle) return;
+		let res = false;
+		if (typeof style === "string") {
+			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+		}
+		if (style instanceof CanvasGradient ){
+			res = lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),ptrs.get(style))
+		}
+		if (res) this.#fillStyle = style;
 	}
-	set strokeStyle(style : string) {
-		lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+	get fillStyle(){
+		return this.#fillStyle
+	}
+	set strokeStyle(style : string | CanvasGradient) {
+		// lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+		if (style == this.#strokeStyle) return;
+		let res = false;
+		if (typeof style === "string") {
+			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+		}
+		if (style instanceof CanvasGradient ){
+			res = lib.symbols.canvas_set_stroke_style_gradient(ptrs.get(this),ptrs.get(style))
+		}
+		if (res) this.#strokeStyle = style;
+	}
+	get strokeStyle(){
+		return this.#strokeStyle
 	}
 	set lineWidth(width : number) {
-		lib.symbols.canvas_set_stroke_width(ptrs.get(this),width)
-		this.#lineWidth = width
+		let w = width<1?1:width;
+		lib.symbols.canvas_set_stroke_width(ptrs.get(this),w)
+		this.#lineWidth = w
 	}
 	get lineWidth() : number {
 		return this.#lineWidth

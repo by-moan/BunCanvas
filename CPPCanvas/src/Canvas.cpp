@@ -199,25 +199,25 @@ struct ColorStop {
 };
 
 class BunCanvasGradient {
-public:
+    public:
     static constexpr uint64_t MAGIC = 0x48BB7416;
     uint64_t magic = MAGIC;
-
+    
     GradientType type;
-
+    
     // Linear
     SkPoint p0, p1;
-
+    
     // Radial
     SkPoint c0, c1;
     float r0, r1;
-
+    
     // Conic
     SkPoint center;
     float angle;
-
+    
     std::vector<ColorStop> stops;
-
+    
     BunCanvasGradient(GradientType gType, float x1, float y1, float x2, float y2) : type{gType}, p0{x1,y1}, p1{x2,y2} {}
 };
 
@@ -242,9 +242,9 @@ class BunCanvasRenderingContext2D {
     float shadowBlurOffsetY = 0.f;
     SkSamplingOptions sampling;
     bool locked = false;
-
+    
     sk_sp<SkImageFilter> shadowBlurFilter;
-
+    
     float globalAlpha = 1.f;
     
     BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
@@ -256,7 +256,7 @@ class BunCanvasRenderingContext2D {
         strokeColor.setAntiAlias(1);
         strokeColor.setBlendMode(compositeOperations.at("source-over"));
         strokeColor.setShader(nullptr);
-
+        
         imageColor.setColor(SK_ColorWHITE);
         imageColor.setAlpha(255);
         imageColor.setStyle(SkPaint::kFill_Style);
@@ -269,7 +269,7 @@ class BunCanvasRenderingContext2D {
         fillColor.setAlpha(255);
         fillColor.setAntiAlias(1);
         fillColor.setBlendMode(compositeOperations.at("source-over"));
-
+        
         shadowBlurFilter = SkImageFilters::DropShadow(
             shadowBlurOffsetX,           // dx
             shadowBlurOffsetX,           // dy
@@ -282,7 +282,7 @@ class BunCanvasRenderingContext2D {
     }
     
     //Mimicking the behavior of values reset when resizing a canvas object.
-    void reset(sk_sp<SkSurface>& surface) {
+    void reset(sk_sp<SkSurface>& surface, sk_sp<SkImage> tmpImage) {
         // std::lock_guard<std::mutex> lock(draw_mutex);
         ctx = surface->getCanvas();
         ctx->resetMatrix();
@@ -297,11 +297,11 @@ class BunCanvasRenderingContext2D {
         strokeColor.setStyle(SkPaint::kStroke_Style);
         strokeColor.setStrokeWidth(1);
         strokeColor.setAntiAlias(1);
-
+        
         shadowBlurAmount = 0.f;
         shadowBlurOffsetX = 0.f;
         shadowBlurOffsetY = 0.f;
-
+        
         shadowBlurFilter = SkImageFilters::DropShadow(
             shadowBlurOffsetX,           // dx
             shadowBlurOffsetX,           // dy
@@ -314,9 +314,11 @@ class BunCanvasRenderingContext2D {
         shadowBlurColor.setImageFilter(shadowBlurFilter);
         
         imageColor.setBlendMode(compositeOperations.at("source-over"));
-
+        
+        ctx->drawImage(tmpImage,0.f,0.f);
+        
         cssFont = "10px sans-serif";
-
+        
         font_cache.setFont(cssFont.c_str(),font_current);
     }
     
@@ -409,7 +411,7 @@ class BunCanvas {
         retiredTextures.clear();
         #endif
     }
-
+    
     void* getContext(const char* c) {
         if (std::strcmp("2d",c) == 0) {
             if (rendering2D == nullptr){
@@ -420,10 +422,10 @@ class BunCanvas {
         }
         return nullptr;
     }
-
+    
     void resize(int w, int h) {
         if (rendering2D == nullptr) return;
-
+        
         #ifndef __APPLE__
         // Flush main thread GPU commands and wait for completion
         // before retiring the old texture
@@ -436,9 +438,9 @@ class BunCanvas {
             hasBackendTex = false;
         }
         #endif
-        
+        auto tmp = surface->makeTemporaryImage();
         surface.reset();
-
+        
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
@@ -475,141 +477,156 @@ class BunCanvas {
         }
         #endif
         
-        if (ctxType == "2d") rendering2D->reset(surface);
+        if (ctxType == "2d") rendering2D->reset(surface, tmp);
     }
 };
 
 
 std::vector<BunCanvas*> canvases;
 
-SkColor4f parseCssColor(const char* c){
-        try {
-            return keywordColors.at(c);
-        }catch (std::exception){
-            if (c[0] == '#') {
-                if (std::strlen(c) == 4) {
-                    unsigned int rgb = std::strtoul(c + 1, nullptr, 16);
-                    uint8_t r = (rgb >> 8) & 0xF;
-                    uint8_t g = (rgb >> 4) & 0xF;
-                    uint8_t b = rgb & 0xF;
-                    r = (r << 4) | r;
-                    g = (g << 4) | g;
-                    b = (b << 4) | b;
-                    return SkColor4f{
-                        r / 255.f,
-                        g / 255.f,
-                        b / 255.f,
-                        1.0f
-                    };
-                }
-                if (std::strlen(c) == 5) {
-                    unsigned int rgba = std::strtoul(c + 1, nullptr, 16);
-                    uint8_t r = (rgba >> 12) & 0xF;
-                    uint8_t g = (rgba >> 8) & 0xF;
-                    uint8_t b = (rgba >> 4) & 0xF;
-                    uint8_t a = rgba & 0xF;
-                    r = (r << 4) | r;
-                    g = (g << 4) | g;
-                    b = (b << 4) | b;
-                    a = (a << 4) | a;
-                    return SkColor4f{
-                        r / 255.f,
-                        g / 255.f,
-                        b / 255.f,
-                        a / 255.f
-                    };
-                }
-                if (std::strlen(c) == 7) {
-                    unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-                    return SkColor4f{
-                        ((rgb >> 16) & 0xFF) / 255.f,
-                        ((rgb >> 8) & 0xFF) / 255.f,
-                        (rgb & 0xFF) / 255.f,
-                        1.0f
-                    };
-                }
-                if (std::strlen(c) == 9) {
-                    unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-                    return SkColor4f{
-                        ((rgb >> 24) & 0xFF) / 255.f,
-                        ((rgb >> 16) & 0xFF) / 255.f,
-                        ((rgb >> 8) & 0xFF) / 255.f,
-                        (rgb & 0xFF) / 255.f
-                    };
-                }
-                return SkColor4f{0,0,0,0};
-            }
-            if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == 'a' && c[4] == '(') {
-                c+=5;
-                int r = 0;
-                while (*c >= '0' && *c <= '9') {
-                    r = r * 10 + (*c - '0');
-                    ++c;
-                }
-                r = std::clamp(r, 0, 255);
-                while (*c == ' ' || *c == ',') ++c;
-                int g = 0;
-                while (*c >= '0' && *c <= '9') {
-                    g = g * 10 + (*c - '0');
-                    ++c;
-                }
-                g = std::clamp(g, 0, 255); 
-                while (*c == ' ' || *c == ',') ++c;
-                int b = 0;
-                while (*c >= '0' && *c <= '9') {
-                    b = b * 10 + (*c - '0');
-                    ++c;
-                }
-                b = std::clamp(b, 0, 255);
-                while (*c == ' ' || *c == ',') ++c;
-                int a = 0;
-                while (*c >= '0' && *c <= '9') {
-                    a = a * 10 + (*c - '0');
-                    ++c;
-                }
-                a = std::clamp(a, 0, 255); 
-                return SkColor4f{
-                    (float)r / 255.f,
-                    (float)g / 255.f,
-                    (float)b / 255.f,
-                    (float)a / 255.f,
-                };
-            }
-            if (c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {
-                c+=4;
-                int r = 0;
-                while (*c >= '0' && *c <= '9') {
-                    r = r * 10 + (*c - '0');
-                    ++c;
-                }
-                r = std::max(r,0);
-                r = std::min(r,255);
-                while (*c == ' ' || *c == ',') ++c;
-                int g = 0;
-                while (*c >= '0' && *c <= '9') {
-                    g = g * 10 + (*c - '0');
-                    ++c;
-                }
-                g = std::max(g,0);
-                g = std::min(g,255);
-                while (*c == ' ' || *c == ',') ++c;
-                int b = 0;
-                while (*c >= '0' && *c <= '9') {
-                    b = b * 10 + (*c - '0');
-                    ++c;
-                }
-                b = std::max(b,0);
-                b = std::min(b,255);
-                return SkColor4f{
-                    (float)r / 255.f,
-                    (float)g / 255.f,
-                    (float)b / 255.f,
-                    1.0f
-                };
-            }
-        }
-        return SkColor4f{0,0,0,0};
+int parseCharValue(const char*& c, bool& isValid){
+    int n = 0;
+    bool v = false;
+    while (*c >= '0' && *c <= '9') {
+        v = true;
+        n = n * 10 + (*c - '0');
+        ++c;
     }
+    isValid = v;
+    return std::clamp(n, 0, 255);
+}
+
+//Skips only a single comma and any number of spaces
+void skipAllowed(const char*& c, int& commaCount){
+    while (*c == ' ' || *c == ',') {
+        if (*c == ',') commaCount++;
+        ++c;
+    };
+}
+
+std::optional<SkColor4f> parseCssColor(const char* c){
+    if (!c) return std::nullopt;
+    auto it = keywordColors.find(c);
+    if (it != keywordColors.end()) return it->second;
+    auto len = std::strlen(c);
+    //Comparing length
+    if (len > 1 && c[0] == '#') {
+        //Check if valid before computing
+        for (size_t i = 1 ; i < len; i++) {
+            if (!(
+                (c[i] >= '0' && c[i] <= '9') ||
+                (c[i] >= 'a' && c[i] <= 'f') ||
+                (c[i] >= 'A' && c[i] <= 'F')
+            )) return std::nullopt;
+        }
+        if (len == 4) {
+            unsigned int rgb = std::strtoul(c + 1, nullptr, 16);
+            uint8_t r = (rgb >> 8) & 0xF;
+            uint8_t g = (rgb >> 4) & 0xF;
+            uint8_t b = rgb & 0xF;
+            r = (r << 4) | r;
+            g = (g << 4) | g;
+            b = (b << 4) | b;
+            return SkColor4f{
+                r / 255.f,
+                g / 255.f,
+                b / 255.f,
+                1.0f
+            };
+        }
+        if (len == 5) {
+            unsigned int rgba = std::strtoul(c + 1, nullptr, 16);
+            uint8_t r = (rgba >> 12) & 0xF;
+            uint8_t g = (rgba >> 8) & 0xF;
+            uint8_t b = (rgba >> 4) & 0xF;
+            uint8_t a = rgba & 0xF;
+            r = (r << 4) | r;
+            g = (g << 4) | g;
+            b = (b << 4) | b;
+            a = (a << 4) | a;
+            return SkColor4f{
+                r / 255.f,
+                g / 255.f,
+                b / 255.f,
+                a / 255.f
+            };
+        }
+        if (len == 7) {
+            unsigned int rgb = std::strtoul(c+1, nullptr, 16);
+            return SkColor4f{
+                ((rgb >> 16) & 0xFF) / 255.f,
+                ((rgb >> 8) & 0xFF) / 255.f,
+                (rgb & 0xFF) / 255.f,
+                1.0f
+            };
+        }
+        if (len == 9) {
+            unsigned int rgb = std::strtoul(c+1, nullptr, 16);
+            return SkColor4f{
+                ((rgb >> 24) & 0xFF) / 255.f,
+                ((rgb >> 16) & 0xFF) / 255.f,
+                ((rgb >> 8) & 0xFF) / 255.f,
+                (rgb & 0xFF) / 255.f
+            };
+        }
+        return std::nullopt;
+    }
+    if (len > 4 && c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == 'a' && c[4] == '(') {
+        for (size_t i = 5 ; i < len - 1 ; i++) {
+            if (!((c[i] >= '0' && c[i] <= '9') ||
+            (c[i] == ',') ||
+            (c[i] == ')') ||
+            (c[i] == ' '))) return std::nullopt;
+        }
+        c+=5;
+        int commaCount = 0;
+        bool isValid = false;
+        int r = parseCharValue(c,isValid);
+        skipAllowed(c,commaCount);
+        int g = parseCharValue(c,isValid);
+        skipAllowed(c,commaCount);
+        int b = parseCharValue(c,isValid);
+        skipAllowed(c,commaCount);
+        int a = parseCharValue(c,isValid);
+
+        //Legacy css does not support all spaces
+        if (commaCount < 3 || commaCount > 3 || !isValid) return std::nullopt;
+
+        return SkColor4f{
+            (float)r / 255.f,
+            (float)g / 255.f,
+            (float)b / 255.f,
+            (float)a / 255.f,
+        };
+    }
+    if (len > 3 && c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {
+        for (size_t i = 4 ; i < len - 1 ; i++) {
+            if (!((c[i] >= '0' && c[i] <= '9') ||
+            (c[i] == ',') ||
+            (c[i] == ')') ||
+            (c[i] == ' '))) return std::nullopt;
+        }
+        if (c[len-1] != ')') return std::nullopt;
+        c+=4;
+        int commaCount = 0;
+        bool isValid = false;
+        int r = parseCharValue(c,isValid);
+        skipAllowed(c,commaCount);
+        int g = parseCharValue(c,isValid);
+        skipAllowed(c,commaCount);
+        int b = parseCharValue(c,isValid);
+
+        if (commaCount != 2 && commaCount != 0 || !isValid) return std::nullopt;
+
+        return SkColor4f{
+            (float)r / 255.f,
+            (float)g / 255.f,
+            (float)b / 255.f,
+            1.0f
+        };
+    }
+    return std::nullopt;
+}
 
 extern "C" {
     
@@ -640,93 +657,108 @@ extern "C" {
         // obj->ctx = obj->surface->getCanvas();
     }
     
-
-    bool canvas_set_fill_style(void* renderingContext, const char* c){
+    
+    WINDOWS_EXPORT bool canvas_set_fill_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
-
-        obj->fillColor.setColor4f(parseCssColor(c));
-        obj->fillColor.setShader({});
-        return true;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        auto col = parseCssColor(c);
+        if (col){
+            obj->fillColor.setColor4f(*col);
+            obj->fillColor.setShader(nullptr);
+            return true;
+        }
+        return false;
     }
-
-    WINDOWS_EXPORT void canvas_set_fill_style_gradient(void* canvasObj, void* cGradient){
+    
+    WINDOWS_EXPORT bool canvas_set_fill_style_gradient(void* canvasObj, void* cGradient){
         
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
-        if (!obj||!grad) return;
-
+        if (!obj||!grad) return false;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        
         switch (grad->type){
             case GradientType::Linear : {
                 std::vector<SkColor4f> colors;
                 std::vector<float> positions;
-
+                
                 colors.reserve(grad->stops.size());
                 positions.reserve(grad->stops.size());
-
+                
                 for (const auto& stop : grad->stops) {
                     colors.push_back(stop.color);
                     positions.push_back(stop.offset);
                 }
-
+                
                 SkGradient gradient(
                     SkGradient::Colors(colors, positions, SkTileMode::kClamp),
                     {}
                 );
                 SkPoint pts[] = { grad->p0, grad->p1 };
                 obj->fillColor.setShader(SkShaders::LinearGradient(pts, gradient));
-                break;
+                return true;
             }
         }
+        return false;
     }
-
-    bool canvas_set_stroke_style(void* renderingContext, const char* c){
+    
+    WINDOWS_EXPORT bool canvas_set_stroke_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
-
-        obj->strokeColor.setColor4f(parseCssColor(c));
-        obj->strokeColor.setShader({});
-
-        return true;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        
+        auto col = parseCssColor(c);
+        if (col){
+            obj->strokeColor.setColor4f(*col);
+            obj->strokeColor.setShader({});
+            return true;
+        }
+        return false;
     }
-
-    WINDOWS_EXPORT void canvas_set_stroke_style_gradient(void* canvasObj, void* cGradient){
+    
+    WINDOWS_EXPORT bool canvas_set_stroke_style_gradient(void* canvasObj, void* cGradient){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
-        if (!obj||!grad) return;
-
+        if (!obj||!grad) return false;
+        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        
         switch (grad->type){
             case GradientType::Linear : {
                 std::vector<SkColor4f> colors;
                 std::vector<float> positions;
-
+                
                 colors.reserve(grad->stops.size());
                 positions.reserve(grad->stops.size());
-
+                
                 for (const auto& stop : grad->stops) {
                     colors.push_back(stop.color);
                     positions.push_back(stop.offset);
                 }
-
+                
                 SkGradient gradient(
                     SkGradient::Colors(colors, positions, SkTileMode::kClamp),
                     {}
                 );
                 SkPoint pts[] = { grad->p0, grad->p1 };
                 obj->strokeColor.setShader(SkShaders::LinearGradient(pts, gradient));
-                break;
+                return true;
             }
         }
+        return false;
     }
-    bool canvas_set_shadow_color(void* renderingContext, const char* c){
+    WINDOWS_EXPORT bool canvas_set_shadow_color(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
-
-        obj->shadowBlurColor.setColor4f(parseCssColor(c));
+        
+        auto col = parseCssColor(c);
+        if (col){
+            obj->shadowBlurColor.setColor4f(*col);
+        }
         return true;
     }
     
-
+    
     
     
     WINDOWS_EXPORT void canvas_set_stroke_width(void* canvasObj, float w) {
@@ -755,7 +787,7 @@ extern "C" {
         }
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), fColor);
     }
-
+    
     WINDOWS_EXPORT void canvas_stroke_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -776,7 +808,7 @@ extern "C" {
             sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
             for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(x,y,w,h), obj->sampling, &shColor);
             // shColor.setStyle(SkPaint::Style::kFill_Style);
-
+            
             
         }
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), sColor);
@@ -864,17 +896,25 @@ extern "C" {
             return;
         };
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-
+        
         SkPaint sColor = obj->strokeColor;
         auto alphaf = obj->strokeColor.getAlphaf()*obj->globalAlpha;
         sColor.setAlphaf(alphaf);
-
+        
         if(obj->shadowBlurAmount > 0.5f) {
             SkPaint shColor = obj->shadowBlurColor;
+            // shColor.setStyle(SkPaint::Style::kFill_Style);
             auto _af = shColor.getAlphaf()*obj->globalAlpha;
-            shColor.setStyle(SkPaint::Style::kStroke_Style);
             shColor.setAlphaf(_af);
-            (*obj)()->drawPath(obj->pathBuilder.snapshot(), shColor);
+            // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+            int w = obj->owner->surface->width();
+            int h = obj->owner->surface->height();
+            sk_sp<SkSurface> sfc = SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
+            sfc->getCanvas()->drawPath(obj->pathBuilder.snapshot(), sColor);
+            for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->sampling, &shColor);
         }
         (*obj)()->drawPath(obj->pathBuilder.snapshot(), sColor);
     }
@@ -902,7 +942,7 @@ extern "C" {
         }
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
-
+    
     WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float x,float y,float w,float h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -975,8 +1015,8 @@ extern "C" {
                 kPremul_SkAlphaType
             );
             size_t rowBytes = w * 4;
-
-
+            
+            
             // if (obj->owner->hasBackendTex) renderThreadContext->context->flushAndSubmit();
             
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
@@ -989,7 +1029,7 @@ extern "C" {
             );
         }
     }
-
+    
     // WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
     //     if (!canvasObj) return false;
     //     BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1004,7 +1044,7 @@ extern "C" {
     //             kPremul_SkAlphaType
     //         );
     //         size_t rowBytes = w * 4;
-            
+    
     //         if (obj->owner->hasBackendTex) {
     //             auto _img = SkImages::BorrowTextureFrom(
     //                 renderThreadContext->context.get(),
@@ -1034,11 +1074,11 @@ extern "C" {
     //                 y, 
     //                 SkImage::CachingHint::kDisallow_CachingHint
     //             );
-
+    
     //             return false;
     //         }
-            
-            
+    
+    
     //     }
     // }
     
@@ -1056,7 +1096,7 @@ extern "C" {
         );
         
         SkBitmap bitmap;
-
+        
         
         if(bitmap.installPixels(imageInfo,buffer,w *4)){
             
@@ -1115,7 +1155,7 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
         return ctx->font_cache.setFont(cssString,ctx->font_current);
     }
-
+    
     WINDOWS_EXPORT void canvas_fill_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1173,14 +1213,14 @@ extern "C" {
             (*ctx)()->drawString(txt, x, y, ctx->font_current, sColor);
         }
     }
-
+    
     WINDOWS_EXPORT void canvas_set_shadow_blur(void* ctxPtr, float b){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
         
         ctx->shadowBlurAmount = std::max(b,0.f);
-
+        
         ctx->shadowBlurFilter = SkImageFilters::DropShadow(
             ctx->shadowBlurOffsetX,           // dx
             ctx->shadowBlurOffsetX,           // dy
@@ -1199,7 +1239,7 @@ extern "C" {
         
         ctx->shadowBlurOffsetX = oX;
     }
-
+    
     WINDOWS_EXPORT void canvas_set_shadow_offsetY(void* ctxPtr, float oY){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1207,17 +1247,16 @@ extern "C" {
         
         ctx->shadowBlurOffsetX = oY;
     }
-
+    
     WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
         return new BunCanvasGradient(GradientType::Linear, x1, y1, x2, y2);
     }
-    WINDOWS_EXPORT void canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
+    WINDOWS_EXPORT bool canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
         // Validate offset (0 <= offset <= 1)
         // Throw IndexSizeError if invalid
         auto* grad = validated<BunCanvasGradient>(gPtr);
-        std::cout << grad << "added!\n";
-        if (!grad) return;
-
+        if (!grad) return false;
+        
         auto it = std::lower_bound(
             grad->stops.begin(),
             grad->stops.end(),
@@ -1225,26 +1264,32 @@ extern "C" {
             [](const ColorStop& s, float o) {
                 return s.offset < o;
             });
-
-        grad->stops.insert(it, {offset, parseCssColor(c)});
-    }
-    WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
-        // Validate offset (0 <= offset <= 1)
-        // Throw IndexSizeError if invalid
-        auto* grad = validated<BunCanvasGradient>(gPtr);
-        if (!grad) return;
-        delete grad;
-    }
-
-    WINDOWS_EXPORT void canvas_destroy(void* ptr) {
-        auto* cnv = validated<BunCanvas>(ptr);
-        if (!cnv) return;
-
-        auto it = std::find(canvases.begin(), canvases.end(), ptr);
-
-        if (it != canvases.end()) {
-            canvases.erase(it);
+            
+            auto col = parseCssColor(c);
+            
+            if (col) {
+                grad->stops.insert(it, {offset, *col});
+                return true;
+            }
+            return false;
         }
-        delete cnv;
+        WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
+            // Validate offset (0 <= offset <= 1)
+            // Throw IndexSizeError if invalid
+            auto* grad = validated<BunCanvasGradient>(gPtr);
+            if (!grad) return;
+            delete grad;
+        }
+        
+        WINDOWS_EXPORT void canvas_destroy(void* ptr) {
+            auto* cnv = validated<BunCanvas>(ptr);
+            if (!cnv) return;
+            
+            auto it = std::find(canvases.begin(), canvases.end(), ptr);
+            
+            if (it != canvases.end()) {
+                canvases.erase(it);
+            }
+            delete cnv;
+        }
     }
-}

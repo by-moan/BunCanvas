@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600)
+const window = new Window(800,600, "AEIOU")
 
 const canvas = new Canvas(200,200)
 const ctx = canvas.getContext("2d")
@@ -68,7 +68,7 @@ window.addEventListener("mousemove", (evt)=>{
 const grad = ctx.createLinearGradient(20,0,220,0);
 grad.addColorStop(0, "green");
 // grad.addColorStop(-0.5, "cyan");
-grad.addColorStop(0.7, "blue");
+grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
 let loop = ()=>{
@@ -79,12 +79,19 @@ let loop = ()=>{
     ctx.fillRect(0,0,window.innerWidth/2, window.innerHeight/2);
     ctx.fillStyle = grad;
     ctx.fillRect(20, 20, 200, 100);
-    ctx.strokeStyle = "#0f0"
-    ctx.fillStyle = "#f0a"
+    // ctx.strokeStyle = "#0f0"
+    ctx.fillStyle = "rgb(255 0 170)"
     ctx.shadowColor = "#d99b9b"
     ctx.lineWidth = 10;
     ctx.shadowBlur = (Math.sin(s)+10)*10;
     ctx.drawImage(img,200,200,396,347)
+    const grad2 = ctx.createLinearGradient(x-150,y-150,x+150,y-150);
+    grad2.addColorStop(0, "red");
+    grad2.addColorStop(0.25, "yellow");
+    grad2.addColorStop(0.5, "lime");
+    grad2.addColorStop(0.75, "cyan");
+    grad2.addColorStop(1, "blue");
+    ctx.strokeStyle = grad2;
     ctx.strokeRect(x-150,y-150,300,300)
     ctx.shadowBlur = 0;
     ctx.fillRect(x-50,y-50,100,100)

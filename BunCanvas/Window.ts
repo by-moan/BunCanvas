@@ -63,7 +63,7 @@ export class Window {
 			this.#renderThread = new Worker(
 				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
 			);
-			this.#renderThread.postMessage({ w: width, h: height });
+			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`)});
 
 			let pendingFrame = false;
 
@@ -72,14 +72,12 @@ export class Window {
 					lib.symbols.destroy_window();
 					process.exit(0);
 				}
-				if (pendingFrame) return;
-				pendingFrame = true;
-				
-				
 				if (msg.data == 1){
 					gpuInitialized = lib.symbols.canvas_init_gpu_context();
 					lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 				}
+				if (pendingFrame) return;
+				pendingFrame = true;
 				
 				lib.symbols.update_window();
 				
@@ -153,6 +151,7 @@ export class Window {
 				// for (let i = 0; i < pLen; i++) {
 				// 	(requestedFrames.shift())()
 				// }
+				lib.symbols.canvas_flush_gpu();
 				setImmediate(()=>{
 					const end = requestedFrames.length;
 
@@ -163,7 +162,6 @@ export class Window {
 					requestedFrames.splice(0, end);
 					pendingFrame = false;
 				});
-				lib.symbols.canvas_flush_gpu();
 			}
 		} else {
 			this.#renderThread  = null;
@@ -259,7 +257,7 @@ export class Window {
 					returns: "void",
 				}
 			});
-			aaplLib.symbols.setup_render_thread(width,height,cb.ptr)
+			aaplLib.symbols.setup_render_thread(width,height,encoder.encode(`${title}\0`),cb.ptr)
 
 			lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 

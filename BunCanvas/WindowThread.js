@@ -29,18 +29,20 @@ const MessagePost = new JSCallback((instruction)=>{
 );
 let w;
 let h;
+let t;
 
 self.onmessage = (msg)=>{
     w = msg.data.w
     h = msg.data.h
+    t = msg.data.t
 
     const lib = dlopen(path, {
         setup_render_thread: {
-            args: ["int","int","ptr"],
+            args: ["int","int","cstring","ptr"],
             returns: "void",
         }
     });
-    lib.symbols.setup_render_thread(w,h,MessagePost.ptr);
+    lib.symbols.setup_render_thread(w,h,t,MessagePost.ptr);
     self.postMessage(2)
     process.exit(0)
 }

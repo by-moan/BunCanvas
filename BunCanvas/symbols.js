@@ -94,6 +94,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","cstring"],
 		returns: "bool",
 	},
+	canvas_set_fill_style_gradient: {
+		args: ["ptr","ptr"],
+		returns: "void",
+	},
 	canvas_set_stroke_style: {
 		args: ["ptr","cstring"],
 		returns: "bool",
@@ -103,6 +107,10 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_fill_rect: {
+		args: ["ptr","int","int","int","int"],
+		returns: "void",
+	},
+	canvas_stroke_rect: {
 		args: ["ptr","int","int","int","int"],
 		returns: "void",
 	},
@@ -191,6 +199,42 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","cstring","float","float","float"],
 		returns: "void",
 	},
+	canvas_stroke_text: {
+		args: ["ptr","cstring","float","float","float"],
+		returns: "void",
+	},
+	canvas_set_shadow_blur: {
+		args: ["ptr","float"],
+		returns: "void",
+	},
+	canvas_set_shadow_color: {
+		args: ["ptr","cstring"],
+		returns: "void",
+	},
+	canvas_set_shadow_offsetX: {
+		args: ["ptr","float"],
+		returns: "void",
+	},
+	canvas_set_shadow_offsetY: {
+		args: ["ptr","float"],
+		returns: "void",
+	},
+	canvas_create_linear_gradient: {
+		args: ["float","float","float","float"],
+		returns: "ptr",
+	},
+	canvas_gradient_add_color_stop: {
+		args: ["ptr", "float", "cstring"],
+		returns: "void",
+	},
+	canvas_gradient_destroy: {
+		args: ["ptr"],
+		returns: "void",
+	},
+	canvas_destroy: {
+		args: ["ptr"],
+		returns: "void",
+	},
 	image_create: {
 		args: [],
 		returns: "ptr",
@@ -198,6 +242,10 @@ export const lib = dlopen(dlPath, {
 	image_set_src: {
 		args: ["ptr","cstring"],
 		returns: "bool",
+	},
+	image_destroy: {
+		args: ["ptr"],
+		returns: "void",
 	},
 	font_load:{
 		args: ["cstring"],

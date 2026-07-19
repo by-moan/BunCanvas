@@ -37,4 +37,9 @@ extern "C" {
         }
         return false;
     }
+
+    WINDOWS_EXPORT void image_destroy(void* ptr) {
+        ImageWrapper* obj = validated<ImageWrapper>(ptr);
+        delete obj;
+    }
 }

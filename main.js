@@ -8,9 +8,9 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "AEIOU", {vsync:true})
+const window = new Window(800,600, "App", {vsync:false, maxFramerate: 165})
 
-const canvas = new Canvas(200,200)
+const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext("2d")
 
 
@@ -28,7 +28,7 @@ img.onload = (evt)=>{
 img.onerror = (evt)=>{
     console.log("error loading image!", evt.timeStamp)
 }
-img.src = "./bunlogo.png";
+img.src = "./face.png";
 
 window.append(canvas)
 
@@ -75,7 +75,7 @@ grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
 
-let loop = async ()=>{
+let loop = ()=>{
     count++;
     // ctx.fillStyle = "#101010"
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
@@ -99,15 +99,13 @@ let loop = async ()=>{
     ctx.save();
     ctx.translate(x,y)
     ctx.rotate(Math.PI*r)
-    let tf = ctx.getTransform();
-    if (tf.m41 != 0) console.log(tf)
     ctx.strokeRect(-150,-150,300,300)
     ctx.restore();
     ctx.shadowBlur = 0;
     ctx.fillRect(x-50,y-50,100,100)
+    // await Bun.sleep(5.5)
     requestAnimationFrame(loop);
 }
 console.log(performance.now()-tStart)
 console.timeEnd("init")
-
 loop();

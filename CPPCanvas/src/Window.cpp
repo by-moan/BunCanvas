@@ -395,8 +395,8 @@ extern "C" {
             std::cout << "Surface was not created!\n";
             return;
         };
-        
-        glfwSwapInterval(0);
+        std::cout << vsync << "\n";
+        glfwSwapInterval(vsync);
         
         canvas = sWrapper->surface->getCanvas();
         
@@ -441,7 +441,7 @@ extern "C" {
         }
         
         // processResizes();
-        onrefresh();
+        onrefresh(1);
         
         for (auto element : canvases) {
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);

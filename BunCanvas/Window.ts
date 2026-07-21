@@ -25,6 +25,8 @@ export class Window {
 	#freeIndex = new Array();
 	#eIndex = 0
 
+	maxFramerate = 0
+
 	fonts = {
 		add(font : FontFace){
 			if (!font._nativePtr) throw new TypeError("Font was not loaded");
@@ -58,7 +60,9 @@ export class Window {
 		this.#dim[0] = width;
 		this.#dim[1] = height;
 
-		const { vsync = true } = args ?? {};
+		const { vsync = true} = args ?? {};
+
+		this.maxFramerate = args.maxFramerate?args.maxFramerate:0;
 		
 		if (process.platform !== "darwin") {
 			let gpuInitialized = false;
@@ -170,7 +174,9 @@ export class Window {
 			}
 		} else {
 			this.#renderThread  = null;
-			let cb = new JSCallback(()=>{
+			let sleeping = false;
+			let cb = new JSCallback(async ()=>{
+				if (sleeping) return;
 				if (lib.symbols.should_window_close()) {
 					lib.symbols.destroy_window();
 					process.exit(0);
@@ -252,17 +258,21 @@ export class Window {
 				for (let i = 0; i < pLen; i++) {
 					(requestedFrames.shift())()
 				}
+				if (this.maxFramerate > 0) {
+					sleeping = true;
+					setTimeout(()=>{sleeping = false},Math.round(1000/this.maxFramerate-1))
+				}
 			},{
 				args:[],
 				returns: "void"
 			});
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {
-					args: ["int","int","ptr"],
+					args: ["int","int","cstring","ptr","bool"],
 					returns: "void",
 				}
 			});
-			aaplLib.symbols.setup_render_thread(width,height,encoder.encode(`${title}\0`),cb.ptr)
+			aaplLib.symbols.setup_render_thread(width,height,encoder.encode(`${title}\0`),cb.ptr,vsync)
 
 			lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 

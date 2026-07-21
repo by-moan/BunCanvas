@@ -3,6 +3,7 @@ import { lib,encoder, dlPath } from "./symbols.js";
 import { ptr, Pointer } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
+import { DOMMatrix } from "./DOMMatrix.js";
 
 const ptrs = new WeakMap();
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
@@ -192,6 +193,11 @@ class CanvasRenderingContext2D {
 	createLinearGradient(...args : [number,number,number,number]) : CanvasGradient {
 		if (args.length < 4) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${args.length} present.`)
 		return new CanvasGradient(...args);
+	}
+	getTransform() : DOMMatrix {
+		let arr = new Float32Array(16)
+		let IsIdentity = lib.symbols.canvas_get_transform(ptrs.get(this),ptr(arr))
+		return new DOMMatrix(arr,true,IsIdentity);
 	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)

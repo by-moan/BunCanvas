@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "AEIOU", {vsync:false})
+const window = new Window(800,600, "AEIOU", {vsync:true})
 
 const canvas = new Canvas(200,200)
 const ctx = canvas.getContext("2d")
@@ -32,7 +32,7 @@ img.src = "./bunlogo.png";
 
 window.append(canvas)
 
-const addedFont = new FontFace("YuyuShort","./YuyuShort-Regular.ttf");
+const addedFont = new FontFace("YuyuShort","url(./YuyuShort-Regular.ttf)");
 
 await addedFont.load();
 
@@ -43,6 +43,7 @@ window.fonts.add(addedFont)
 let x = 0;
 let y = 0;
 let s = 0;
+let r = 0;
 let count = 0;
 
 setInterval(()=>{
@@ -52,6 +53,8 @@ setInterval(()=>{
 
 setInterval(()=>{
     s+=0.05
+    // if (r >= Math.PI*2) r = 0;
+    r+=0.01
 },5)
 
 window.addEventListener("resize", (evt)=>{
@@ -71,6 +74,7 @@ grad.addColorStop(0, "green");
 grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
+
 let loop = async ()=>{
     count++;
     // ctx.fillStyle = "#101010"
@@ -85,14 +89,20 @@ let loop = async ()=>{
     ctx.lineWidth = 10;
     ctx.shadowBlur = (Math.sin(s)+10)*10;
     ctx.drawImage(img,200,200,396,347)
-    const grad2 = ctx.createLinearGradient(x-150,y-150,x+150,y-150);
+    const grad2 = ctx.createLinearGradient(-150,0,150,0);
     grad2.addColorStop(0, "red");
     grad2.addColorStop(0.25, "yellow");
     grad2.addColorStop(0.5, "lime");
     grad2.addColorStop(0.75, "cyan");
     grad2.addColorStop(1, "blue");
     ctx.strokeStyle = grad2;
-    ctx.strokeRect(x-150,y-150,300,300)
+    ctx.save();
+    ctx.translate(x,y)
+    ctx.rotate(Math.PI*r)
+    let tf = ctx.getTransform();
+    if (tf.m41 != 0) console.log(tf)
+    ctx.strokeRect(-150,-150,300,300)
+    ctx.restore();
     ctx.shadowBlur = 0;
     ctx.fillRect(x-50,y-50,100,100)
     requestAnimationFrame(loop);

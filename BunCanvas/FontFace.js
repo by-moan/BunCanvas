@@ -10,7 +10,7 @@ export class FontFace {
 
 	constructor(fontName, path) {
 		this.#fontName	= fontName.toLowerCase()
-		this.#path		= path.trim().replaceAll('url(', "").replaceAll('"', "").replaceAll("'","").trim()
+		this.#path		= path.trim().replaceAll('url(', "").replaceAll('"', "").replaceAll("'","").replaceAll(")","").trim()
 	}
 
 	get family(){

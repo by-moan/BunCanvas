@@ -1146,7 +1146,7 @@ extern "C" {
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->rotate(deg);
+        (*obj)()->rotate(deg*57.29577951308232);
     }
     
     WINDOWS_EXPORT bool canvas_set_font(void* ctxPtr, const char* cssString) {
@@ -1272,24 +1272,36 @@ extern "C" {
                 return true;
             }
             return false;
-        }
-        WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
-            // Validate offset (0 <= offset <= 1)
-            // Throw IndexSizeError if invalid
-            auto* grad = validated<BunCanvasGradient>(gPtr);
-            if (!grad) return;
-            delete grad;
-        }
-        
-        WINDOWS_EXPORT void canvas_destroy(void* ptr) {
-            auto* cnv = validated<BunCanvas>(ptr);
-            if (!cnv) return;
-            
-            auto it = std::find(canvases.begin(), canvases.end(), ptr);
-            
-            if (it != canvases.end()) {
-                canvases.erase(it);
-            }
-            delete cnv;
-        }
     }
+    WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
+        // Validate offset (0 <= offset <= 1)
+        // Throw IndexSizeError if invalid
+        auto* grad = validated<BunCanvasGradient>(gPtr);
+        if (!grad) return;
+        delete grad;
+    }
+    
+    WINDOWS_EXPORT void canvas_destroy(void* ptr) {
+        auto* cnv = validated<BunCanvas>(ptr);
+        if (!cnv) return;
+        
+        auto it = std::find(canvases.begin(), canvases.end(), ptr);
+        
+        if (it != canvases.end()) {
+            canvases.erase(it);
+        }
+        delete cnv;
+    }
+    WINDOWS_EXPORT bool canvas_get_transform(void* ctxPtr, float* mtx){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return false;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        
+        auto matrix = (*ctx)()->getLocalToDevice();
+        matrix.getColMajor(mtx);
+        return mtx[0]  == 1 && mtx[1]  == 0 && mtx[2]  == 0 && mtx[3]  == 0 &&
+        mtx[4]  == 0 && mtx[5]  == 1 && mtx[6]  == 0 && mtx[7]  == 0 &&
+        mtx[8]  == 0 && mtx[9]  == 0 && mtx[10] == 1 && mtx[11] == 0 &&
+        mtx[12] == 0 && mtx[13] == 0 && mtx[14] == 0 && mtx[15] == 1;
+    }
+}

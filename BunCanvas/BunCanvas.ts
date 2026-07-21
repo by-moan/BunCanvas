@@ -35,6 +35,13 @@ class CanvasRenderingContext2D {
 	#compositeOperation = "source-over";
 	#fontCss = "10px sans-serif";
 
+	#reset(){
+		this.#fillStyle = "#000000";
+		this.#strokeStyle = "#000000";
+		this.#compositeOperation = "source-over";
+		this.#fontCss = "10px sans-serif";
+	}
+
 	
 	
 	set font(css: string) {
@@ -189,10 +196,12 @@ class CanvasRenderingContext2D {
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr : Pointer | null) {
+	constructor(iptr : Pointer | null, resetCallback : any) {
 		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
 		ptrs.set(this, renderContextPtr)
 		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#fontCss}\0`))
+
+		resetCallback.cb = this.#reset.bind(this)
 	}
 }
 
@@ -214,6 +223,9 @@ class CanvasRenderingContext2D {
 
 export class Canvas {
 	#dim = new Float64Array(2);
+	#rCapture = {
+		cb : ()=>{}
+	}
 	constructor(w=1,h=1) {
 		this.#dim[0] = w;
 		this.#dim[1] = h;
@@ -228,10 +240,12 @@ export class Canvas {
 	
 	set width(v){
 		this.#dim[0] = v
+		this.#rCapture.cb()
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
 	}
 	set height(v){
 		this.#dim[1] = v
+		this.#rCapture.cb()
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
 	}
 	get width(){
@@ -243,7 +257,7 @@ export class Canvas {
 	
 	getContext(contextType : string) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this))
+			return new CanvasRenderingContext2D(ptrs.get(this),this.#rCapture)
 		}
 	}
 }

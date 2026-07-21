@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "AEIOU")
+const window = new Window(800,600, "AEIOU", {vsync:false})
 
 const canvas = new Canvas(200,200)
 const ctx = canvas.getContext("2d")
@@ -71,7 +71,7 @@ grad.addColorStop(0, "green");
 grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
-let loop = ()=>{
+let loop = async ()=>{
     count++;
     // ctx.fillStyle = "#101010"
     ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
@@ -80,7 +80,7 @@ let loop = ()=>{
     ctx.fillStyle = grad;
     ctx.fillRect(20, 20, 200, 100);
     // ctx.strokeStyle = "#0f0"
-    ctx.fillStyle = "rgb(255 0 170)"
+    ctx.fillStyle = "rgb(255,0,170)"
     ctx.shadowColor = "#d99b9b"
     ctx.lineWidth = 10;
     ctx.shadowBlur = (Math.sin(s)+10)*10;

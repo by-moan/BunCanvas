@@ -50,6 +50,10 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
+	signal_frame_ready:{
+		args: [],
+		returns: "void",
+	},
 	create_window: {
 		args: ["int","int", "cstring"],
 		returns: "void",

@@ -54,16 +54,21 @@ export class Window {
 	
 	#renderThread : Worker | null;
 	
-	constructor(width : number, height : number, title = "App") {
+	constructor(width : number, height : number, title = "App", args : any) {
 		this.#dim[0] = width;
 		this.#dim[1] = height;
+
+		const { vsync = true } = args ?? {};
 		
 		if (process.platform !== "darwin") {
 			let gpuInitialized = false;
 			this.#renderThread = new Worker(
 				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
 			);
-			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`)});
+			this.#renderThread.onerror = (msg)=>{
+				console.log(msg)
+			}
+			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: vsync});
 
 			let pendingFrame = false;
 
@@ -78,6 +83,20 @@ export class Window {
 				}
 				if (pendingFrame) return;
 				pendingFrame = true;
+				setImmediate(()=>{
+					const end = requestedFrames.length;
+
+					// for (let i = 0; i < end; i++) {
+					//     requestedFrames[i]();
+					// }
+					requestedFrames.forEach((item)=>{
+						item();
+					});
+					lib.symbols.canvas_flush_gpu();
+					lib.symbols.signal_frame_ready();
+					requestedFrames.splice(0, end);
+					pendingFrame = false;
+				});
 				
 				lib.symbols.update_window();
 				
@@ -88,7 +107,7 @@ export class Window {
 					this.#dim[0] = this.#wResizeViewer[1]
 					this.#dim[1] = this.#wResizeViewer[2]
 					if (this.onresize) this.onresize(details)
-						this.#rEvts.forEach((item,key)=>{
+					this.#rEvts.forEach((item,key)=>{
 						item.cb(details);
 					})
 				}
@@ -147,21 +166,7 @@ export class Window {
 					})
 				}
 				
-				// const pLen = requestedFrames.length
-				// for (let i = 0; i < pLen; i++) {
-				// 	(requestedFrames.shift())()
-				// }
-				lib.symbols.canvas_flush_gpu();
-				setImmediate(()=>{
-					const end = requestedFrames.length;
-
-					for (let i = 0; i < end; i++) {
-					    requestedFrames[i]();
-					}
-
-					requestedFrames.splice(0, end);
-					pendingFrame = false;
-				});
+				
 			}
 		} else {
 			this.#renderThread  = null;

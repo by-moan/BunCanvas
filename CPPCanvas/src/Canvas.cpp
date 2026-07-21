@@ -1245,7 +1245,7 @@ extern "C" {
         if (!ctx) return;
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
         
-        ctx->shadowBlurOffsetX = oY;
+        ctx->shadowBlurOffsetY = oY;
     }
     
     WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){

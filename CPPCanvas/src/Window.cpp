@@ -132,7 +132,7 @@ extern "C" {
     
     #ifndef __APPLE__
     // Called in the bun worker thread.
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
@@ -219,6 +219,7 @@ extern "C" {
         pImageDataColor.setBlendMode(SkBlendMode::kSrc);
         
         ready = true;
+        glfwSwapInterval(vsync);
         while (!glfwWindowShouldClose(window)) {
             // loop_mutex.lock();
             
@@ -281,14 +282,20 @@ extern "C" {
                         ++it;
                     }
                 }
+
                 #else
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
             }
             onrefresh(0);
+            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             
-            renderThreadContext->context->flushAndSubmit();
             glfwSwapBuffers(window);
+            std::unique_lock<std::mutex> lock(frameMtx);
+            frameCv.wait(lock, [] { return frameReady; });
+            frameReady = false;
+            lock.unlock();
+
             // loop_mutex.unlock();
         }
         ready = false;
@@ -317,7 +324,7 @@ extern "C" {
         mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
     }
     #else
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;

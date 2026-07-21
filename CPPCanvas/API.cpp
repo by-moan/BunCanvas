@@ -8,6 +8,8 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <condition_variable>
+
 
 // #include <pthread.h>
 
@@ -197,6 +199,9 @@ static _Float64_t mUpViewer[9]{};
 static int32_t kDownViewer[7]{};
 static int32_t kUpViewer[7]{};
 
+std::mutex frameMtx;
+std::condition_variable frameCv;
+bool frameReady = true;
 
 extern "C" {
     WINDOWS_EXPORT int32_t* get_wResizeViewer(){return wResizeViewer;}
@@ -206,6 +211,14 @@ extern "C" {
     WINDOWS_EXPORT _Float64_t* get_mUpViewer(){return mUpViewer;}
     WINDOWS_EXPORT int32_t* get_kDownViewer(){return kDownViewer;}
     WINDOWS_EXPORT int32_t* get_kUpViewer(){return kUpViewer;}
+
+    WINDOWS_EXPORT void signal_frame_ready() {
+        {
+            std::lock_guard<std::mutex> lock(frameMtx);
+            frameReady = true;
+        }
+        frameCv.notify_one();
+    }
 }
 
 // For this function to compile the object to convert MUST have the following components: static constexpr uint64_t MAGIC and uint64_t magic

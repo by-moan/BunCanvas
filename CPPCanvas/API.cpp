@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <functional>
 #include <mutex>
 #include <cctype>
 #include <regex>
@@ -181,6 +182,7 @@ SurfaceWrapper* sWrapper = nullptr;
 sk_sp<SkFontMgr> fontMgr = CreateFontManager();
 bool ready = false;
 bool mainThreadReady = false;
+std::vector<int> vsyncQueue;
 
 #ifndef __APPLE__
 GLFWwindow* sharedWindow = nullptr;

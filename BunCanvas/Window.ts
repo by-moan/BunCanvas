@@ -27,6 +27,13 @@ export class Window {
 
 	maxFramerate = 0
 
+	#vsync = true;
+	get vsync(){return this.#vsync}
+	set vsync(v : boolean){
+		this.#vsync = v
+		lib.symbols.set_vsync(v)
+	}
+
 	fonts = {
 		add(font : FontFace){
 			if (!font._nativePtr) throw new TypeError("Font was not loaded");
@@ -60,9 +67,12 @@ export class Window {
 		this.#dim[0] = width;
 		this.#dim[1] = height;
 
-		const { vsync = true} = args ?? {};
+		const { vsync = true, maxFramerate = 0 } = args ?? {};
+		this.#vsync = vsync;
+		this.maxFramerate = maxFramerate;
 
-		this.maxFramerate = args.maxFramerate?args.maxFramerate:0;
+		let lastFrame = performance.now();
+
 		
 		if (process.platform !== "darwin") {
 			let gpuInitialized = false;
@@ -72,11 +82,13 @@ export class Window {
 			this.#renderThread.onerror = (msg)=>{
 				console.log(msg)
 			}
-			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: vsync});
+			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync});
 
 			let pendingFrame = false;
 
-			this.#renderThread.onmessage = (msg)=>{
+			this.#renderThread.onmessage = async(msg)=>{
+				const frameTime = 1000 / this.maxFramerate;
+
 				if (msg.data == 2) {
 					lib.symbols.destroy_window();
 					process.exit(0);
@@ -85,24 +97,41 @@ export class Window {
 					gpuInitialized = lib.symbols.canvas_init_gpu_context();
 					lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 				}
-				if (pendingFrame) return;
-				pendingFrame = true;
-				setImmediate(()=>{
-					const end = requestedFrames.length;
+				lib.symbols.signal_frame_ready();
 
-					// for (let i = 0; i < end; i++) {
-					//     requestedFrames[i]();
-					// }
-					requestedFrames.forEach((item)=>{
-						item();
-					});
+				if (!pendingFrame) {
 					lib.symbols.canvas_flush_gpu();
-					lib.symbols.signal_frame_ready();
-					requestedFrames.splice(0, end);
+					pendingFrame = true;
+					setImmediate(async ()=>{
+						const end = requestedFrames.length;
+					
+						// for (let i = 0; i < end; i++) {
+						//     requestedFrames[i]();
+						// }
+						requestedFrames.forEach((item)=>{
+							item();
+						});
+						// lib.symbols.signal_frame_ready();
+					
+						requestedFrames.splice(0, end);
+					});
+				}
+
+				const now = performance.now();
+				if (now - lastFrame >= frameTime) {
+				    lastFrame += frameTime;
+				    // Prevent drift if we fell far behind.
+				    if (now - lastFrame >= frameTime)
+				        lastFrame = now;
 					pendingFrame = false;
-				});
+				}else if (frameTime == Infinity) {
+					pendingFrame = false;
+				}else if (this.#vsync) {
+					pendingFrame = false;
+				}
 				
-				lib.symbols.update_window();
+				
+				// lib.symbols.update_window();
 				
 				if (this.#wResizeViewer[0] != 0) {
 					this.#wResizeViewer[0] = 0

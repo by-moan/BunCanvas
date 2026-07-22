@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "App", {vsync:false, maxFramerate: 165})
+const window = new Window(800,600, "App", {vsync: false})
 
 const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext("2d")
@@ -28,7 +28,7 @@ img.onload = (evt)=>{
 img.onerror = (evt)=>{
     console.log("error loading image!", evt.timeStamp)
 }
-img.src = "./face.png";
+img.src = "./bunlogo.png";
 
 window.append(canvas)
 
@@ -67,6 +67,9 @@ window.addEventListener("mousemove", (evt)=>{
     x = evt.clientX
     y = evt.clientY
 })
+window.addEventListener("click", (evt)=>{
+    console.log("swag")
+})
 
 const grad = ctx.createLinearGradient(20,0,220,0);
 grad.addColorStop(0, "green");
@@ -74,6 +77,9 @@ grad.addColorStop(0, "green");
 grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
+setTimeout(()=>{
+    window.vsync = true
+},3000)
 
 let loop = ()=>{
     count++;
@@ -108,4 +114,5 @@ let loop = ()=>{
 }
 console.log(performance.now()-tStart)
 console.timeEnd("init")
-loop();
+loop()
+// setInterval(loop,33);

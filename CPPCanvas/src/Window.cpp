@@ -132,6 +132,11 @@ extern "C" {
     
     #ifndef __APPLE__
     // Called in the bun worker thread.
+
+    WINDOWS_EXPORT void set_vsync(bool v){
+        vsyncQueue.push_back(v);
+    }
+
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
@@ -283,10 +288,16 @@ extern "C" {
                     }
                 }
 
+                for (int it : vsyncQueue){
+                    glfwSwapInterval(it);
+                }
+                vsyncQueue.clear();
+
                 #else
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
             }
+            
             onrefresh(0);
             renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             
@@ -450,11 +461,6 @@ extern "C" {
         glfwSwapBuffers(window);
     }
     #endif
-    
-    
-    
-    
-    
     
     #ifndef __APPLE__
     WINDOWS_EXPORT bool should_window_close() {

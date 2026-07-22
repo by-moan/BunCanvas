@@ -54,6 +54,10 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "void",
 	},
+	set_vsync: {
+		args: ["bool"],
+		returns: "void",
+	},
 	create_window: {
 		args: ["int","int", "cstring"],
 		returns: "void",

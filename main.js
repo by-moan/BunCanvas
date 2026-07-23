@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "App", {vsync: false})
+const window = new Window(800,600, "App")
 
 const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext("2d")
@@ -28,7 +28,7 @@ img.onload = (evt)=>{
 img.onerror = (evt)=>{
     console.log("error loading image!", evt.timeStamp)
 }
-img.src = "./bunlogo.png";
+img.src = "./face.png";
 
 window.append(canvas)
 
@@ -60,6 +60,9 @@ setInterval(()=>{
 window.addEventListener("resize", (evt)=>{
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "low";
+    // ctx.filter = "blur(30px)";
     // ctx.font = "60px regular YuyuShort"
 })
 
@@ -77,9 +80,11 @@ grad.addColorStop(0, "green");
 grad.addColorStop(0.5, "cyan");
 grad.addColorStop(1, "green");
 
-setTimeout(()=>{
-    window.vsync = true
-},3000)
+
+// setTimeout(()=>{
+//     // window.vsync = true
+//     // ctx.imageSmoothingQuality = "high";
+// },3000)
 
 let loop = ()=>{
     count++;
@@ -89,7 +94,7 @@ let loop = ()=>{
     ctx.fillRect(0,0,window.innerWidth/2, window.innerHeight/2);
     ctx.fillStyle = grad;
     ctx.fillRect(20, 20, 200, 100);
-    // ctx.strokeStyle = "#0f0"
+    ctx.strokeStyle = "#0f0"
     ctx.fillStyle = "rgb(255,0,170)"
     ctx.shadowColor = "#d99b9b"
     ctx.lineWidth = 10;
@@ -105,7 +110,9 @@ let loop = ()=>{
     ctx.save();
     ctx.translate(x,y)
     ctx.rotate(Math.PI*r)
+    ctx.filter = `blur(${y/10}px)`;
     ctx.strokeRect(-150,-150,300,300)
+    // ctx.filter = "none";
     ctx.restore();
     ctx.shadowBlur = 0;
     ctx.fillRect(x-50,y-50,100,100)

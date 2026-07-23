@@ -1,6 +1,6 @@
 import { lib,encoder, dlPath } from "./symbols.js";
 
-import { ptr, Pointer } from "bun:ffi"
+import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
 import { DOMMatrix } from "./DOMMatrix.js";
@@ -31,15 +31,23 @@ class CanvasGradient {
 class CanvasRenderingContext2D {
 	#lineWidth = 0;
 	#globalAlpha = 1;
+	#imageSmoothingQuality = "low";
+	#imageSmoothingEnabled = true;
 	#fillStyle : string | CanvasGradient = "#000000";
 	#strokeStyle : string | CanvasGradient = "#000000";
 	#compositeOperation = "source-over";
+	#filter = "none";
 	#fontCss = "10px sans-serif";
 
 	#reset(){
+		this.#lineWidth = 0;
+		this.#globalAlpha = 1;
+		this.#imageSmoothingQuality = "low";
+		this.#imageSmoothingEnabled = true;
 		this.#fillStyle = "#000000";
 		this.#strokeStyle = "#000000";
 		this.#compositeOperation = "source-over";
+		this.#filter = "none";
 		this.#fontCss = "10px sans-serif";
 	}
 
@@ -89,13 +97,61 @@ class CanvasRenderingContext2D {
 	get lineWidth() : number {
 		return this.#lineWidth
 	}
-	set globalCompositeOperation(operation) {
-		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),encoder.encode(`${operation}\0`)) == true)
-			this.#compositeOperation = operation
-	}
 	
 	set globalAlpha(a : number) {
 		this.#globalAlpha = lib.symbols.canvas_set_global_alpha(ptrs.get(this),a)
+	}
+	
+	get globalAlpha() {
+		return this.#globalAlpha
+	}
+
+	set imageSmoothingQuality(v : string) {
+		let res = false;
+		switch(v) {
+			case "low": {
+				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),1);
+				break;
+			}
+			case "medium": {
+				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),2);
+				break;
+			}
+			case "high": {
+				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),3);
+				break;
+			}
+		}
+		if (res){
+			this.#imageSmoothingQuality = v;
+		}
+	}
+	
+	get imageSmoothingQuality() : string {
+		return this.#imageSmoothingQuality;
+	}
+
+	set imageSmoothingEnabled(v : boolean) {
+		this.#imageSmoothingEnabled = lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)
+	}
+	
+	get imageSmoothingEnabled() : boolean {
+		return this.#imageSmoothingEnabled;
+	}
+
+	set filter(v : string) {
+		if (lib.symbols.canvas_set_filter(ptrs.get(this),encoder.encode(`${v}\0`))){
+			this.#filter = v;
+		}
+	}
+	
+	get filter() : string {
+		return this.#filter;
+	}
+
+	set globalCompositeOperation(operation) {
+		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),encoder.encode(`${operation}\0`)) == true)
+			this.#compositeOperation = operation
 	}
 	
 	get globalCompositeOperation(){
@@ -202,12 +258,14 @@ class CanvasRenderingContext2D {
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr : Pointer | null, resetCallback : any) {
-		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`))
+	constructor(iptr : Pointer | null) {
+		const cb = new JSCallback(this.#reset.bind(this),{
+			args: [],
+			returns: "void"
+		})
+		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`), cb.ptr)
 		ptrs.set(this, renderContextPtr)
 		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#fontCss}\0`))
-
-		resetCallback.cb = this.#reset.bind(this)
 	}
 }
 

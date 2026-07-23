@@ -31,159 +31,12 @@ std::unordered_map<std::string,SkBlendMode> compositeOperations{{
     {"luminosity",SkBlendMode::kLuminosity},
 }};
 
-std::unordered_map<std::string,SkColor4f> keywordColors{{
-    {"aliceblue",SkColor4f{0.9411765f, 0.9725490f, 1.0000000f, 1.0f}},
-    {"antiquewhite",SkColor4f{0.9803922f, 0.9215686f, 0.8431373f, 1.0f}},
-    {"aqua",SkColor4f{0.0000000f, 1.0000000f, 1.0000000f, 1.0f}},
-    {"aquamarine",SkColor4f{0.4980392f, 1.0000000f, 0.8313725f, 1.0f}},
-    {"azure",SkColor4f{0.9411765f, 1.0000000f, 1.0000000f, 1.0f}},
-    {"beige",SkColor4f{0.9607843f, 0.9607843f, 0.8627451f, 1.0f}},
-    {"bisque",SkColor4f{1.0000000f, 0.8941176f, 0.7686275f, 1.0f}},
-    {"black",SkColor4f{0.0000000f, 0.0000000f, 0.0000000f, 1.0f}},
-    {"blanchedalmond",SkColor4f{1.0000000f, 0.9215686f, 0.8039216f, 1.0f}},
-    {"blue",SkColor4f{0.0000000f, 0.0000000f, 1.0000000f, 1.0f}},
-    {"blueviolet",SkColor4f{0.5411765f, 0.1686275f, 0.8862745f, 1.0f}},
-    {"brown",SkColor4f{0.6470588f, 0.1647059f, 0.1647059f, 1.0f}},
-    {"burlywood",SkColor4f{0.8705882f, 0.7215686f, 0.5294118f, 1.0f}},
-    {"cadetblue",SkColor4f{0.3725490f, 0.6196078f, 0.6274510f, 1.0f}},
-    {"chartreuse",SkColor4f{0.4980392f, 1.0000000f, 0.0000000f, 1.0f}},
-    {"chocolate",SkColor4f{0.8235294f, 0.4117647f, 0.1176471f, 1.0f}},
-    {"coral",SkColor4f{1.0000000f, 0.4980392f, 0.3137255f, 1.0f}},
-    {"cornflowerblue",SkColor4f{0.3921569f, 0.5843137f, 0.9294118f, 1.0f}},
-    {"cornsilk",SkColor4f{1.0000000f, 0.9725490f, 0.8627451f, 1.0f}},
-    {"crimson",SkColor4f{0.8627451f, 0.0784314f, 0.2352941f, 1.0f}},
-    {"cyan",SkColor4f{0.0000000f, 1.0000000f, 1.0000000f, 1.0f}},
-    {"darkblue",SkColor4f{0.0000000f, 0.0000000f, 0.5450980f, 1.0f}},
-    {"darkcyan",SkColor4f{0.0000000f, 0.5450980f, 0.5450980f, 1.0f}},
-    {"darkgoldenrod",SkColor4f{0.7215686f, 0.5254902f, 0.0431373f, 1.0f}},
-    {"darkgray",SkColor4f{0.6627451f, 0.6627451f, 0.6627451f, 1.0f}},
-    {"darkgreen",SkColor4f{0.0000000f, 0.3921569f, 0.0000000f, 1.0f}},
-    {"darkgrey",SkColor4f{0.6627451f, 0.6627451f, 0.6627451f, 1.0f}},
-    {"darkkhaki",SkColor4f{0.7411765f, 0.7176471f, 0.4196078f, 1.0f}},
-    {"darkmagenta",SkColor4f{0.5450980f, 0.0000000f, 0.5450980f, 1.0f}},
-    {"darkolivegreen",SkColor4f{0.3333333f, 0.4196078f, 0.1843137f, 1.0f}},
-    {"darkorange",SkColor4f{1.0000000f, 0.5490196f, 0.0000000f, 1.0f}},
-    {"darkorchid",SkColor4f{0.6000000f, 0.1960784f, 0.8000000f, 1.0f}},
-    {"darkred",SkColor4f{0.5450980f, 0.0000000f, 0.0000000f, 1.0f}},
-    {"darksalmon",SkColor4f{0.9137255f, 0.5882353f, 0.4784314f, 1.0f}},
-    {"darkseagreen",SkColor4f{0.5607843f, 0.7372549f, 0.5450980f, 1.0f}},
-    {"darkslateblue",SkColor4f{0.2823530f, 0.2392157f, 0.5450980f, 1.0f}},
-    {"darkslategray",SkColor4f{0.1843137f, 0.3098039f, 0.3098039f, 1.0f}},
-    {"darkslategrey",SkColor4f{0.1843137f, 0.3098039f, 0.3098039f, 1.0f}},
-    {"darkturquoise",SkColor4f{0.0000000f, 0.8078431f, 0.8196078f, 1.0f}},
-    {"darkviolet",SkColor4f{0.5803922f, 0.0000000f, 0.8274510f, 1.0f}},
-    {"deeppink",SkColor4f{1.0000000f, 0.0784314f, 0.5764706f, 1.0f}},
-    {"deepskyblue",SkColor4f{0.0000000f, 0.7490196f, 1.0000000f, 1.0f}},
-    {"dimgray",SkColor4f{0.4117647f, 0.4117647f, 0.4117647f, 1.0f}},
-    {"dimgrey",SkColor4f{0.4117647f, 0.4117647f, 0.4117647f, 1.0f}},
-    {"dodgerblue",SkColor4f{0.1176471f, 0.5647059f, 1.0000000f, 1.0f}},
-    {"firebrick",SkColor4f{0.6980392f, 0.1333333f, 0.1333333f, 1.0f}},
-    {"floralwhite",SkColor4f{1.0000000f, 0.9803922f, 0.9411765f, 1.0f}},
-    {"forestgreen",SkColor4f{0.1333333f, 0.5450980f, 0.1333333f, 1.0f}},
-    {"fuchsia",SkColor4f{1.0000000f, 0.0000000f, 1.0000000f, 1.0f}},
-    {"gainsboro",SkColor4f{0.8627451f, 0.8627451f, 0.8627451f, 1.0f}},
-    {"ghostwhite",SkColor4f{0.9725490f, 0.9725490f, 1.0000000f, 1.0f}},
-    {"gold",SkColor4f{1.0000000f, 0.8431373f, 0.0000000f, 1.0f}},
-    {"goldenrod",SkColor4f{0.8549020f, 0.6470588f, 0.1254902f, 1.0f}},
-    {"gray",SkColor4f{0.5019608f, 0.5019608f, 0.5019608f, 1.0f}},
-    {"green",SkColor4f{0.0000000f, 0.5019608f, 0.0000000f, 1.0f}},
-    {"greenyellow",SkColor4f{0.6784314f, 1.0000000f, 0.1843137f, 1.0f}},
-    {"grey",SkColor4f{0.5019608f, 0.5019608f, 0.5019608f, 1.0f}},
-    {"honeydew",SkColor4f{0.9411765f, 1.0000000f, 0.9411765f, 1.0f}},
-    {"hotpink",SkColor4f{1.0000000f, 0.4117647f, 0.7058824f, 1.0f}},
-    {"indianred",SkColor4f{0.8039216f, 0.3607843f, 0.3607843f, 1.0f}},
-    {"indigo",SkColor4f{0.2941176f, 0.0000000f, 0.5098039f, 1.0f}},
-    {"ivory",SkColor4f{1.0000000f, 1.0000000f, 0.9411765f, 1.0f}},
-    {"khaki",SkColor4f{0.9411765f, 0.9019608f, 0.5490196f, 1.0f}},
-    {"lavender",SkColor4f{0.9019608f, 0.9019608f, 0.9803922f, 1.0f}},
-    {"lavenderblush",SkColor4f{1.0000000f, 0.9411765f, 0.9607843f, 1.0f}},
-    {"lawngreen",SkColor4f{0.4862745f, 0.9882353f, 0.0000000f, 1.0f}},
-    {"lemonchiffon",SkColor4f{1.0000000f, 0.9803922f, 0.8039216f, 1.0f}},
-    {"lightblue",SkColor4f{0.6784314f, 0.8470588f, 0.9019608f, 1.0f}},
-    {"lightcoral",SkColor4f{0.9411765f, 0.5019608f, 0.5019608f, 1.0f}},
-    {"lightcyan",SkColor4f{0.8784314f, 1.0000000f, 1.0000000f, 1.0f}},
-    {"lightgoldenrodyellow",SkColor4f{0.9803922f, 0.9803922f, 0.8235294f, 1.0f}},
-    {"lightgray",SkColor4f{0.8274510f, 0.8274510f, 0.8274510f, 1.0f}},
-    {"lightgreen",SkColor4f{0.5647059f, 0.9333333f, 0.5647059f, 1.0f}},
-    {"lightgrey",SkColor4f{0.8274510f, 0.8274510f, 0.8274510f, 1.0f}},
-    {"lightpink",SkColor4f{1.0000000f, 0.7137255f, 0.7568628f, 1.0f}},
-    {"lightsalmon",SkColor4f{1.0000000f, 0.6274510f, 0.4784314f, 1.0f}},
-    {"lightseagreen",SkColor4f{0.1254902f, 0.6980392f, 0.6666667f, 1.0f}},
-    {"lightskyblue",SkColor4f{0.5294118f, 0.8078431f, 0.9803922f, 1.0f}},
-    {"lightslategray",SkColor4f{0.4666667f, 0.5333333f, 0.6000000f, 1.0f}},
-    {"lightslategrey",SkColor4f{0.4666667f, 0.5333333f, 0.6000000f, 1.0f}},
-    {"lightsteelblue",SkColor4f{0.6901961f, 0.7686275f, 0.8705882f, 1.0f}},
-    {"lightyellow",SkColor4f{1.0000000f, 1.0000000f, 0.8784314f, 1.0f}},
-    {"lime",SkColor4f{0.0000000f, 1.0000000f, 0.0000000f, 1.0f}},
-    {"limegreen",SkColor4f{0.1960784f, 0.8039216f, 0.1960784f, 1.0f}},
-    {"linen",SkColor4f{0.9803922f, 0.9411765f, 0.9019608f, 1.0f}},
-    {"magenta",SkColor4f{1.0000000f, 0.0000000f, 1.0000000f, 1.0f}},
-    {"maroon",SkColor4f{0.5019608f, 0.0000000f, 0.0000000f, 1.0f}},
-    {"mediumaquamarine",SkColor4f{0.4000000f, 0.8039216f, 0.6666667f, 1.0f}},
-    {"mediumblue",SkColor4f{0.0000000f, 0.0000000f, 0.8039216f, 1.0f}},
-    {"mediumorchid",SkColor4f{0.7294118f, 0.3333333f, 0.8274510f, 1.0f}},
-    {"mediumpurple",SkColor4f{0.5764706f, 0.4392157f, 0.8588235f, 1.0f}},
-    {"mediumseagreen",SkColor4f{0.2352941f, 0.7019608f, 0.4431373f, 1.0f}},
-    {"mediumslateblue",SkColor4f{0.4823529f, 0.4078431f, 0.9333333f, 1.0f}},
-    {"mediumspringgreen",SkColor4f{0.0000000f, 0.9803922f, 0.6039216f, 1.0f}},
-    {"mediumturquoise",SkColor4f{0.2823530f, 0.8196078f, 0.8000000f, 1.0f}},
-    {"mediumvioletred",SkColor4f{0.7803922f, 0.0823529f, 0.5215686f, 1.0f}},
-    {"midnightblue",SkColor4f{0.0980392f, 0.0980392f, 0.4392157f, 1.0f}},
-    {"mintcream",SkColor4f{0.9607843f, 1.0000000f, 0.9803922f, 1.0f}},
-    {"mistyrose",SkColor4f{1.0000000f, 0.8941176f, 0.8823529f, 1.0f}},
-    {"moccasin",SkColor4f{1.0000000f, 0.8941176f, 0.7098039f, 1.0f}},
-    {"navajowhite",SkColor4f{1.0000000f, 0.8705882f, 0.6784314f, 1.0f}},
-    {"navy",SkColor4f{0.0000000f, 0.0000000f, 0.5019608f, 1.0f}},
-    {"oldlace",SkColor4f{0.9921569f, 0.9607843f, 0.9019608f, 1.0f}},
-    {"olive",SkColor4f{0.5019608f, 0.5019608f, 0.0000000f, 1.0f}},
-    {"olivedrab",SkColor4f{0.4196078f, 0.5568627f, 0.1372549f, 1.0f}},
-    {"orange",SkColor4f{1.0000000f, 0.6470588f, 0.0000000f, 1.0f}},
-    {"orangered",SkColor4f{1.0000000f, 0.2705882f, 0.0000000f, 1.0f}},
-    {"orchid",SkColor4f{0.8549020f, 0.4392157f, 0.8392157f, 1.0f}},
-    {"palegoldenrod",SkColor4f{0.9333333f, 0.9098039f, 0.6666667f, 1.0f}},
-    {"palegreen",SkColor4f{0.5960784f, 0.9843137f, 0.5960784f, 1.0f}},
-    {"paleturquoise",SkColor4f{0.6862745f, 0.9333333f, 0.9333333f, 1.0f}},
-    {"palevioletred",SkColor4f{0.8588235f, 0.4392157f, 0.5764706f, 1.0f}},
-    {"papayawhip",SkColor4f{1.0000000f, 0.9372549f, 0.8352941f, 1.0f}},
-    {"peachpuff",SkColor4f{1.0000000f, 0.8549020f, 0.7254902f, 1.0f}},
-    {"peru",SkColor4f{0.8039216f, 0.5215686f, 0.2470588f, 1.0f}},
-    {"pink",SkColor4f{1.0000000f, 0.7529412f, 0.7960784f, 1.0f}},
-    {"plum",SkColor4f{0.8666667f, 0.6274510f, 0.8666667f, 1.0f}},
-    {"powderblue",SkColor4f{0.6901961f, 0.8784314f, 0.9019608f, 1.0f}},
-    {"purple",SkColor4f{0.5019608f, 0.0000000f, 0.5019608f, 1.0f}},
-    {"rebeccapurple",SkColor4f{0.4000000f, 0.2000000f, 0.6000000f, 1.0f}},
-    {"red",SkColor4f{1.0000000f, 0.0000000f, 0.0000000f, 1.0f}},
-    {"rosybrown",SkColor4f{0.7372549f, 0.5607843f, 0.5607843f, 1.0f}},
-    {"royalblue",SkColor4f{0.2549020f, 0.4117647f, 0.8823529f, 1.0f}},
-    {"saddlebrown",SkColor4f{0.5450980f, 0.2705882f, 0.0745098f, 1.0f}},
-    {"salmon",SkColor4f{0.9803922f, 0.5019608f, 0.4470588f, 1.0f}},
-    {"sandybrown",SkColor4f{0.9568627f, 0.6431373f, 0.3764706f, 1.0f}},
-    {"seagreen",SkColor4f{0.1803922f, 0.5450980f, 0.3411765f, 1.0f}},
-    {"seashell",SkColor4f{1.0000000f, 0.9607843f, 0.9333333f, 1.0f}},
-    {"sienna",SkColor4f{0.6274510f, 0.3215686f, 0.1764706f, 1.0f}},
-    {"silver",SkColor4f{0.7529412f, 0.7529412f, 0.7529412f, 1.0f}},
-    {"skyblue",SkColor4f{0.5294118f, 0.8078431f, 0.9215686f, 1.0f}},
-    {"slateblue",SkColor4f{0.4156863f, 0.3529412f, 0.8039216f, 1.0f}},
-    {"slategray",SkColor4f{0.4392157f, 0.5019608f, 0.5647059f, 1.0f}},
-    {"slategrey",SkColor4f{0.4392157f, 0.5019608f, 0.5647059f, 1.0f}},
-    {"snow",SkColor4f{1.0000000f, 0.9803922f, 0.9803922f, 1.0f}},
-    {"springgreen",SkColor4f{0.0000000f, 1.0000000f, 0.4980392f, 1.0f}},
-    {"steelblue",SkColor4f{0.2745098f, 0.5098039f, 0.7058824f, 1.0f}},
-    {"tan",SkColor4f{0.8235294f, 0.7058824f, 0.5490196f, 1.0f}},
-    {"teal",SkColor4f{0.0000000f, 0.5019608f, 0.5019608f, 1.0f}},
-    {"thistle",SkColor4f{0.8470588f, 0.7490196f, 0.8470588f, 1.0f}},
-    {"tomato",SkColor4f{1.0000000f, 0.3882353f, 0.2784314f, 1.0f}},
-    {"transparent",SkColor4f{0.0f, 0.0f, 0.0f, 0.0f}},
-    {"turquoise",SkColor4f{0.2509804f, 0.8784314f, 0.8156863f, 1.0f}},
-    {"violet",SkColor4f{0.9333333f, 0.5098039f, 0.9333333f, 1.0f}},
-    {"wheat",SkColor4f{0.9607843f, 0.8705882f, 0.7019608f, 1.0f}},
-    {"white",SkColor4f{1.0000000f, 1.0000000f, 1.0000000f, 1.0f}},
-    {"whitesmoke",SkColor4f{0.9607843f, 0.9607843f, 0.9607843f, 1.0f}},
-    {"yellow",SkColor4f{1.0000000f, 1.0000000f, 0.0000000f, 1.0f}},
-    {"yellowgreen",SkColor4f{0.6039216f, 0.8039216f, 0.1960784f, 1.0f}},
-}};
 
-
+// std::unordered_map<std::string,SkFilterMode> smoothingQualities{{
+//     {"low",SkFilterMode::kLinear},
+//     {"medium",SkFilterMode::kLinear},
+//     {"high",SkFilterMode::kLinear}
+// }};
 
 class BunCanvas;
 
@@ -221,6 +74,68 @@ class BunCanvasGradient {
     BunCanvasGradient(GradientType gType, float x1, float y1, float x2, float y2) : type{gType}, p0{x1,y1}, p1{x2,y2} {}
 };
 
+typedef int (*JSCallback_CReset)();
+
+class Rendering2DState {
+    public:
+    SkPathBuilder pathBuilder;
+    SkPaint fillColor;
+    sk_sp<SkShader> fillShader;
+    SkPaint strokeColor;
+    sk_sp<SkShader> strokeShader;
+    sk_sp<SkImageFilter> filters;
+    sk_sp<SkImageFilter> shadowBlurFilter;
+    sk_sp<SkImageFilter> resolvedFilters;
+    SkPaint imageColor;
+    SkPaint shadowBlurColor;
+    std::string cssFont;
+    CanvasFontCache font_cache;
+    SkFont font_current;
+    float shadowBlurAmount;
+    float shadowBlurOffsetX;
+    float shadowBlurOffsetY;
+    SkSamplingOptions sampling;
+
+    
+
+
+    Rendering2DState(
+        SkPathBuilder pathBuilder,
+        SkPaint fillColor,
+        sk_sp<SkShader> fillShader,
+        SkPaint strokeColor,
+        sk_sp<SkShader> strokeShader,
+        sk_sp<SkImageFilter> filters,
+        sk_sp<SkImageFilter> shadowBlurFilter,
+        sk_sp<SkImageFilter> resolvedFilters,
+        SkPaint imageColor,
+        SkPaint shadowBlurColor,
+        std::string cssFont,
+        CanvasFontCache font_cache,
+        SkFont font_current,
+        float shadowBlurAmount,
+        float shadowBlurOffsetX,
+        float shadowBlurOffsetY,
+        SkSamplingOptions sampling
+    ) : pathBuilder{pathBuilder},
+        fillColor{fillColor},
+        fillShader{fillShader},
+        strokeColor{strokeColor},
+        strokeShader{strokeShader},
+        filters{filters},
+        shadowBlurFilter{shadowBlurFilter},
+        resolvedFilters{resolvedFilters},
+        imageColor{imageColor},
+        shadowBlurColor{shadowBlurColor},
+        cssFont{cssFont},font_cache{font_cache},
+        font_current{font_current},
+        shadowBlurAmount{shadowBlurAmount},
+        shadowBlurOffsetX{shadowBlurOffsetX},
+        shadowBlurOffsetY{shadowBlurOffsetY},
+        sampling{sampling}
+        {}
+};
+
 class BunCanvasRenderingContext2D {
     SkCanvas* ctx = nullptr;
     public:
@@ -230,6 +145,9 @@ class BunCanvasRenderingContext2D {
     sk_sp<SkShader> fillShader;
     SkPaint strokeColor;
     sk_sp<SkShader> strokeShader;
+    sk_sp<SkImageFilter> filters;
+    sk_sp<SkImageFilter> shadowBlurFilter;
+    sk_sp<SkImageFilter> resolvedFilters;
     SkPaint imageColor;
     SkPaint shadowBlurColor;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
@@ -241,13 +159,14 @@ class BunCanvasRenderingContext2D {
     float shadowBlurOffsetX = 0.f;
     float shadowBlurOffsetY = 0.f;
     SkSamplingOptions sampling;
-    bool locked = false;
-    
-    sk_sp<SkImageFilter> shadowBlurFilter;
+    int samplingQuality = 1;
+    JSCallback_CReset jsResetCanvas;
+
+    Rendering2DState* saveState;
     
     float globalAlpha = 1.f;
     
-    BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear){
+    BunCanvasRenderingContext2D(sk_sp<SkSurface>& surface, BunCanvas* owner, JSCallback_CReset cb) : ctx(surface->getCanvas()),sampling(SkFilterMode::kLinear), jsResetCanvas(cb){
         this->owner = owner;
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
@@ -280,6 +199,52 @@ class BunCanvasRenderingContext2D {
             nullptr                       // cropRect (optional, can omit)
         );
     }
+
+    void save(){
+        this->saveState = new Rendering2DState(
+            pathBuilder,
+            fillColor,
+            fillShader,
+            strokeColor,
+            strokeShader,
+            filters,
+            shadowBlurFilter,
+            resolvedFilters,
+            imageColor,
+            shadowBlurColor,
+            cssFont,
+            font_cache,
+            font_current,
+            shadowBlurAmount,
+            shadowBlurOffsetX,
+            shadowBlurOffsetY,
+            sampling
+        );
+        ctx->save();
+    }
+
+    void restore(){
+        if (saveState){
+            pathBuilder = saveState->pathBuilder;
+            fillColor = saveState->fillColor;
+            fillShader = saveState->fillShader;
+            strokeColor = saveState->strokeColor;
+            strokeShader = saveState->strokeShader;
+            filters = saveState->filters;
+            shadowBlurFilter = saveState->shadowBlurFilter;
+            resolvedFilters = saveState->resolvedFilters;
+            imageColor = saveState->imageColor;
+            shadowBlurColor = saveState->shadowBlurColor;
+            cssFont = saveState->cssFont;
+            font_cache = saveState->font_cache;
+            font_current = saveState->font_current;
+            shadowBlurAmount = saveState->shadowBlurAmount;
+            shadowBlurOffsetX = saveState->shadowBlurOffsetX;
+            shadowBlurOffsetY = saveState->shadowBlurOffsetY;
+            sampling = saveState->sampling;
+        }
+        ctx->restore();
+    }
     
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface>& surface, sk_sp<SkImage> tmpImage) {
@@ -290,12 +255,14 @@ class BunCanvasRenderingContext2D {
         fillColor.setBlendMode(compositeOperations.at("source-over"));
         fillColor.setColor(SK_ColorBLACK);
         fillColor.setStyle(SkPaint::kFill_Style);
+        fillColor.setImageFilter(nullptr);
         fillColor.setAntiAlias(1);
         
         strokeColor.setBlendMode(compositeOperations.at("source-over"));
         strokeColor.setColor(SK_ColorBLACK);
         strokeColor.setStyle(SkPaint::kStroke_Style);
         strokeColor.setStrokeWidth(1);
+        strokeColor.setImageFilter(nullptr);
         strokeColor.setAntiAlias(1);
         
         shadowBlurAmount = 0.f;
@@ -312,14 +279,23 @@ class BunCanvasRenderingContext2D {
             nullptr                       // cropRect (optional, can omit)
         );
         shadowBlurColor.setImageFilter(shadowBlurFilter);
+
+        samplingQuality = 1;
+        sampling = SkFilterMode::kLinear;
         
         imageColor.setBlendMode(compositeOperations.at("source-over"));
+        imageColor.setImageFilter(nullptr);
+
         
         ctx->drawImage(tmpImage,0.f,0.f);
         
         cssFont = "10px sans-serif";
+
+        filters = nullptr;
         
         font_cache.setFont(cssFont.c_str(),font_current);
+
+        jsResetCanvas();
     }
     
     SkCanvas* operator()() {
@@ -412,11 +388,11 @@ class BunCanvas {
         #endif
     }
     
-    void* getContext(const char* c) {
+    void* getContext(const char* c, JSCallback_CReset cb) {
         if (std::strcmp("2d",c) == 0) {
             if (rendering2D == nullptr){
                 ctxType = c;
-                rendering2D = new BunCanvasRenderingContext2D(surface,this);
+                rendering2D = new BunCanvasRenderingContext2D(surface,this,cb);
             };
             return rendering2D;
         }
@@ -484,149 +460,6 @@ class BunCanvas {
 
 std::vector<BunCanvas*> canvases;
 
-int parseCharValue(const char*& c, bool& isValid){
-    int n = 0;
-    bool v = false;
-    while (*c >= '0' && *c <= '9') {
-        v = true;
-        n = n * 10 + (*c - '0');
-        ++c;
-    }
-    isValid = v;
-    return std::clamp(n, 0, 255);
-}
-
-//Skips only a single comma and any number of spaces
-void skipAllowed(const char*& c, int& commaCount){
-    while (*c == ' ' || *c == ',') {
-        if (*c == ',') commaCount++;
-        ++c;
-    };
-}
-
-std::optional<SkColor4f> parseCssColor(const char* c){
-    if (!c) return std::nullopt;
-    auto it = keywordColors.find(c);
-    if (it != keywordColors.end()) return it->second;
-    auto len = std::strlen(c);
-    //Comparing length
-    if (len > 1 && c[0] == '#') {
-        //Check if valid before computing
-        for (size_t i = 1 ; i < len; i++) {
-            if (!(
-                (c[i] >= '0' && c[i] <= '9') ||
-                (c[i] >= 'a' && c[i] <= 'f') ||
-                (c[i] >= 'A' && c[i] <= 'F')
-            )) return std::nullopt;
-        }
-        if (len == 4) {
-            unsigned int rgb = std::strtoul(c + 1, nullptr, 16);
-            uint8_t r = (rgb >> 8) & 0xF;
-            uint8_t g = (rgb >> 4) & 0xF;
-            uint8_t b = rgb & 0xF;
-            r = (r << 4) | r;
-            g = (g << 4) | g;
-            b = (b << 4) | b;
-            return SkColor4f{
-                r / 255.f,
-                g / 255.f,
-                b / 255.f,
-                1.0f
-            };
-        }
-        if (len == 5) {
-            unsigned int rgba = std::strtoul(c + 1, nullptr, 16);
-            uint8_t r = (rgba >> 12) & 0xF;
-            uint8_t g = (rgba >> 8) & 0xF;
-            uint8_t b = (rgba >> 4) & 0xF;
-            uint8_t a = rgba & 0xF;
-            r = (r << 4) | r;
-            g = (g << 4) | g;
-            b = (b << 4) | b;
-            a = (a << 4) | a;
-            return SkColor4f{
-                r / 255.f,
-                g / 255.f,
-                b / 255.f,
-                a / 255.f
-            };
-        }
-        if (len == 7) {
-            unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-            return SkColor4f{
-                ((rgb >> 16) & 0xFF) / 255.f,
-                ((rgb >> 8) & 0xFF) / 255.f,
-                (rgb & 0xFF) / 255.f,
-                1.0f
-            };
-        }
-        if (len == 9) {
-            unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-            return SkColor4f{
-                ((rgb >> 24) & 0xFF) / 255.f,
-                ((rgb >> 16) & 0xFF) / 255.f,
-                ((rgb >> 8) & 0xFF) / 255.f,
-                (rgb & 0xFF) / 255.f
-            };
-        }
-        return std::nullopt;
-    }
-    if (len > 4 && c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == 'a' && c[4] == '(') {
-        for (size_t i = 5 ; i < len - 1 ; i++) {
-            if (!((c[i] >= '0' && c[i] <= '9') ||
-            (c[i] == ',') ||
-            (c[i] == ')') ||
-            (c[i] == ' '))) return std::nullopt;
-        }
-        c+=5;
-        int commaCount = 0;
-        bool isValid = false;
-        int r = parseCharValue(c,isValid);
-        skipAllowed(c,commaCount);
-        int g = parseCharValue(c,isValid);
-        skipAllowed(c,commaCount);
-        int b = parseCharValue(c,isValid);
-        skipAllowed(c,commaCount);
-        int a = parseCharValue(c,isValid);
-
-        //Legacy css does not support all spaces
-        if (commaCount < 3 || commaCount > 3 || !isValid) return std::nullopt;
-
-        return SkColor4f{
-            (float)r / 255.f,
-            (float)g / 255.f,
-            (float)b / 255.f,
-            (float)a / 255.f,
-        };
-    }
-    if (len > 3 && c[0] == 'r' && c[1] == 'g' && c[2] == 'b' && c[3] == '(') {
-        for (size_t i = 4 ; i < len - 1 ; i++) {
-            if (!((c[i] >= '0' && c[i] <= '9') ||
-            (c[i] == ',') ||
-            (c[i] == ')') ||
-            (c[i] == ' '))) return std::nullopt;
-        }
-        if (c[len-1] != ')') return std::nullopt;
-        c+=4;
-        int commaCount = 0;
-        bool isValid = false;
-        int r = parseCharValue(c,isValid);
-        skipAllowed(c,commaCount);
-        int g = parseCharValue(c,isValid);
-        skipAllowed(c,commaCount);
-        int b = parseCharValue(c,isValid);
-
-        if (commaCount != 2 && commaCount != 0 || !isValid) return std::nullopt;
-
-        return SkColor4f{
-            (float)r / 255.f,
-            (float)g / 255.f,
-            (float)b / 255.f,
-            1.0f
-        };
-    }
-    return std::nullopt;
-}
 
 extern "C" {
     
@@ -644,13 +477,13 @@ extern "C" {
     }
     
     //Sets native internal context so it is returned if is asked again.
-    WINDOWS_EXPORT void* canvas_setup_context(void* canvasObj, const char* ctxType){
+    WINDOWS_EXPORT void* canvas_setup_context(void* canvasObj, const char* ctxType, JSCallback_CReset cb){
         if (!canvasObj) return nullptr;
         BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
         if (obj == nullptr) return nullptr;
         
-        void* ptr = obj->getContext(ctxType);
+        void* ptr = obj->getContext(ctxType, cb);
         
         return ptr;
         
@@ -754,8 +587,9 @@ extern "C" {
         auto col = parseCssColor(c);
         if (col){
             obj->shadowBlurColor.setColor4f(*col);
+            return true;
         }
-        return true;
+        return false;
     }
     
     
@@ -779,12 +613,12 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         SkPaint fColor = obj->fillColor;
         fColor.setAlphaf(obj->fillColor.getAlphaf()*obj->globalAlpha);
-        if(obj->shadowBlurAmount > 0.5f) {
-            SkPaint shColor = obj->shadowBlurColor;
-            auto _af = shColor.getAlphaf()*obj->globalAlpha;
-            shColor.setAlphaf(_af);
-            (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-        }
+        // if(obj->shadowBlurAmount > 0.5f) {
+        //     SkPaint shColor = obj->shadowBlurColor;
+        //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+        //     shColor.setAlphaf(_af);
+        //     (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+        // }
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), fColor);
     }
     
@@ -796,21 +630,19 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
         SkPaint sColor = obj->strokeColor;
         sColor.setAlphaf(obj->strokeColor.getAlphaf()*obj->globalAlpha);
-        if(obj->shadowBlurAmount > 0.5f) {
-            SkPaint shColor = obj->shadowBlurColor;
-            // shColor.setStyle(SkPaint::Style::kFill_Style);
-            auto _af = shColor.getAlphaf()*obj->globalAlpha;
-            shColor.setAlphaf(_af);
-            // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-            sk_sp<SkSurface> sfc = SkSurfaces::Raster(
-                SkImageInfo::MakeN32Premul(w,h)
-            );
-            sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
-            for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(x,y,w,h), obj->sampling, &shColor);
-            // shColor.setStyle(SkPaint::Style::kFill_Style);
-            
-            
-        }
+        // if(obj->shadowBlurAmount > 0.5f) {
+        //     SkPaint shColor = obj->shadowBlurColor;
+        //     // shColor.setStyle(SkPaint::Style::kFill_Style);
+        //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+        //     shColor.setAlphaf(_af);
+        //     // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+        //     sk_sp<SkSurface> sfc = SkSurfaces::Raster(
+        //         SkImageInfo::MakeN32Premul(w,h)
+        //     );
+        //     sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
+        //     for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(x,y,w,h), obj->sampling, &shColor);
+        //     // shColor.setStyle(SkPaint::Style::kFill_Style);
+        // }
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), sColor);
     }
     
@@ -901,21 +733,21 @@ extern "C" {
         auto alphaf = obj->strokeColor.getAlphaf()*obj->globalAlpha;
         sColor.setAlphaf(alphaf);
         
-        if(obj->shadowBlurAmount > 0.5f) {
-            SkPaint shColor = obj->shadowBlurColor;
-            // shColor.setStyle(SkPaint::Style::kFill_Style);
-            auto _af = shColor.getAlphaf()*obj->globalAlpha;
-            shColor.setAlphaf(_af);
-            // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-            int w = obj->owner->surface->width();
-            int h = obj->owner->surface->height();
-            sk_sp<SkSurface> sfc = SkSurfaces::Raster(
-                SkImageInfo::MakeN32Premul(w,h)
-            );
-            // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
-            sfc->getCanvas()->drawPath(obj->pathBuilder.snapshot(), sColor);
-            for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->sampling, &shColor);
-        }
+        // if(obj->shadowBlurAmount > 0.5f) {
+        //     SkPaint shColor = obj->shadowBlurColor;
+        //     // shColor.setStyle(SkPaint::Style::kFill_Style);
+        //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+        //     shColor.setAlphaf(_af);
+        //     // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+        //     int w = obj->owner->surface->width();
+        //     int h = obj->owner->surface->height();
+        //     sk_sp<SkSurface> sfc = SkSurfaces::Raster(
+        //         SkImageInfo::MakeN32Premul(w,h)
+        //     );
+        //     // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
+        //     sfc->getCanvas()->drawPath(obj->pathBuilder.snapshot(), sColor);
+        //     for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->sampling, &shColor);
+        // }
         (*obj)()->drawPath(obj->pathBuilder.snapshot(), sColor);
     }
     
@@ -934,12 +766,17 @@ extern "C" {
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        if(obj->shadowBlurAmount > 0.5f) {
-            SkPaint shColor = obj->shadowBlurColor;
-            auto _af = shColor.getAlphaf()*obj->globalAlpha;
-            shColor.setAlphaf(_af);
-            (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
-        }
+        // if(obj->shadowBlurAmount > 0.5f) {
+        //     SkPaint shColor = obj->shadowBlurColor;
+        //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+        //     shColor.setAlphaf(_af);
+        //     SkMatrix savedMatrix = (*obj)()->getTotalMatrix();
+        //     auto dst = SkRect::MakeXYWH(x,y,w,h);
+        //     (*obj)()->saveLayer(dst,&(shColor));
+        //     (*obj)()->drawImageRect(img->image.get(),dst,obj->sampling,&(shColor));
+        //     (*obj)()->restore();
+        //     (*obj)()->setMatrix(savedMatrix);
+        // }
         (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
     }
     
@@ -961,22 +798,22 @@ extern "C" {
                 nullptr
             );
             if (_img) {
-                if(obj->shadowBlurAmount > 0.5f) {
-                    SkPaint shColor = obj->shadowBlurColor;
-                    auto _af = shColor.getAlphaf()*obj->globalAlpha;
-                    shColor.setAlphaf(_af);
-                    (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
-                }
+                // if(obj->shadowBlurAmount > 0.5f) {
+                //     SkPaint shColor = obj->shadowBlurColor;
+                //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+                //     shColor.setAlphaf(_af);
+                //     (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
+                // }
                 (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
             }
         } else {
             auto _img = img->surface->makeTemporaryImage();
-            if(obj->shadowBlurAmount > 0.5f) {
-                SkPaint shColor = obj->shadowBlurColor;
-                auto _af = shColor.getAlphaf()*obj->globalAlpha;
-                shColor.setAlphaf(_af);
-                (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
-            }
+            // if(obj->shadowBlurAmount > 0.5f) {
+            //     SkPaint shColor = obj->shadowBlurColor;
+            //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
+            //     shColor.setAlphaf(_af);
+            //     (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
+            // }
             (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
         }
         #else
@@ -1122,7 +959,7 @@ extern "C" {
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->save();
+        obj->save();
     }
     WINDOWS_EXPORT void canvas_restore(void* canvasObj){
         if (!canvasObj) return;
@@ -1130,7 +967,7 @@ extern "C" {
         
         if (obj == nullptr) return;
         nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->restore();
+        obj->restore();
     }
     WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
         if (!canvasObj) return;
@@ -1221,16 +1058,28 @@ extern "C" {
         
         ctx->shadowBlurAmount = std::max(b,0.f);
         
-        ctx->shadowBlurFilter = SkImageFilters::DropShadow(
-            ctx->shadowBlurOffsetX,           // dx
-            ctx->shadowBlurOffsetX,           // dy
-            ctx->shadowBlurAmount * 0.5f, // sigmaX
-            ctx->shadowBlurAmount * 0.5f, // sigmaY
-            ctx->shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-            nullptr,                      // input (no input filter)
-            nullptr                       // cropRect (optional, can omit)
-        );
-        ctx->shadowBlurColor.setImageFilter(ctx->shadowBlurFilter);
+        if (ctx->shadowBlurAmount > 0.2f){
+            ctx->shadowBlurFilter = SkImageFilters::DropShadow(
+                ctx->shadowBlurOffsetX,           // dx
+                ctx->shadowBlurOffsetY,           // dy
+                ctx->shadowBlurAmount * 0.5f, // sigmaX
+                ctx->shadowBlurAmount * 0.5f, // sigmaY
+                ctx->shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
+                nullptr,                      // input (no input filter)
+                nullptr                       // cropRect (optional, can omit)
+            );
+        }else {
+            ctx->shadowBlurFilter = nullptr;
+        }
+        if (ctx->filters){
+            ctx->resolvedFilters = SkImageFilters::Compose(ctx->shadowBlurFilter, ctx->filters);
+        }else{
+            ctx->resolvedFilters = ctx->shadowBlurFilter;
+        }
+        ctx->fillColor.setImageFilter(ctx->resolvedFilters);
+        ctx->imageColor.setImageFilter(ctx->resolvedFilters);
+        ctx->strokeColor.setImageFilter(ctx->resolvedFilters);
+        // ctx->shadowBlurColor.setImageFilter(ctx->shadowBlurFilter);
     }
     WINDOWS_EXPORT void canvas_set_shadow_offsetX(void* ctxPtr, float oX){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
@@ -1246,6 +1095,60 @@ extern "C" {
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
         
         ctx->shadowBlurOffsetY = oY;
+    }
+
+    WINDOWS_EXPORT bool canvas_set_image_smoothing_enabled(void* ctxPtr, bool v){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return false;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        
+        if (v){
+            switch(ctx->samplingQuality) {
+                case 1:{
+                    ctx->sampling = SkFilterMode::kLinear;
+                    return true;
+                }
+                case 2: {
+                    ctx->sampling = SkFilterMode::kLinear;
+                    return true;
+                }
+                case 3: {
+                    ctx->sampling = SkCubicResampler::Mitchell();
+                    return true;
+                }
+            }
+        }else{
+            ctx->samplingQuality = 0;
+            ctx->sampling = SkFilterMode::kNearest;
+            return true;
+        }
+
+        return false;
+    }
+
+    WINDOWS_EXPORT bool canvas_set_image_smoothing_quality(void* ctxPtr, int v){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return false;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        switch(v) {
+            case 1:{
+                ctx->sampling = SkFilterMode::kLinear;
+                ctx->samplingQuality = v;
+                return true;
+            }
+            case 2: {
+                ctx->sampling = SkFilterMode::kLinear;
+                ctx->samplingQuality = v;
+                return true;
+            }
+            case 3: {
+                ctx->sampling = SkCubicResampler::Mitchell();
+                std::cout << v << "\n";
+                ctx->samplingQuality = v;
+                return true;
+            }
+        }
+        return false;
     }
     
     WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
@@ -1303,5 +1206,39 @@ extern "C" {
         mtx[4]  == 0 && mtx[5]  == 1 && mtx[6]  == 0 && mtx[7]  == 0 &&
         mtx[8]  == 0 && mtx[9]  == 0 && mtx[10] == 1 && mtx[11] == 0 &&
         mtx[12] == 0 && mtx[13] == 0 && mtx[14] == 0 && mtx[15] == 1;
+
+        // SkImageFilters::Compose
+    }
+    WINDOWS_EXPORT bool canvas_set_filter(void* ctxPtr, const char* fltr){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return false;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        auto filter = css::buildSkiaFilter(fltr);
+        if (std::strcmp(fltr, "none") == 0){
+             ctx->filters = nullptr;
+            if (ctx->shadowBlurFilter){
+                ctx->resolvedFilters = ctx->shadowBlurFilter;
+            }else{
+                ctx->resolvedFilters = nullptr;
+            }
+            ctx->fillColor.setImageFilter(ctx->resolvedFilters);
+            ctx->imageColor.setImageFilter(ctx->resolvedFilters);
+            ctx->strokeColor.setImageFilter(ctx->resolvedFilters);
+            return true;
+        }
+        if (filter) {
+            // SkPaint paint;
+            ctx->filters = filter;
+            if (ctx->shadowBlurFilter){
+                ctx->resolvedFilters = SkImageFilters::Compose(ctx->shadowBlurFilter, ctx->filters);
+            }else{
+                ctx->resolvedFilters = filter;
+            }
+            ctx->fillColor.setImageFilter(ctx->resolvedFilters);
+            ctx->imageColor.setImageFilter(ctx->resolvedFilters);
+            ctx->strokeColor.setImageFilter(ctx->resolvedFilters);
+            return true;
+        }
+        return false;
     }
 }

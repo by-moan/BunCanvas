@@ -6,6 +6,9 @@
 #include <regex>
 #include <algorithm>
 #include <optional>
+#include <variant>
+#include <cmath>
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -56,6 +59,8 @@
 #include "include/core/SkShader.h"
 #include "include/effects/SkGradient.h"
 #include "include/effects/SkImageFilters.h"
+#include "include/effects/SkColorMatrix.h"
+#include "include/core/SkSamplingOptions.h"
 #include "include/core/SkPath.h"
 #include "include/core/SkSpan.h"
 #include "include/core/SkPathBuilder.h"
@@ -63,8 +68,10 @@
 #include "include/core/SkBitmap.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkColorFilter.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkStream.h"
+#include "include/core/SkScalar.h"
 
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/gpu/ganesh/SkImageGanesh.h"
@@ -238,6 +245,9 @@ targetPtr* validated(void* ptr){
 
 // #include "src/FontFace/FontCache.cpp"
 // #include "src/FontFace/FontFaceSet.cpp"
+#include "src/KeywordColors.h"
+#include "src/CssColorParser.cpp"
+#include "src/CanvasFilterParser.cpp"
 #include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Canvas.cpp"

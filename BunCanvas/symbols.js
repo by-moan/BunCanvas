@@ -95,7 +95,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_setup_context: {
-		args: ["ptr", "cstring"],
+		args: ["ptr", "cstring", "ptr"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
@@ -231,6 +231,14 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","float"],
 		returns: "void",
 	},
+	canvas_set_image_smoothing_quality: {
+		args: ["ptr","int"],
+		returns: "bool",
+	},
+	canvas_set_image_smoothing_enabled: {
+		args: ["ptr","bool"],
+		returns: "bool",
+	},
 	canvas_create_linear_gradient: {
 		args: ["float","float","float","float"],
 		returns: "ptr",
@@ -245,6 +253,10 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_get_transform: {
 		args: ["ptr", "ptr"],
+		returns: "bool",
+	},
+	canvas_set_filter: {
+		args: ["ptr", "cstring"],
 		returns: "bool",
 	},
 	canvas_destroy: {

@@ -11,6 +11,8 @@ import { Canvas } from "./BunCanvas.js";
 
 let requestedFrames : any[] = []
 
+lib.symbols.canvas_init_gpu_context(1,1,encoder.encode(`app\0`));
+
 
 export class Window {
 	#dim = new Float64Array(2);
@@ -75,7 +77,6 @@ export class Window {
 
 		
 		if (process.platform !== "darwin") {
-			let gpuInitialized = false;
 			this.#renderThread = new Worker(
 				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
 			);
@@ -85,6 +86,7 @@ export class Window {
 			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync});
 
 			let pendingFrame = false;
+			
 
 			this.#renderThread.onmessage = async(msg)=>{
 				const frameTime = 1000 / this.maxFramerate;
@@ -94,7 +96,6 @@ export class Window {
 					process.exit(0);
 				}
 				if (msg.data == 1){
-					gpuInitialized = lib.symbols.canvas_init_gpu_context();
 					lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
 				}
 				lib.symbols.signal_frame_ready();

@@ -137,38 +137,25 @@ extern "C" {
         vsyncQueue.push_back(v);
     }
 
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
+    WINDOWS_EXPORT void glfw_init(){
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
         };
-        width = w;
-        height = h;
-        
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
         glfwWindowHint(GLFW_STENCIL_BITS, 8);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    }
+
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         
-        window = glfwCreateWindow(width, height, title, NULL, NULL);
-        if (!window) {
-            std::cerr << "Couldn't initialize Window...\n";
-            const char* desc;
-            int code = glfwGetError(&desc);
-            std::cerr << "GLFW error " << code << ": "
-            << (desc ? desc : "unknown")
-            << "\n";
-            glfwTerminate();
-            return;
-        }
         
-        sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, window);
-        if (sharedWindow) {
-            glfwHideWindow(sharedWindow);
-            onrefresh(1);
-        }
+        
+        glfwShowWindow(window);
+        
         
         #pragma region Events Setup
         
@@ -316,8 +303,26 @@ extern "C" {
         delete renderThreadInterface;
     }
     
-    WINDOWS_EXPORT bool canvas_init_gpu_context() {
-        if (!sharedWindow) return false;
+    WINDOWS_EXPORT bool canvas_init_gpu_context(int w, int h, const char* title) {
+        glfw_init();
+        width = w;
+        height = h;
+        window = glfwCreateWindow(width, height, title, NULL, NULL);
+        if (!window) {
+            std::cerr << "Couldn't initialize Window...\n";
+            const char* desc;
+            int code = glfwGetError(&desc);
+            std::cerr << "GLFW error " << code << ": "
+            << (desc ? desc : "unknown")
+            << "\n";
+            glfwTerminate();
+            return false;
+        }
+        glfwHideWindow(window);
+        sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, window);
+        if (sharedWindow) {
+            glfwHideWindow(sharedWindow);
+        }
         glfwMakeContextCurrent(sharedWindow);
         mainThreadIface = new InterfaceWrapper(GrGLMakeNativeInterface());
         if (!mainThreadIface->interface) return false;

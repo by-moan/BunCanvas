@@ -19,6 +19,19 @@ if(!exists) {
     process.exit(-1)
 }
 
+const lib = dlopen(path, {
+    glfw_init: {
+        args: [],
+        returns: "void"
+    },
+    setup_render_thread: {
+        args: ["int","int","cstring","ptr","bool"],
+        returns: "void",
+    }
+});
+
+// lib.symbols.glfw_init();
+
 const MessagePost = new JSCallback((instruction)=>{
     self.postMessage(`${instruction}`);
     },
@@ -34,12 +47,7 @@ let vsync;
 
 self.onmessage = (msg)=>{
     const { w = 1, h = 1, t = "App", vsync = true } = msg.data ?? {};
-    const lib = dlopen(path, {
-        setup_render_thread: {
-            args: ["int","int","cstring","ptr","bool"],
-            returns: "void",
-        }
-    });
+    
     lib.symbols.setup_render_thread(w,h,t,MessagePost.ptr,vsync);
     self.postMessage("2")
     process.exit(0)

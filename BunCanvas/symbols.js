@@ -75,7 +75,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_init_gpu_context: {
-		args: [],
+		args: ["int", "int", "cstring"],
 		returns: "bool",
 	},
 	canvas_flush_gpu: {

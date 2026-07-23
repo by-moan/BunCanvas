@@ -111,7 +111,7 @@ let loop = ()=>{
     ctx.save();
     ctx.translate(x,y)
     ctx.rotate(Math.PI*r)
-    ctx.filter = `blur(${y/10}px)`;
+    ctx.filter = `blur(${y/20}px)`;
     ctx.strokeRect(-150,-150,300,300)
     // ctx.filter = "none";
     ctx.restore();

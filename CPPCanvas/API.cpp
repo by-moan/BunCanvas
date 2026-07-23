@@ -36,7 +36,7 @@
 
 #ifndef __APPLE__
 #define nonapple(code) code
-#include <GL/glew.h>
+// #include <GL/glew.h>
 #include <GL/gl.h>
 #else
 #define _Float64_t double
@@ -89,7 +89,20 @@
 #elif __APPLE__
 #include "include/ports/SkFontMgr_mac_ct.h"
 #elif _WIN64
-#include "include/ports/SkFontMgr_win.h"
+#include <dwrite.h>
+#include <unknwn.h>    // or <Unknwn.h>
+#include <wrl/client.h> // optional
+#ifdef interface
+#undef interface // thank you windows for polluting :)
+#endif
+#define M_PI 3.14159265358979323846f
+#ifdef _WIN32
+#define strncasecmp _strnicmp
+#define strcasecmp  _stricmp
+#endif
+
+#include <string.h>
+#include "include/ports/SkTypeface_win.h"
 #else
 #error "Platform is not supported by BunCanvas"
 #endif

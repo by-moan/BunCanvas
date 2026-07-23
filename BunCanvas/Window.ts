@@ -11,7 +11,7 @@ import { Canvas } from "./BunCanvas.js";
 
 let requestedFrames : any[] = []
 
-lib.symbols.canvas_init_gpu_context(1,1,encoder.encode(`app\0`));
+lib.symbols.canvas_init_gpu_context(200,200,encoder.encode(`app\0`));
 
 
 export class Window {

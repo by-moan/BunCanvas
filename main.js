@@ -32,11 +32,11 @@ img.src = "./face.png";
 
 window.append(canvas)
 
-const addedFont = new FontFace("YuyuShort","url(./YuyuShort-Regular.ttf)");
+// const addedFont = new FontFace("YuyuShort","url(./YuyuShort-Regular.ttf)");
 
-await addedFont.load();
+// await addedFont.load();
 
-window.fonts.add(addedFont)
+// window.fonts.add(addedFont)
 
 // ctx.font = "60px regular YuyuShort"
 
@@ -54,7 +54,7 @@ setInterval(()=>{
 setInterval(()=>{
     s+=0.05
     // if (r >= Math.PI*2) r = 0;
-    // r+=0.01
+    r+=0.01
 },5)
 
 window.addEventListener("resize", (evt)=>{
@@ -118,9 +118,9 @@ let loop = ()=>{
     ctx.shadowBlur = 0;
     ctx.fillRect(x-50,y-50,100,100)
     // await Bun.sleep(5.5)
-    requestAnimationFrame(loop);
+    // requestAnimationFrame(loop);
 }
 console.log(performance.now()-tStart)
 console.timeEnd("init")
-loop()
-// setInterval(loop,33);
+// loop()
+setInterval(loop,33);

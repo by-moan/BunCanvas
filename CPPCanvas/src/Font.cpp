@@ -223,11 +223,11 @@ private:
 
 extern "C" {
     // Register a custom font for fast lookup
-    void* font_load(const char* path){
+    WINDOWS_EXPORT void* font_load(const char* path){
         return fontMgr->makeFromFile(path).release();
     }
 
-    void font_add_to_registry(const char* family_name, void* typeface) {
+    WINDOWS_EXPORT void font_add_to_registry(const char* family_name, void* typeface) {
         auto _ptr = static_cast<SkTypeface*>(typeface);
         if (!_ptr) return;
         auto typ = sk_sp<SkTypeface>(_ptr);

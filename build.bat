@@ -41,6 +41,7 @@ clang-cl ^
  user32.lib ^
  gdi32.lib ^
  shell32.lib ^
+ dwrite.lib ^
  .\CPPCanvas\Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib ^
  /Fe:%OUTFILE%
 

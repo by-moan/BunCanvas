@@ -259,6 +259,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "cstring"],
 		returns: "bool",
 	},
+	canvas_set_line_dash: {
+		args: ["ptr", "ptr", "int"],
+		returns: "bool",
+	},
 	canvas_destroy: {
 		args: ["ptr"],
 		returns: "void",

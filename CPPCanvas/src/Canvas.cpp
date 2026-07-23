@@ -1055,7 +1055,6 @@ extern "C" {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
         nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
-        
         ctx->shadowBlurAmount = std::max(b,0.f);
         
         if (ctx->shadowBlurAmount > 0.2f){
@@ -1240,5 +1239,14 @@ extern "C" {
             return true;
         }
         return false;
+    }
+
+    WINDOWS_EXPORT void canvas_set_line_dash(void* ctxPtr, float* pts, int len){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+
+        if(!pts || len <= 0) ctx->strokeColor.setPathEffect(nullptr);
+        ctx->strokeColor.setPathEffect(SkDashPathEffect::Make(SkSpan<const SkScalar>(pts, len),0));
     }
 }

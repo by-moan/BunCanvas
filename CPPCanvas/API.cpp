@@ -57,6 +57,7 @@
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkImageFilter.h"
 #include "include/core/SkShader.h"
+#include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkGradient.h"
 #include "include/effects/SkImageFilters.h"
 #include "include/effects/SkColorMatrix.h"

@@ -38,6 +38,7 @@ class CanvasRenderingContext2D {
 	#compositeOperation = "source-over";
 	#filter = "none";
 	#fontCss = "10px sans-serif";
+	#lineDash : number[] = []
 
 	#reset(){
 		this.#lineWidth = 0;
@@ -255,6 +256,27 @@ class CanvasRenderingContext2D {
 		let IsIdentity = lib.symbols.canvas_get_transform(ptrs.get(this),ptr(arr))
 		return new DOMMatrix(arr,true,IsIdentity);
 	}
+
+	setLineDash(lines : number[]){
+		if (lines.constructor.name.toLowerCase().includes("array")){
+			let _a
+			if (lines.length&0) {
+				_a = lines.concat(Array.from(lines))
+			}else {
+				_a = lines;
+			}
+			const arr = new Float32Array(_a);
+			if(arr.some(Number.isNaN)) return;
+			lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length)
+			this.#lineDash = lines;
+			return;
+		}
+		
+		throw new TypeError(`Failed to execute 'setLineDash' on 'CanvasRenderingContext2D': The provided value cannot be converted to a sequence.`)
+	}
+	getLineDash(){
+		return this.#lineDash;
+	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
@@ -321,7 +343,7 @@ export class Canvas {
 	
 	getContext(contextType : string) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this),this.#rCapture)
+			return new CanvasRenderingContext2D(ptrs.get(this))
 		}
 	}
 }

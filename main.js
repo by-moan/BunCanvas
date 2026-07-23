@@ -8,7 +8,7 @@ import { writePNG } from "./png.js";
 
 
 
-const window = new Window(800,600, "App")
+const window = new Window(800,600, "App", {vsync:false})
 
 const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext("2d")
@@ -54,7 +54,7 @@ setInterval(()=>{
 setInterval(()=>{
     s+=0.05
     // if (r >= Math.PI*2) r = 0;
-    r+=0.01
+    // r+=0.01
 },5)
 
 window.addEventListener("resize", (evt)=>{
@@ -62,6 +62,7 @@ window.addEventListener("resize", (evt)=>{
     canvas.height = window.innerHeight;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "low";
+    ctx.setLineDash([5,15]);
     // ctx.filter = "blur(30px)";
     // ctx.font = "60px regular YuyuShort"
 })

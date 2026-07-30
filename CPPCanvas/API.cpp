@@ -8,6 +8,7 @@
 #include <optional>
 #include <variant>
 #include <cmath>
+#include <chrono>
 #include <algorithm>
 #include <string>
 #include <string_view>
@@ -59,6 +60,7 @@
 #include "include/core/SkShader.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkGradient.h"
+#include "include/effects/SkBlurMaskFilter.h"
 #include "include/effects/SkImageFilters.h"
 #include "include/effects/SkColorMatrix.h"
 #include "include/core/SkSamplingOptions.h"

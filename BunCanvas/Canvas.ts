@@ -1,4 +1,4 @@
-import { lib,encoder, dlPath } from "./symbols.js";
+import { lib,encoder, dlPath, encodeCString } from "./symbols.js";
 
 import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
@@ -8,6 +8,7 @@ import { DOMMatrix } from "./DOMMatrix.js";
 const ptrs = new WeakMap();
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
+	console.log("destroyed Canvas!")
 });
 const cGradientFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_gradient_destroy(ptr);
@@ -28,56 +29,61 @@ class CanvasGradient {
 	}
 };
 
+class Render2DState {
+	lineWidth = 0;
+	globalAlpha = 1;
+	imageSmoothingQuality = "low";
+	imageSmoothingEnabled = true;
+	fillStyle : string | CanvasGradient = "#000000";
+	strokeStyle : string | CanvasGradient = "#000000";
+	compositeOperation = "source-over";
+	filter = "none";
+	fontCss = "10px sans-serif";
+	lineDash : number[] = []
+	lineDashOffset = 0;
+	lineJoin = "miter";
+	constructor(){}
+}
+
 class CanvasRenderingContext2D {
-	#lineWidth = 0;
-	#globalAlpha = 1;
-	#imageSmoothingQuality = "low";
-	#imageSmoothingEnabled = true;
-	#fillStyle : string | CanvasGradient = "#000000";
-	#strokeStyle : string | CanvasGradient = "#000000";
-	#compositeOperation = "source-over";
-	#filter = "none";
-	#fontCss = "10px sans-serif";
-	#lineDash : number[] = []
+	#currentState : Render2DState = new Render2DState();
+	#savedState : Render2DState | null = null;
+	#owner : Canvas;
+
+	get canvas() : Canvas {
+		return this.#owner
+	}
 
 	#reset(){
-		this.#lineWidth = 0;
-		this.#globalAlpha = 1;
-		this.#imageSmoothingQuality = "low";
-		this.#imageSmoothingEnabled = true;
-		this.#fillStyle = "#000000";
-		this.#strokeStyle = "#000000";
-		this.#compositeOperation = "source-over";
-		this.#filter = "none";
-		this.#fontCss = "10px sans-serif";
+		this.#currentState = new Render2DState();
 	}
 
 	
 	
 	set font(css: string) {
-		this.#fontCss = css.trim().toLowerCase();
+		this.#currentState.fontCss = css.trim().toLowerCase();
 		// The native side will parse the CSS string, resolve a typeface and cache it.
-		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#fontCss}\0`));
+		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`));
 	}
-	get font(): string { return this.#fontCss; }
+	get font(): string { return this.#currentState.fontCss; }
 	
 	set fillStyle(style : string | CanvasGradient) {
-		if (style == this.#fillStyle) return;
+		if (style == this.#currentState.fillStyle) return;
 		let res = false;
 		if (typeof style === "string") {
-			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
 		}
 		if (style instanceof CanvasGradient ){
 			res = lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),ptrs.get(style))
 		}
-		if (res) this.#fillStyle = style;
+		if (res) this.#currentState.fillStyle = style;
 	}
 	get fillStyle(){
-		return this.#fillStyle
+		return this.#currentState.fillStyle
 	}
 	set strokeStyle(style : string | CanvasGradient) {
 		// lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
-		if (style == this.#strokeStyle) return;
+		if (style == this.#currentState.strokeStyle) return;
 		let res = false;
 		if (typeof style === "string") {
 			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
@@ -85,26 +91,26 @@ class CanvasRenderingContext2D {
 		if (style instanceof CanvasGradient ){
 			res = lib.symbols.canvas_set_stroke_style_gradient(ptrs.get(this),ptrs.get(style))
 		}
-		if (res) this.#strokeStyle = style;
+		if (res) this.#currentState.strokeStyle = style;
 	}
 	get strokeStyle(){
-		return this.#strokeStyle
+		return this.#currentState.strokeStyle
 	}
 	set lineWidth(width : number) {
 		let w = width<1?1:width;
 		lib.symbols.canvas_set_stroke_width(ptrs.get(this),w)
-		this.#lineWidth = w
+		this.#currentState.lineWidth = w
 	}
 	get lineWidth() : number {
-		return this.#lineWidth
+		return this.#currentState.lineWidth
 	}
 	
 	set globalAlpha(a : number) {
-		this.#globalAlpha = lib.symbols.canvas_set_global_alpha(ptrs.get(this),a)
+		this.#currentState.globalAlpha = lib.symbols.canvas_set_global_alpha(ptrs.get(this),a)
 	}
 	
 	get globalAlpha() {
-		return this.#globalAlpha
+		return this.#currentState.globalAlpha
 	}
 
 	set imageSmoothingQuality(v : string) {
@@ -124,39 +130,39 @@ class CanvasRenderingContext2D {
 			}
 		}
 		if (res){
-			this.#imageSmoothingQuality = v;
+			this.#currentState.imageSmoothingQuality = v;
 		}
 	}
 	
 	get imageSmoothingQuality() : string {
-		return this.#imageSmoothingQuality;
+		return this.#currentState.imageSmoothingQuality;
 	}
 
 	set imageSmoothingEnabled(v : boolean) {
-		this.#imageSmoothingEnabled = lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)
+		this.#currentState.imageSmoothingEnabled = lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)
 	}
 	
 	get imageSmoothingEnabled() : boolean {
-		return this.#imageSmoothingEnabled;
+		return this.#currentState.imageSmoothingEnabled;
 	}
 
 	set filter(v : string) {
 		if (lib.symbols.canvas_set_filter(ptrs.get(this),encoder.encode(`${v}\0`))){
-			this.#filter = v;
+			this.#currentState.filter = v;
 		}
 	}
 	
 	get filter() : string {
-		return this.#filter;
+		return this.#currentState.filter;
 	}
 
 	set globalCompositeOperation(operation) {
 		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),encoder.encode(`${operation}\0`)) == true)
-			this.#compositeOperation = operation
+			this.#currentState.compositeOperation = operation
 	}
 	
 	get globalCompositeOperation(){
-		return this.#compositeOperation
+		return this.#currentState.compositeOperation
 	}
 	
 	fillRect(x : number,y : number,w : number,h : number){
@@ -195,6 +201,9 @@ class CanvasRenderingContext2D {
 	closePath(){
 		lib.symbols.canvas_path_close(ptrs.get(this))
 	}
+	fill(){
+		lib.symbols.canvas_path_fill(ptrs.get(this))
+	}
 	stroke(){
 		lib.symbols.canvas_path_stroke(ptrs.get(this))
 	}
@@ -209,6 +218,30 @@ class CanvasRenderingContext2D {
 	}
 	set shadowOffsetY(y : number){
 		lib.symbols.canvas_set_shadow_offsetY(ptrs.get(this),y)
+	}
+	set lineJoin(joinType : string){
+		let res = false;
+		switch(joinType) {
+			case "round": {
+				res = lib.symbols.canvas_set_line_join(ptrs.get(this),1)
+				break;
+			}
+			case "bevel": {
+				res = lib.symbols.canvas_set_line_join(ptrs.get(this),2)
+				break;
+			}
+			case "miter": {
+				res = lib.symbols.canvas_set_line_join(ptrs.get(this),3)
+				break;
+			}
+		}
+
+		if (res){
+			this.#currentState.lineJoin = joinType
+		}
+	}
+	get lineJoin() : string{
+		return this.#currentState.lineJoin
 	}
 	
 	drawImage(img : Image, x : number, y : number, w : number,h : number) : void;
@@ -235,9 +268,12 @@ class CanvasRenderingContext2D {
 		lib.symbols.canvas_put_image_data(ptrs.get(this),dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
 	}
 	save(){
+		this.#savedState = structuredClone(this.#currentState)
 		lib.symbols.canvas_save(ptrs.get(this))
 	}
 	restore(){
+		if (!this.#savedState) return
+		this.#currentState = structuredClone(this.#savedState)
 		lib.symbols.canvas_restore(ptrs.get(this))
 	}
 	translate(x : number,y : number){
@@ -260,34 +296,45 @@ class CanvasRenderingContext2D {
 	setLineDash(lines : number[]){
 		if (lines.constructor.name.toLowerCase().includes("array")){
 			let _a
-			if (lines.length&0) {
+			if (lines.length&1) {
 				_a = lines.concat(Array.from(lines))
 			}else {
 				_a = lines;
 			}
 			const arr = new Float32Array(_a);
 			if(arr.some(Number.isNaN)) return;
-			lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length)
-			this.#lineDash = lines;
+			lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,this.#currentState.lineDashOffset)
+			this.#currentState.lineDash = _a;
 			return;
 		}
 		
 		throw new TypeError(`Failed to execute 'setLineDash' on 'CanvasRenderingContext2D': The provided value cannot be converted to a sequence.`)
 	}
 	getLineDash(){
-		return this.#lineDash;
+		return this.#currentState.lineDash;
+	}
+
+	set lineDashOffset(v : number){
+		if (this.#currentState.lineDash.length <= 0) {
+			this.#currentState.lineDashOffset = 0;
+			return
+		}
+		const arr = new Float32Array(this.#currentState.lineDash);
+		lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,v)
+		this.#currentState.lineDashOffset = v;
 	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr : Pointer | null) {
+	constructor(iptr : Pointer | null, cnv : Canvas) {
 		const cb = new JSCallback(this.#reset.bind(this),{
 			args: [],
 			returns: "void"
 		})
-		const renderContextPtr = lib.symbols.canvas_setup_context(iptr, encoder.encode(`2d\0`), cb.ptr)
+		this.#owner = cnv
+		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr)
 		ptrs.set(this, renderContextPtr)
-		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#fontCss}\0`))
+		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`))
 	}
 }
 
@@ -343,7 +390,7 @@ export class Canvas {
 	
 	getContext(contextType : string) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this))
+			return new CanvasRenderingContext2D(ptrs.get(this),this)
 		}
 	}
 }

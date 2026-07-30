@@ -126,7 +126,6 @@ typedef int (*JSCallback_WRefresh)(int);
 typedef int (*JSCallback_WClose)();
 JSCallback_WRefresh* wRefreshCallback = nullptr;
 void window_move_callback(GLFWwindow* wnd, int x, int y){
-    std::cout << "drag\n";
             canvas->clear(SK_ColorTRANSPARENT);
             for (auto element : canvases) {
                 std::lock_guard<std::mutex> lock(element->mutex);
@@ -163,10 +162,10 @@ void window_move_callback(GLFWwindow* wnd, int x, int y){
                     }
                 }
 
-                for (int it : vsyncQueue){
-                    glfwSwapInterval(it);
-                }
-                vsyncQueue.clear();
+                // for (int it : vsyncQueue){
+                //     glfwSwapInterval(it);
+                // }
+                // vsyncQueue.clear();
 
                 #else
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
@@ -196,7 +195,7 @@ extern "C" {
     // Called in the bun worker thread.
 
     WINDOWS_EXPORT void set_vsync(bool v){
-        vsyncQueue.push_back(v);
+        // vsyncQueue.push_back(v);
     }
 
     WINDOWS_EXPORT void glfw_init(){
@@ -213,8 +212,8 @@ extern "C" {
     }
 
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
-        std::cout << "beforeShow\n";
-        // glfwShowWindow(window);
+        width = w;
+        height = h;
         window = glfwCreateWindow(width, height, title, NULL, sharedWindow);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
@@ -237,11 +236,7 @@ extern "C" {
         // glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion
         
-        
-        std::cout << "beforeCurrent\n";
-        
         glfwMakeContextCurrent(window);
-        std::cout << "A\n";
         renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
         if (!renderThreadInterface->interface) {
             std::cout << "Native interface failed\n";
@@ -250,7 +245,6 @@ extern "C" {
         
         std::cout << "Native interface OK\n";
         
-        std::cout << "B\n";
         renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
         if (!renderThreadContext->context) {
             std::cout << "Context was not created!\n";
@@ -267,7 +261,6 @@ extern "C" {
         currentWidth = width;
         currentHeight = height;
         
-        std::cout << "C\n";
         sWrapper = new SurfaceWrapper(createSurface(
             renderThreadContext->context.get(),
             width,
@@ -291,7 +284,6 @@ extern "C" {
         glfwSwapInterval(vsync);
         while (!glfwWindowShouldClose(window)) {
             // loop_mutex.lock();
-            std::cout << "loop!\n";
             glfwGetFramebufferSize(window, &width, &height);
             
             glfwPollEvents();
@@ -380,12 +372,7 @@ extern "C" {
         delete renderThreadInterface;
     }
     
-    WINDOWS_EXPORT bool canvas_init_gpu_context(int w, int h, const char* title) {
-        glfw_init();
-        width = w;
-        height = h;
-        
-        // glfwHideWindow(window);
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {
         sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, NULL);
         if (sharedWindow) {
             glfwHideWindow(sharedWindow);

@@ -7,6 +7,7 @@ const fRegistry = new FinalizationRegistry((ptr: any)=>{
 });
 
 export class Image {
+	#queue : any = null;
 	constructor() {
 		let ptr = lib.symbols.image_create();
 		ptrs.set(this,ptr)
@@ -17,13 +18,16 @@ export class Image {
 	onerror: ((this: Image, evt: Event) => any) | null = null;
 	
 	set src(path : string){
-		setImmediate(()=>{
+		//Assuming it runs immediately after a tick in the event loop, doing two set operations would override it
+		if (this.#queue) clearTimeout(this.#queue)
+		this.#queue = setTimeout(() => {
 			if (lib.symbols.image_set_src(ptrs.get(this), encoder.encode(`${path}\0`))) {
 				this.onload instanceof Function ? this.onload(new Event("load",this)):undefined;
 			}else {
 				this.onerror instanceof Function ? this.onerror(new Event("error",this)):undefined;
 			}
-		})
+			this.#queue = null;
+		},0)
 	}
 
     get ptr(){

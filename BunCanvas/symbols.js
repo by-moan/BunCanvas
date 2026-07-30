@@ -21,7 +21,22 @@ if(!exists) {
 
 export const encoder = new TextEncoder();
 
+const encodedCache = new Map();
+
+export function encodeCString(str) {
+    let buf = encodedCache.get(str);
+    if (buf) return buf;
+
+    buf = encoder.encode(str + "\0");
+    encodedCache.set(str, buf);
+    return buf;
+}
+
 export const lib = dlopen(dlPath, {
+	glfw_init: {
+        args: [],
+        returns: "void"
+    },
 	get_wResizeViewer:{
 		args: [],
 		returns: "ptr",
@@ -75,7 +90,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_init_gpu_context: {
-		args: ["int", "int", "cstring"],
+		args: [],
 		returns: "bool",
 	},
 	canvas_flush_gpu: {
@@ -94,12 +109,12 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr",],
 		returns: "void",
 	},
-	canvas_setup_context: {
-		args: ["ptr", "cstring", "ptr"],
+	canvas_get_context2D: {
+		args: ["ptr", "ptr"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
-		args: ["ptr","cstring"],
+		args: ["ptr",FFIType.cstring],
 		returns: "bool",
 	},
 	canvas_set_fill_style_gradient: {
@@ -152,6 +167,10 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_path_bezier_to: {
 		args: ["ptr", "float", "float","float","float","float","float"],
+		returns: "void",
+	},
+	canvas_path_fill: {
+		args: ["ptr"],
 		returns: "void",
 	},
 	canvas_path_stroke: {
@@ -260,7 +279,11 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	canvas_set_line_dash: {
-		args: ["ptr", "ptr", "int"],
+		args: ["ptr", "ptr", "int", "float"],
+		returns: "bool",
+	},
+	canvas_set_line_join: {
+		args: ["ptr","int"],
 		returns: "bool",
 	},
 	canvas_destroy: {

@@ -34,6 +34,9 @@ if [[ "$(uname -o)" = "Darwin"  ]]
 then
 bun ../main.js
 else
-# gdb -q -batch -ex "set pagination off" -ex "run" --args bun ../main.js
+# gdb \
+#   -ex "set pagination off" \
+#   -ex "handle SIGPWR nostop noprint pass" \
+#   --args bun ../main.js
 bun ../main.js
 fi

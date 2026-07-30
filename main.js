@@ -1,126 +1,103 @@
-console.time("init")
-const tStart = performance.now();
 import { Window, requestAnimationFrame } from "./BunCanvas/Window.ts";
-import { Canvas } from "./BunCanvas/BunCanvas.ts";
+import { Canvas } from "./BunCanvas/Canvas.ts";
 import { FontFace } from "./BunCanvas/FontFace.js";
 import { Image } from "./BunCanvas/Image";
-import { writePNG } from "./png.js";
+import { cc, toArrayBuffer } from "bun:ffi"
+import test from "./test.c" with { type: "text" };
 
+const path = "/tmp/test.c"
+Bun.write(path,test)
+const custom = cc({
+  source:path,
+  symbols: {
+    create: {
+      args: [],
+      returns: "ptr",
+    },
+    getPosFromObject: {
+      args: ["ptr"],
+      returns: "ptr",
+    },
+    getVelFromObject: {
+      args: ["ptr"],
+      returns: "ptr",
+    },
+    insert: {
+      args: ["ptr"],
+      returns: "void",
+    },
+    UpdateAll: {
+      args: ["double"],
+      returns: "void",
+    },
+  },
+});
 
-
-const window = new Window(800,600, "App", {vsync:false})
+const window = new Window(800,600, "App", {vsync:true, maxFramerate : 165})
 
 const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext("2d")
 
-
-// const canvas2 = new Canvas(100,100)
-// const ctx2 = canvas2.getContext("2d")
-
-// ctx2.fillStyle = "#ff0000";
-// ctx2.fillRect(0,0,100,100)
-
-const img = new Image();
-
-img.onload = (evt)=>{
-    console.log("image loaded!", evt.timeStamp)
+window.onresize = ()=>{
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
 }
-img.onerror = (evt)=>{
-    console.log("error loading image!", evt.timeStamp)
+
+let clicking = false;
+
+class Entity {
+    ptr = custom.symbols.create();
+    pos = new Float64Array(toArrayBuffer(custom.symbols.getPosFromObject(this.ptr),0, 2 * 8))
+    vel = new Float64Array(toArrayBuffer(custom.symbols.getVelFromObject(this.ptr),0, 2 * 8))
+
+    constructor(){
+        this.vel[0] = 2
+    }
+
+    draw(){
+        ctx.fillStyle = "#f00"
+        ctx.fillRect(this.pos[0]-15, this.pos[1]-15, 30,30)
+        ctx.fillStyle = "#000"
+    }
 }
-img.src = "./face.png";
+let entities = []
+function insert(obj){
+    custom.symbols.insert(obj.ptr)
+    entities.push(obj)
+}
+
+function UpdateAll(n) {
+    custom.symbols.UpdateAll(n);
+}
+
+window.onclick = ()=>{
+    insert(new Entity())
+}
+let x = 0;
+let y = 0;
+window.onmousemove = (evt)=>{
+    x = evt.clientX
+    y = evt.clientY
+}
 
 window.append(canvas)
 
-// const addedFont = new FontFace("YuyuShort","url(./YuyuShort-Regular.ttf)");
-
-// await addedFont.load();
-
-// window.fonts.add(addedFont)
-
-// ctx.font = "60px regular YuyuShort"
-
-let x = 0;
-let y = 0;
-let s = 0;
-let r = 0;
-let count = 0;
+let count = 0
 
 setInterval(()=>{
     console.log(`${count}fps`)
-    count = 0
+    count = 0;
 },1000)
 
-setInterval(()=>{
-    s+=0.05
-    // if (r >= Math.PI*2) r = 0;
-    r+=0.01
-},5)
 
-window.addEventListener("resize", (evt)=>{
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "low";
-    ctx.setLineDash([5,15]);
-    // ctx.filter = "blur(30px)";
-    // ctx.font = "60px regular YuyuShort"
-})
-
-window.addEventListener("mousemove", (evt)=>{
-    x = evt.clientX
-    y = evt.clientY
-})
-window.addEventListener("click", (evt)=>{
-    console.log("swag")
-})
-
-const grad = ctx.createLinearGradient(20,0,220,0);
-grad.addColorStop(0, "green");
-// grad.addColorStop(-0.5, "cyan");
-grad.addColorStop(0.5, "cyan");
-grad.addColorStop(1, "green");
-
-
-// setTimeout(()=>{
-//     // window.vsync = true
-//     // ctx.imageSmoothingQuality = "high";
-// },3000)
 
 let loop = ()=>{
-    count++;
-    // ctx.fillStyle = "#101010"
-    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
-    ctx.fillStyle = "#101010"
-    ctx.fillRect(0,0,window.innerWidth/2, window.innerHeight/2);
-    ctx.fillStyle = grad;
-    ctx.fillRect(20, 20, 200, 100);
-    ctx.strokeStyle = "#0f0"
-    ctx.fillStyle = "rgb(255,0,170)"
-    ctx.shadowColor = "#d99b9b"
-    ctx.lineWidth = 10;
-    ctx.shadowBlur = (Math.sin(s)+10)*10;
-    ctx.drawImage(img,200,200,396,347)
-    const grad2 = ctx.createLinearGradient(-150,0,150,0);
-    grad2.addColorStop(0, "red");
-    grad2.addColorStop(0.25, "yellow");
-    grad2.addColorStop(0.5, "lime");
-    grad2.addColorStop(0.75, "cyan");
-    grad2.addColorStop(1, "blue");
-    ctx.strokeStyle = grad2;
-    ctx.save();
-    ctx.translate(x,y)
-    ctx.rotate(Math.PI*r)
-    ctx.filter = `blur(${y/20}px)`;
-    ctx.strokeRect(-150,-150,300,300)
-    // ctx.filter = "none";
-    ctx.restore();
-    ctx.shadowBlur = 0;
-    ctx.fillRect(x-50,y-50,100,100)
-    // await Bun.sleep(5.5)
-    // requestAnimationFrame(loop);
+    count++
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight)
+    UpdateAll(0.1)
+    for (const item of entities) {
+        item.draw();
+    }
+    requestAnimationFrame(loop)
 }
-console.log(performance.now()-tStart)
-console.timeEnd("init")
-// loop()
-setInterval(loop,33);
+loop()

@@ -7,13 +7,23 @@ import { KeyboardEvent } from "./KeyboardEvent";
 import { FontFace } from "./FontFace.js";
 
 import WindowThread from "./WindowThread.js" with { type:"text" };
-import { Canvas } from "./BunCanvas.js";
+import { Canvas } from "./Canvas.js";
 
 let requestedFrames : any[] = []
 
-lib.symbols.canvas_init_gpu_context(200,200,encoder.encode(`app\0`));
+let render_thread : Worker;
 
+lib.symbols.glfw_init();
 
+if (process.platform !== "darwin"){
+	render_thread = new Worker(
+		URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
+	);
+}
+
+lib.symbols.canvas_init_gpu_context();
+
+let windowWasCreated = false;
 export class Window {
 	#dim = new Float64Array(2);
 	
@@ -63,9 +73,11 @@ export class Window {
 	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
 	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
 	
-	#renderThread : Worker | null;
-	
 	constructor(width : number, height : number, title = "App", args : any) {
+		if (windowWasCreated) {
+			console.error("")
+		}
+		windowWasCreated = true;
 		this.#dim[0] = width;
 		this.#dim[1] = height;
 
@@ -77,18 +89,15 @@ export class Window {
 
 		
 		if (process.platform !== "darwin") {
-			this.#renderThread = new Worker(
-				URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
-			);
-			this.#renderThread.onerror = (msg)=>{
+			render_thread.onerror = (msg)=>{
 				console.log(msg)
 			}
-			this.#renderThread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync});
+			render_thread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync});
 
 			let pendingFrame = false;
 			
 
-			this.#renderThread.onmessage = async(msg)=>{
+			render_thread.onmessage = async(msg)=>{
 				const frameTime = 1000 / this.maxFramerate;
 
 				if (msg.data == 2) {
@@ -106,12 +115,9 @@ export class Window {
 					setImmediate(async ()=>{
 						const end = requestedFrames.length;
 					
-						// for (let i = 0; i < end; i++) {
-						//     requestedFrames[i]();
-						// }
-						requestedFrames.forEach((item)=>{
-							item();
-						});
+						for (let i = 0; i < end; i++) {
+						    requestedFrames[i]();
+						}
 						// lib.symbols.signal_frame_ready();
 					
 						requestedFrames.splice(0, end);
@@ -203,7 +209,6 @@ export class Window {
 				
 			}
 		} else {
-			this.#renderThread  = null;
 			let sleeping = false;
 			let cb = new JSCallback(async ()=>{
 				if (sleeping) return;
@@ -386,7 +391,7 @@ export class Window {
 }
 
 export function requestAnimationFrame(callback :(cb : any)=>void) : void {
-	requestedFrames.push(callback);
+	setImmediate(()=>{requestedFrames.push(callback);})
 }
 
 requestAnimationFrame.toString = () =>

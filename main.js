@@ -3,10 +3,10 @@ import { Canvas } from "./BunCanvas/Canvas.ts";
 import { FontFace } from "./BunCanvas/FontFace.js";
 import { Image } from "./BunCanvas/Image";
 import { cc, toArrayBuffer } from "bun:ffi"
-import test from "./test.c" with { type: "text" };
+import test from "./test.ignore.c" with { type: "text" };
 
 const path = "/tmp/test.c"
-Bun.write(path,test)
+await Bun.write(path,test)
 const custom = cc({
   source:path,
   symbols: {
@@ -32,6 +32,7 @@ const custom = cc({
     },
   },
 });
+await Bun.file(path).delete();
 
 const window = new Window(800,600, "App", {vsync:true, maxFramerate : 165})
 

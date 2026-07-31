@@ -5,5 +5,5 @@
 /CPPCanvas/Thirdparty/*
 /CPPCanvas/build/*
 *.BAK
-*_BAK
+*_BAK*
 node_modules

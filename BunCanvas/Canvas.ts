@@ -15,11 +15,30 @@ const cGradientFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
 });
 
 class CanvasGradient {
+	constructor(a : number, x1 : number, y1 : number);
 	constructor(x1 : number, y1 : number, x2 : number, y2 : number);
+	constructor(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
 	constructor(...args : any[]){
-		let ptr = lib.symbols.canvas_create_linear_gradient(args[0],args[1],args[2],args[3])
-		ptrs.set(this,ptr)
-		cGradientFinalizationRegistry.register(this,ptr)
+		switch (args.length) {
+			case 3: {
+				let ptr = lib.symbols.canvas_create_conic_gradient(args[0],args[1],args[2])
+				ptrs.set(this,ptr)
+				cGradientFinalizationRegistry.register(this,ptr)
+				break;
+			}
+			case 4: {
+				let ptr = lib.symbols.canvas_create_linear_gradient(args[0],args[1],args[2],args[3])
+				ptrs.set(this,ptr)
+				cGradientFinalizationRegistry.register(this,ptr)
+				break;
+			}
+			case 6: {
+				let ptr = lib.symbols.canvas_create_radial_gradient(args[0],args[1],args[2],args[3],args[4],args[5])
+				ptrs.set(this,ptr)
+				cGradientFinalizationRegistry.register(this,ptr)
+				break;
+			}
+		}
 	}
 
 	addColorStop(offset : number, color : string) {
@@ -282,9 +301,19 @@ class CanvasRenderingContext2D {
 	rotate(deg : number){
 		lib.symbols.canvas_rotate(ptrs.get(this),deg)
 	}
+	createConicGradient(a : number, x1 : number, y1 : number) : CanvasGradient;
+	createConicGradient(...args : [number,number,number]) : CanvasGradient {
+		if (args.length < 3) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 3 arguments required, but only ${args.length} present.`)
+		return new CanvasGradient(...args);
+	}
 	createLinearGradient(x1 : number, y1 : number, x2 : number, y2 : number) : CanvasGradient;
 	createLinearGradient(...args : [number,number,number,number]) : CanvasGradient {
 		if (args.length < 4) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${args.length} present.`)
+		return new CanvasGradient(...args);
+	}
+	createRadialGradient(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number) : CanvasGradient;
+	createRadialGradient(...args : [number,number,number,number,number,number]) : CanvasGradient {
+		if (args.length < 6) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 6 arguments required, but only ${args.length} present.`)
 		return new CanvasGradient(...args);
 	}
 	getTransform() : DOMMatrix {
@@ -326,13 +355,14 @@ class CanvasRenderingContext2D {
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr : Pointer | null, cnv : Canvas) {
+	constructor(iptr : Pointer | null, cnv : Canvas, args: any) {
 		const cb = new JSCallback(this.#reset.bind(this),{
 			args: [],
 			returns: "void"
 		})
 		this.#owner = cnv
-		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr)
+		const { desynchronized = false, alpha = true } = args ?? {};
+		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr, desynchronized, alpha)
 		ptrs.set(this, renderContextPtr)
 		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`))
 	}
@@ -388,9 +418,10 @@ export class Canvas {
 		return this.#dim[1]
 	}
 	
-	getContext(contextType : string) {
+	getContext(contextType : string, args : any) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this),this)
+			
+			return new CanvasRenderingContext2D(ptrs.get(this),this, args)
 		}
 	}
 }

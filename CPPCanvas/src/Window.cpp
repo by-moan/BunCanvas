@@ -209,6 +209,16 @@ extern "C" {
         glfwWindowHint(GLFW_STENCIL_BITS, 8);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+        g_clearColor.setColor(SK_ColorTRANSPARENT);
+        g_clearColor.setStyle(SkPaint::kFill_Style);
+        g_clearColor.setBlendMode(SkBlendMode::kClear);
+        g_clearColor.setAntiAlias(1);
+        g_noAlphaClearColor.setColor(SK_ColorBLACK);
+        g_noAlphaClearColor.setStyle(SkPaint::kFill_Style);
+        // noAlphaClearColor.setBlendMode(SkBlendMode::kSrc);
+        g_noAlphaClearColor.setAntiAlias(1);
+        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
     }
 
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
@@ -273,12 +283,6 @@ extern "C" {
         };
         
         canvas = sWrapper->surface->getCanvas();
-        
-        clearColor.setColor(SK_ColorTRANSPARENT);
-        clearColor.setStyle(SkPaint::kFill_Style);
-        clearColor.setBlendMode(SkBlendMode::kClear);
-        clearColor.setAntiAlias(1);
-        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
         
         ready = true;
         glfwSwapInterval(vsync);
@@ -361,7 +365,7 @@ extern "C" {
             std::unique_lock<std::mutex> lock(frameMtx);
             frameCv.wait(lock, [] { return frameReady; });
             frameReady = false;
-            lock.unlock();
+            // lock.unlock();
 
             // loop_mutex.unlock();
         }

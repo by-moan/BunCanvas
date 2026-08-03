@@ -1,5 +1,5 @@
-SkPaint clearColor;
-SkPaint noAlphaClearColor;
+SkPaint g_clearColor;
+SkPaint g_noAlphaClearColor;
 SkPaint pImageDataColor;
 
 std::unordered_map<std::string,SkBlendMode> compositeOperations{{
@@ -72,7 +72,9 @@ class BunCanvasGradient {
     
     std::vector<ColorStop> stops;
     
+    BunCanvasGradient(GradientType gType, float x1, float y1, float a) : type{gType}, center{x1,y1}, angle{a} {}
     BunCanvasGradient(GradientType gType, float x1, float y1, float x2, float y2) : type{gType}, p0{x1,y1}, p1{x2,y2} {}
+    BunCanvasGradient(GradientType gType, float x1, float y1, float x2, float y2, float _r0, float _r1) : type{gType}, c0{x1,y1}, c1{x2,y2}, r0{_r0}, r1{_r1} {}
 };
 
 typedef int (*JSCallback_CReset)();
@@ -171,7 +173,9 @@ class BunCanvasRenderingContext2D {
     JSCallback_CReset jsResetCanvas;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
-
+    bool desynchronized = false;
+    bool alpha = true;
+    SkPaint clearColor;
     // SkPathBuilder pathBuilder;
     // SkPaint fillColor;
     // sk_sp<SkShader> fillShader;
@@ -195,14 +199,19 @@ class BunCanvasRenderingContext2D {
     Rendering2DState savedState;
     
     
-    BunCanvasRenderingContext2D(sk_sp<SkSurface> surface, BunCanvas* owner, JSCallback_CReset cb) : sfc(surface), jsResetCanvas(cb){
+    BunCanvasRenderingContext2D(sk_sp<SkSurface> surface, BunCanvas* owner, JSCallback_CReset cb, bool desync, bool alpha) : sfc(surface), jsResetCanvas(cb), desynchronized(desync), alpha(alpha) {
         this->owner = owner;
+        if (alpha) {
+            clearColor = g_clearColor;
+        }else {
+            clearColor = g_noAlphaClearColor;
+        }
         currentState.strokeColor.setColor(SK_ColorBLACK);
         currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
         currentState.strokeColor.setAlpha(255);
         currentState.strokeColor.setStrokeWidth(1);
         currentState.strokeColor.setAntiAlias(1);
-        currentState.strokeColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
         currentState.strokeColor.setPathEffect(nullptr);
         currentState.strokeColor.setShader(nullptr);
         currentState.strokeColor.setStrokeCap(SkPaint::kButt_Cap);
@@ -211,14 +220,14 @@ class BunCanvasRenderingContext2D {
         currentState.imageColor.setAlpha(255);
         currentState.imageColor.setStyle(SkPaint::kFill_Style);
         currentState.imageColor.setAntiAlias(1);
-        currentState.imageColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
         
         currentState.fillColor.setColor(SK_ColorBLACK);
         currentState.fillColor.setStyle(SkPaint::kFill_Style);
         currentState.fillColor.setShader(nullptr);
         currentState.fillColor.setAlpha(255);
         currentState.fillColor.setAntiAlias(1);
-        currentState.fillColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
         
         currentState.shadowBlurFilter = SkImageFilters::DropShadow(
             currentState.shadowBlurOffsetX,           // dx
@@ -248,13 +257,13 @@ class BunCanvasRenderingContext2D {
         sfc = surface;
         sfc->getCanvas()->resetMatrix();
         currentState.pathBuilder.reset();
-        currentState.fillColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
         currentState.fillColor.setColor(SK_ColorBLACK);
         currentState.fillColor.setStyle(SkPaint::kFill_Style);
         currentState.fillColor.setImageFilter(nullptr);
         currentState.fillColor.setAntiAlias(1);
         
-        currentState.strokeColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
         currentState.strokeColor.setColor(SK_ColorBLACK);
         currentState.strokeColor.setStrokeJoin(SkPaint::Join::kMiter_Join);
         currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
@@ -280,7 +289,7 @@ class BunCanvasRenderingContext2D {
         currentState.samplingQuality = 1;
         currentState.sampling = SkFilterMode::kLinear;
         
-        currentState.imageColor.setBlendMode(compositeOperations.at("source-over"));
+        currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
         currentState.imageColor.setImageFilter(nullptr);
 
         
@@ -330,7 +339,7 @@ class BunCanvas {
     
     
     BunCanvas(int w, int h){
-        nonapple(std::lock_guard lock(mutex));
+        // nonapple(std::lock_guard lock(mutex, std::defer_lock));
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
@@ -392,10 +401,10 @@ class BunCanvas {
         #endif
     }
     
-    void* getContext2D(JSCallback_CReset cb) {
+    void* getContext2D(JSCallback_CReset cb, bool desync, bool alpha) {
         if (!rendering2D) {
             ctxType = CanvasContextType::Rendering2D;
-            rendering2D = new BunCanvasRenderingContext2D(surface,this,cb);
+            rendering2D = new BunCanvasRenderingContext2D(surface,this,cb, desync, alpha);
             return rendering2D;
         };
         return rendering2D;
@@ -479,13 +488,13 @@ extern "C" {
     }
     
     //Sets native internal context so it is returned if is asked again.
-    WINDOWS_EXPORT void* canvas_get_context2D(void* canvasObj, JSCallback_CReset cb){
+    WINDOWS_EXPORT void* canvas_get_context2D(void* canvasObj, JSCallback_CReset cb, bool desync, bool alpha){
         if (!canvasObj) return nullptr;
         BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
         if (obj == nullptr) return nullptr;
         
-        void* ptr = obj->getContext2D(cb);
+        void* ptr = obj->getContext2D(cb, desync, alpha);
         
         return ptr;
         
@@ -496,7 +505,10 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_fill_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
-        // nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         auto col = parseCssColor(c);
         if (col){
             obj->currentState.fillColor.setColor4f(*col);
@@ -511,7 +523,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
         if (!obj||!grad) return false;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         
         switch (grad->type){
             case GradientType::Linear : {
@@ -534,6 +549,79 @@ extern "C" {
                 obj->currentState.fillColor.setShader(SkShaders::LinearGradient(pts, gradient));
                 return true;
             }
+            case GradientType::Radial: {
+                std::vector<SkColor4f> colors;
+                std::vector<float> positions;
+
+                colors.reserve(grad->stops.size());
+                positions.reserve(grad->stops.size());
+
+                for (const auto& stop : grad->stops) {
+                    colors.push_back(stop.color);
+                    positions.push_back(stop.offset);
+                }
+            
+                SkGradient gradient(
+                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
+                    {}
+                );
+            
+                sk_sp<SkShader> shader;
+            
+                // Simple radial gradient
+                if (grad->c0 == grad->c1 && grad->r0 == 0.0f) {
+                    shader = SkShaders::RadialGradient(
+                        grad->c1,
+                        grad->r1,
+                        gradient
+                    );
+                }
+                // General Canvas radial gradient
+                else {
+                    shader = SkShaders::TwoPointConicalGradient(
+                        grad->c0,
+                        grad->r0,
+                        grad->c1,
+                        grad->r1,
+                        gradient
+                    );
+                }
+            
+                obj->currentState.fillColor.setShader(std::move(shader));
+                return true;
+            }
+
+            case GradientType::Conic: {
+                std::vector<SkColor4f> colors;
+                std::vector<float> positions;
+            
+                colors.reserve(grad->stops.size());
+                positions.reserve(grad->stops.size());
+            
+                for (const auto& stop : grad->stops) {
+                    colors.push_back(stop.color);
+                    positions.push_back(stop.offset);
+                }
+            
+                SkGradient gradient(
+                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
+                    {}
+                );
+            
+                float startDeg = SkRadiansToDegrees(grad->angle);
+            
+                obj->currentState.fillColor.setShader(
+                    SkShaders::SweepGradient(
+                        grad->center,
+                        startDeg,
+                        startDeg + 360.0f,
+                        gradient,
+                        nullptr
+                    )
+                );
+            
+                return true;
+            }
         }
         return false;
     }
@@ -541,7 +629,10 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_stroke_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         
         auto col = parseCssColor(c);
         if (col){
@@ -556,7 +647,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
         if (!obj||!grad) return false;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         
         switch (grad->type){
             case GradientType::Linear : {
@@ -577,6 +671,79 @@ extern "C" {
                 );
                 SkPoint pts[] = { grad->p0, grad->p1 };
                 obj->currentState.strokeColor.setShader(SkShaders::LinearGradient(pts, gradient));
+                return true;
+            }
+            case GradientType::Radial: {
+                std::vector<SkColor4f> colors;
+                std::vector<float> positions;
+
+                colors.reserve(grad->stops.size());
+                positions.reserve(grad->stops.size());
+
+                for (const auto& stop : grad->stops) {
+                    colors.push_back(stop.color);
+                    positions.push_back(stop.offset);
+                }
+            
+                SkGradient gradient(
+                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
+                    {}
+                );
+            
+                sk_sp<SkShader> shader;
+            
+                // Simple radial gradient
+                if (grad->c0 == grad->c1 && grad->r0 == 0.0f) {
+                    shader = SkShaders::RadialGradient(
+                        grad->c1,
+                        grad->r1,
+                        gradient
+                    );
+                }
+                // General Canvas radial gradient
+                else {
+                    shader = SkShaders::TwoPointConicalGradient(
+                        grad->c0,
+                        grad->r0,
+                        grad->c1,
+                        grad->r1,
+                        gradient
+                    );
+                }
+            
+                obj->currentState.strokeColor.setShader(std::move(shader));
+                return true;
+            }
+
+            case GradientType::Conic: {
+                std::vector<SkColor4f> colors;
+                std::vector<float> positions;
+            
+                colors.reserve(grad->stops.size());
+                positions.reserve(grad->stops.size());
+            
+                for (const auto& stop : grad->stops) {
+                    colors.push_back(stop.color);
+                    positions.push_back(stop.offset);
+                }
+            
+                SkGradient gradient(
+                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
+                    {}
+                );
+            
+                float startDeg = SkRadiansToDegrees(grad->angle);
+            
+                obj->currentState.strokeColor.setShader(
+                    SkShaders::SweepGradient(
+                        grad->center,
+                        startDeg,
+                        startDeg + 360.0f,
+                        gradient,
+                        nullptr
+                    )
+                );
+            
                 return true;
             }
         }
@@ -603,16 +770,22 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.strokeColor.setStrokeWidth(w);
     }
     
     WINDOWS_EXPORT void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        
         if (obj == nullptr) return;
-        // nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        
         // SkPaint fColor = obj->currentState.fillColor;
         // fColor.setAlphaf(obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha);
         // if(obj->currentState.shadowBlurAmount > 0.5f) {
@@ -629,7 +802,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         SkPaint sColor = obj->currentState.strokeColor;
         sColor.setAlphaf(obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha);
         // if(obj->shadowBlurAmount > 0.5f) {
@@ -657,8 +833,11 @@ extern "C" {
         // std::cout << "obj->magic == BunCanvasRenderingContext2d::MAGIC = " << (obj->magic == BunCanvasRenderingContext2D::MAGIC) << "\n";
         
         if (!obj) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), clearColor);
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->clearColor);
     }
     
     WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
@@ -670,6 +849,8 @@ extern "C" {
         };
         
         {
+            //This should lock at all costs. Otherwise it will cause a segfault
+            //because the surface becomes invalid for a brief period
             nonapple(std::lock_guard<std::mutex> lock(obj->mutex));
             obj->resize(w,h);
         }
@@ -679,7 +860,10 @@ extern "C" {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.reset();
     }
     
@@ -688,7 +872,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.moveTo(x,y);
     }
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
@@ -696,7 +883,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.lineTo(x,y);
     }
     
@@ -705,7 +895,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
     }
     
@@ -714,7 +907,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.arcTo({x1,y1},{x2,y2},radius);
     }
     
@@ -723,7 +919,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
     }
     WINDOWS_EXPORT void canvas_path_fill(void* canvasObj) {
@@ -733,7 +932,10 @@ extern "C" {
         if (obj == nullptr) {
             return;
         };
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         
         SkPaint fColor = obj->currentState.fillColor;
         auto alphaf = obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha;
@@ -747,7 +949,10 @@ extern "C" {
         if (obj == nullptr) {
             return;
         };
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         
         SkPaint sColor = obj->currentState.strokeColor;
         auto alphaf = obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha;
@@ -776,7 +981,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.pathBuilder.close();
     }
     
@@ -785,7 +993,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
         if (obj == nullptr || img == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         // if(obj->shadowBlurAmount > 0.5f) {
         //     SkPaint shColor = obj->shadowBlurColor;
         //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
@@ -805,8 +1016,14 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvas* img = validated<BunCanvas>(image);
         if (obj == nullptr || img == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
-        nonapple(std::lock_guard<std::mutex> lock2(img->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock2;
+            if (!obj->desynchronized) lock2.emplace(img->mutex);
+        );
         #ifndef __APPLE__
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
@@ -847,7 +1064,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return false;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         try {
             obj->currentState.fillColor.setBlendMode(compositeOperations.at(name));
             obj->currentState.strokeColor.setBlendMode(compositeOperations.at(name));
@@ -865,7 +1085,10 @@ extern "C" {
             return false;
         };
         {
-            nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+            nonapple(
+                std::optional<std::lock_guard<std::mutex>> lock;
+                if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            );
             SkImageInfo dstInfo = SkImageInfo::Make(
                 w,h,
                 kRGBA_8888_SkColorType,
@@ -873,8 +1096,30 @@ extern "C" {
             );
             size_t rowBytes = w * 4;
             
-            
-            // if (obj->owner->hasBackendTex) renderThreadContext->context->flushAndSubmit();
+            if (gpuContextReady && obj->owner->hasBackendTex) {
+                auto img = SkImages::BorrowTextureFrom(
+                    mainThreadCtx->context.get(),
+                    obj->owner->backendTex,
+                    kTopLeft_GrSurfaceOrigin,
+                    kN32_SkColorType,
+                    kPremul_SkAlphaType,
+                    nullptr
+                );
+                
+                if (img) {
+                    // canvas->drawImage(img, 0, 0);
+                    return img->readPixels(
+                        dstInfo, 
+                        out_buffer, 
+                        rowBytes, 
+                        x, 
+                        y, 
+                        SkImage::CachingHint::kDisallow_CachingHint
+                    );
+                }else {
+                    return false;
+                }
+            }
             
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
                 dstInfo, 
@@ -945,7 +1190,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return false;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         SkImageInfo imageInfo = SkImageInfo::Make(
             w,h,
             kRGBA_8888_SkColorType,
@@ -968,7 +1216,10 @@ extern "C" {
         if (!canvasObj) return _a;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) return _a;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->currentState.globalAlpha = _a;
         obj->currentState.imageColor.setAlphaf(_a);
         return _a;
@@ -978,7 +1229,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->save();
     }
     WINDOWS_EXPORT void canvas_restore(void* canvasObj){
@@ -986,7 +1240,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         obj->restore();
     }
     WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
@@ -994,7 +1251,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         (*obj)()->translate(x,y);
     }
     WINDOWS_EXPORT void canvas_rotate(void* canvasObj, float deg){
@@ -1002,7 +1262,10 @@ extern "C" {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
-        nonapple(std::lock_guard<std::mutex> lock(obj->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
         (*obj)()->rotate(deg*57.29577951308232);
     }
     
@@ -1173,6 +1436,12 @@ extern "C" {
     WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
         return new BunCanvasGradient(GradientType::Linear, x1, y1, x2, y2);
     }
+    WINDOWS_EXPORT void* canvas_create_radial_gradient(float x1, float y1, float x2, float y2, float r0, float r1){
+        return new BunCanvasGradient(GradientType::Radial, x1, y1, x2, y2, r0, r1);
+    }
+    WINDOWS_EXPORT void* canvas_create_conic_gradient(float a,float x1, float y1){
+        return new BunCanvasGradient(GradientType::Conic, x1, y1, a);
+    }
     WINDOWS_EXPORT bool canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
         // Validate offset (0 <= offset <= 1)
         // Throw IndexSizeError if invalid
@@ -1185,15 +1454,16 @@ extern "C" {
             offset,
             [](const ColorStop& s, float o) {
                 return s.offset < o;
-            });
-            
-            auto col = parseCssColor(c);
-            
-            if (col) {
-                grad->stops.insert(it, {offset, *col});
-                return true;
             }
-            return false;
+        );
+            
+        auto col = parseCssColor(c);
+        
+        if (col) {
+            grad->stops.insert(it, {offset, *col});
+            return true;
+        }
+        return false;
     }
     WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
         // Validate offset (0 <= offset <= 1)

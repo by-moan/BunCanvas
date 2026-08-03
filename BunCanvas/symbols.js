@@ -1,16 +1,15 @@
-import { dlopen, FFIType } from "bun:ffi";
+import { dlopen, FFIType, suffix } from "bun:ffi";
 
-let extension;
+// let extension;
 
-if (process.platform === "win32") {
-	extension = "dll"
-}else if (process.platform === "darwin") {
-	extension = "dylib"
-}else if (process.platform === "linux") {
-	extension = "so"
-}
-
-export const dlPath = `BunCanvas.${process.platform}.${process.arch}.${extension}`;
+// if (process.platform === "win32") {
+// 	extension = "dll"
+// }else if (process.platform === "darwin") {
+// 	extension = "dylib"
+// }else if (process.platform === "linux") {
+// 	extension = "so"
+// }
+export const dlPath = `BunCanvas.${process.platform}.${process.arch}.${suffix}`;
 
 const exists = await Bun.file(dlPath).exists();
 
@@ -110,7 +109,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_get_context2D: {
-		args: ["ptr", "ptr"],
+		args: ["ptr", "ptr", "bool", "bool"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
@@ -258,8 +257,16 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","bool"],
 		returns: "bool",
 	},
+	canvas_create_conic_gradient: {
+		args: ["float","float","float"],
+		returns: "ptr",
+	},
 	canvas_create_linear_gradient: {
 		args: ["float","float","float","float"],
+		returns: "ptr",
+	},
+	canvas_create_radial_gradient: {
+		args: ["float","float","float","float","float","float"],
 		returns: "ptr",
 	},
 	canvas_gradient_add_color_stop: {

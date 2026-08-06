@@ -84,7 +84,6 @@ export class Window {
 		const { vsync = true, maxFramerate = 0 } = args ?? {};
 		this.#vsync = vsync;
 		this.maxFramerate = maxFramerate;
-
 		let lastFrame = performance.now();
 
 		

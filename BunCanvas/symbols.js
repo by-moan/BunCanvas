@@ -279,7 +279,11 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_get_transform: {
 		args: ["ptr", "ptr"],
-		returns: "bool",
+		returns: "void",
+	},
+	canvas_set_transform: {
+		args: ["ptr", "ptr"],
+		returns: "void",
 	},
 	canvas_set_filter: {
 		args: ["ptr", "cstring"],
@@ -292,6 +296,10 @@ export const lib = dlopen(dlPath, {
 	canvas_set_line_join: {
 		args: ["ptr","int"],
 		returns: "bool",
+	},
+	canvas_path_clip: {
+		args: ["ptr"],
+		returns: "void",
 	},
 	canvas_destroy: {
 		args: ["ptr"],

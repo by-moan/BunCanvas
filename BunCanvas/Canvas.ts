@@ -272,7 +272,7 @@ class CanvasRenderingContext2D {
 			return;
 		}
 		if (img instanceof Canvas) {
-			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),Number(x),Number(y),Number(w),Number(h))
+			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),Number(x),Number(y),Number(w??img.width),Number(h??img.height))
 			return;
 		}
 		
@@ -318,8 +318,22 @@ class CanvasRenderingContext2D {
 	}
 	getTransform() : DOMMatrix {
 		let arr = new Float32Array(16)
-		let IsIdentity = lib.symbols.canvas_get_transform(ptrs.get(this),ptr(arr))
-		return new DOMMatrix(arr,true,IsIdentity);
+		lib.symbols.canvas_get_transform(ptrs.get(this),ptr(arr))
+		return new DOMMatrix(arr);
+	}
+	setTransform(matrix : DOMMatrix) : void;
+	setTransform(a : number, b : number,c : number,d : number,e : number,f : number) : void;
+	setTransform(...args : any) : void {
+		if (args[0] instanceof DOMMatrix) lib.symbols.canvas_set_transform(ptrs.get(this),args[0].ptr)
+		if (args.length == 6) {
+			const mtx = new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5]]);
+			// console.log(mtx.m11,mtx.m21,mtx.m31,mtx.m41)
+			// console.log(mtx.m12,mtx.m22,mtx.m32,mtx.m42)
+			// console.log(mtx.m13,mtx.m23,mtx.m33,mtx.m43)
+			// console.log(mtx.m14,mtx.m24,mtx.m34,mtx.m44)
+			lib.symbols.canvas_set_transform(ptrs.get(this),mtx.ptr)
+		}
+		if (args.length == 16) lib.symbols.canvas_set_transform(ptrs.get(this),new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5],args[5],args[6],args[7],args[8],args[9],args[10],args[11],args[12],args[13],args[14],args[15]]).ptr)
 	}
 
 	setLineDash(lines : number[]){
@@ -341,6 +355,10 @@ class CanvasRenderingContext2D {
 	}
 	getLineDash(){
 		return this.#currentState.lineDash;
+	}
+
+	clip(){
+		lib.symbols.canvas_path_clip(ptrs.get(this))
 	}
 
 	set lineDashOffset(v : number){

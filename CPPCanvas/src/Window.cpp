@@ -195,7 +195,7 @@ extern "C" {
     // Called in the bun worker thread.
 
     WINDOWS_EXPORT void set_vsync(bool v){
-        // vsyncQueue.push_back(v);
+        vsyncQueue.push_back(v);
     }
 
     WINDOWS_EXPORT void glfw_init(){
@@ -357,9 +357,9 @@ extern "C" {
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
             }
+            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             
             onrefresh(0);
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             
             glfwSwapBuffers(window);
             std::unique_lock<std::mutex> lock(frameMtx);

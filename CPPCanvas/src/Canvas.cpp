@@ -957,7 +957,7 @@ extern "C" {
         SkPaint sColor = obj->currentState.strokeColor;
         auto alphaf = obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha;
         sColor.setAlphaf(alphaf);
-        
+        sColor.setAntiAlias(false);
         // if(obj->shadowBlurAmount > 0.5f) {
         //     SkPaint shColor = obj->shadowBlurColor;
         //     // shColor.setStyle(SkPaint::Style::kFill_Style);
@@ -974,6 +974,20 @@ extern "C" {
         //     for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->sampling, &shColor);
         // }
         (*obj)()->drawPath(obj->currentState.pathBuilder.snapshot(), sColor);
+    }
+
+    WINDOWS_EXPORT void canvas_path_clip(void* canvasObj) {
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) {
+            return;
+        };
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        (*obj)()->clipPath(obj->currentState.pathBuilder.snapshot());
     }
     
     WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
@@ -1027,7 +1041,7 @@ extern "C" {
         #ifndef __APPLE__
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
-                renderThreadContext->context.get(),
+                mainThreadCtx->context.get(),
                 img->backendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
@@ -1272,14 +1286,20 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_font(void* ctxPtr, const char* cssString) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         return ctx->font_cache.setFont(cssString,ctx->currentState.font_current);
     }
     
     WINDOWS_EXPORT void canvas_fill_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         float width = ctx->currentState.font_current.measureText(
             txt,
             std::strlen(txt),
@@ -1308,7 +1328,10 @@ extern "C" {
     WINDOWS_EXPORT void canvas_stroke_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         float width = ctx->currentState.font_current.measureText(
             txt,
             std::strlen(txt),
@@ -1337,7 +1360,10 @@ extern "C" {
     WINDOWS_EXPORT void canvas_set_shadow_blur(void* ctxPtr, float b){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         ctx->currentState.shadowBlurAmount = std::max(b,0.f);
         
         if (ctx->currentState.shadowBlurAmount > 0.2f){
@@ -1366,7 +1392,10 @@ extern "C" {
     WINDOWS_EXPORT void canvas_set_shadow_offsetX(void* ctxPtr, float oX){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         
         ctx->currentState.shadowBlurOffsetX = oX;
     }
@@ -1374,7 +1403,10 @@ extern "C" {
     WINDOWS_EXPORT void canvas_set_shadow_offsetY(void* ctxPtr, float oY){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         
         ctx->currentState.shadowBlurOffsetY = oY;
     }
@@ -1382,7 +1414,10 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_image_smoothing_enabled(void* ctxPtr, bool v){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         
         if (v){
             switch(ctx->currentState.samplingQuality) {
@@ -1411,7 +1446,10 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_image_smoothing_quality(void* ctxPtr, int v){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         switch(v) {
             case 1:{
                 ctx->currentState.sampling = SkFilterMode::kLinear;
@@ -1484,24 +1522,40 @@ extern "C" {
         }
         delete cnv;
     }
-    WINDOWS_EXPORT bool canvas_get_transform(void* ctxPtr, float* mtx){
+    WINDOWS_EXPORT void canvas_get_transform(void* ctxPtr, float* mtx){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        if (!ctx) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         
         auto matrix = (*ctx)()->getLocalToDevice();
-        matrix.getColMajor(mtx);
-        return mtx[0]  == 1 && mtx[1]  == 0 && mtx[2]  == 0 && mtx[3]  == 0 &&
-        mtx[4]  == 0 && mtx[5]  == 1 && mtx[6]  == 0 && mtx[7]  == 0 &&
-        mtx[8]  == 0 && mtx[9]  == 0 && mtx[10] == 1 && mtx[11] == 0 &&
-        mtx[12] == 0 && mtx[13] == 0 && mtx[14] == 0 && mtx[15] == 1;
+        matrix.getRowMajor(mtx);
+    }
+    WINDOWS_EXPORT void canvas_set_transform(void* ctxPtr, double* mtx){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+        (*ctx)()->setMatrix(SkM44{
+            (float)mtx[0],  (float)mtx[1],  (float)mtx[2],  (float)mtx[3],
+            (float)mtx[4],  (float)mtx[5],  (float)mtx[6],  (float)mtx[7],
+            (float)mtx[8],  (float)mtx[9],  (float)mtx[10], (float)mtx[11],
+            (float)mtx[12], (float)mtx[13], (float)mtx[14], (float)mtx[15]
+        });
 
         // SkImageFilters::Compose
     }
     WINDOWS_EXPORT bool canvas_set_filter(void* ctxPtr, const char* fltr){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         auto filter = css::buildSkiaFilter(fltr);
         if (std::strcmp(fltr, "none") == 0){
             ctx->currentState.filters = nullptr;
@@ -1534,7 +1588,10 @@ extern "C" {
     WINDOWS_EXPORT void canvas_set_line_dash(void* ctxPtr, float* pts, int len, float offset){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
 
         if(!pts || len <= 0) ctx->currentState.strokeColor.setPathEffect(nullptr);
         ctx->currentState.lineDashEffect = SkDashPathEffect::Make(SkSpan<const SkScalar>(pts, len),offset);
@@ -1544,7 +1601,10 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_set_line_join(void* ctxPtr, int lJoinType){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
-        nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
         switch(lJoinType) {
             case 1:{
                 ctx->currentState.strokeColor.setStrokeJoin(SkPaint::Join::kRound_Join);

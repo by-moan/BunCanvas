@@ -18,8 +18,8 @@ const ad = new Audio("./Kawkaw_voiceclip_happy_1.wav")
 const ad2 = new Audio("./Kawkaw_voiceclip_sad_1.wav")
 
 window.addEventListener("click",()=>{
-  const rand = Math.random()
-  if (rand > 0.7){
+  const sadness = Math.random()
+  if (sadness > 0.5){
     ad2.play()
     return
   }

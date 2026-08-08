@@ -48,7 +48,7 @@ then
     clang++ -dynamiclib -shared -fPIC ./CPPCanvas/API.cpp \
     "./CPPCanvas/Thirdparty/skia_build/skia/out/$(uname -o)_$(uname -m)/libskia.a" \
     -std=c++23 \
-    -fsanitize=address -g -O1 \
+    -g -O3 \
     -stdlib=libc++ \
     -DGL_SILENCE_DEPRECATION \
     -I./CPPCanvas/Thirdparty/skia_build/skia/ \

@@ -32,6 +32,7 @@ cd ./build/
 # bun ../main.js
 if [[ "$(uname -o)" = "Darwin"  ]]
 then
+export DYLD_INSERT_LIBRARIES=/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.asan_osx_dynamic.dylib
 bun ../main.js
 else
 # gdb \

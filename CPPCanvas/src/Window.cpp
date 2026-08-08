@@ -126,62 +126,62 @@ typedef int (*JSCallback_WRefresh)(int);
 typedef int (*JSCallback_WClose)();
 
 void window_move_callback(GLFWwindow* wnd, int x, int y){
-            canvas->clear(SK_ColorTRANSPARENT);
-            for (auto element : canvases) {
-                std::lock_guard<std::mutex> lock(element->mutex);
-                #ifndef __APPLE__
-                if (element->hasBackendTex) {
-                    auto img = SkImages::BorrowTextureFrom(
-                        renderThreadContext->context.get(),
-                        element->backendTex,
-                        kTopLeft_GrSurfaceOrigin,
-                        kN32_SkColorType,
-                        kPremul_SkAlphaType,
-                        nullptr
-                    );
-                    if (img) {
-                        canvas->drawImage(img, 0, 0);
-                    }
-                } else {
-                    canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-                }
-                
-                // Clean up retired textures after the frame delay
-                // ensures the render thread has finished using them
-                auto& retired = element->retiredTextures;
-                for (auto it = retired.begin(); it != retired.end(); ) {
-                    it->framesLeft--;
-                    if (it->framesLeft <= 0) {
-                        GrGLTextureInfo info;
-                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
-                            glDeleteTextures(1, &info.fID);
-                        }
-                        it = retired.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-
-                // for (int it : vsyncQueue){
-                //     glfwSwapInterval(it);
-                // }
-                // vsyncQueue.clear();
-
-                #else
-                canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-                #endif
+    canvas->clear(SK_ColorTRANSPARENT);
+    for (auto element : canvases) {
+        std::lock_guard<std::mutex> lock(element->mutex);
+        #ifndef __APPLE__
+        if (element->hasBackendTex) {
+            auto img = SkImages::BorrowTextureFrom(
+                renderThreadContext->context.get(),
+                element->backendTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
+            if (img) {
+                canvas->drawImage(img, 0, 0);
             }
-            
-            // if (wRefreshCallback) (*wRefreshCallback)(0);
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-            
-            glfwSwapBuffers(window);
-            // std::unique_lock<std::mutex> lock(frameMtx);
-            // frameCv.wait(lock, [] { return frameReady; });
-            // frameReady = false;
-            // lock.unlock();
-
-            // loop_mutex.unlock();
+        } else {
+            canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        }
+        
+        // Clean up retired textures after the frame delay
+        // ensures the render thread has finished using them
+        auto& retired = element->retiredTextures;
+        for (auto it = retired.begin(); it != retired.end(); ) {
+            it->framesLeft--;
+            if (it->framesLeft <= 0) {
+                GrGLTextureInfo info;
+                if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
+                    glDeleteTextures(1, &info.fID);
+                }
+                it = retired.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        
+        // for (int it : vsyncQueue){
+        //     glfwSwapInterval(it);
+        // }
+        // vsyncQueue.clear();
+        
+        #else
+        canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        #endif
+    }
+    
+    // if (wRefreshCallback) (*wRefreshCallback)(0);
+    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+    
+    glfwSwapBuffers(window);
+    // std::unique_lock<std::mutex> lock(frameMtx);
+    // frameCv.wait(lock, [] { return frameReady; });
+    // frameReady = false;
+    // lock.unlock();
+    
+    // loop_mutex.unlock();
 }
 
 
@@ -189,13 +189,6 @@ void window_move_callback(GLFWwindow* wnd, int x, int y){
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title){
-    }
-    
-    #ifndef __APPLE__
-    // Called in the bun worker thread.
-
-    WINDOWS_EXPORT void set_vsync(bool v){
-        vsyncQueue.push_back(v);
     }
 
     WINDOWS_EXPORT void glfw_init(){
@@ -209,7 +202,7 @@ extern "C" {
         glfwWindowHint(GLFW_STENCIL_BITS, 8);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
+        
         g_clearColor.setColor(SK_ColorTRANSPARENT);
         g_clearColor.setStyle(SkPaint::kFill_Style);
         g_clearColor.setBlendMode(SkBlendMode::kClear);
@@ -219,11 +212,17 @@ extern "C" {
         // noAlphaClearColor.setBlendMode(SkBlendMode::kSrc);
         g_noAlphaClearColor.setAntiAlias(1);
         pImageDataColor.setBlendMode(SkBlendMode::kSrc);
-
+        
         // globalAudioBackend.init();
         // globalAudioBackend.start();
     }
-
+    WINDOWS_EXPORT void set_vsync(bool v){}
+    #ifndef __APPLE__
+    // Called in the bun worker thread.
+    
+    WINDOWS_EXPORT void set_vsync(bool v){
+        vsyncQueue.push_back(v);
+    }
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         width = w;
         height = h;
@@ -352,12 +351,12 @@ extern "C" {
                         ++it;
                     }
                 }
-
+                
                 for (int it : vsyncQueue){
                     glfwSwapInterval(it);
                 }
                 vsyncQueue.clear();
-
+                
                 #else
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
@@ -371,7 +370,7 @@ extern "C" {
             // frameCv.wait(lock, [] { return frameReady; });
             frameReady = false;
             // lock.unlock();
-
+            
             // loop_mutex.unlock();
         }
         ready = false;
@@ -404,19 +403,10 @@ extern "C" {
     }
     #else
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
-        if (!glfwInit()) {
-            std::cerr << "Couldn't initialize GLFW...\n";
-            return;
-        };
+        
         width = w;
         height = h;
         
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-        glfwWindowHint(GLFW_STENCIL_BITS, 8);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
         
         window = glfwCreateWindow(width, height, title, NULL, NULL);
         if (!window) {
@@ -479,12 +469,12 @@ extern "C" {
         
         canvas = sWrapper->surface->getCanvas();
         
-        clearColor.setColor(SK_ColorTRANSPARENT);
-        clearColor.setStyle(SkPaint::kFill_Style);
-        clearColor.setBlendMode(SkBlendMode::kClear);
-        clearColor.setAntiAlias(1);
-        pImageDataColor.setBlendMode(SkBlendMode::kSrc);
-
+        // g_clearColor.setColor(SK_ColorTRANSPARENT);
+        // g_clearColor.setStyle(SkPaint::kFill_Style);
+        // g_clearColor.setBlendMode(SkBlendMode::kClear);
+        // g_clearColor.setAntiAlias(1);
+        // pImageDataColor.setBlendMode(SkBlendMode::kSrc);
+        
         ready = true;
     }
     

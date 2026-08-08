@@ -1085,7 +1085,7 @@ extern "C" {
         }
         #else
         auto _img = img->surface->makeTemporaryImage();
-        (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(obj->imageColor));
+        (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
         #endif
     }
     
@@ -1126,6 +1126,7 @@ extern "C" {
             );
             size_t rowBytes = w * 4;
             
+            #ifndef __APPLE__
             if (gpuContextReady && obj->owner->hasBackendTex) {
                 auto img = SkImages::BorrowTextureFrom(
                     mainThreadCtx->context.get(),
@@ -1150,7 +1151,23 @@ extern "C" {
                     return false;
                 }
             }
-            
+            #else
+            auto img = obj->owner->surface->makeImageSnapshot();
+                
+                if (img) {
+                    // canvas->drawImage(img, 0, 0);
+                    return img->readPixels(
+                        dstInfo, 
+                        out_buffer, 
+                        rowBytes, 
+                        x, 
+                        y, 
+                        SkImage::CachingHint::kDisallow_CachingHint
+                    );
+                }else {
+                    return false;
+                }
+            #endif
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
                 dstInfo, 
                 out_buffer, 

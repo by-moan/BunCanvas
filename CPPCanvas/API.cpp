@@ -45,6 +45,9 @@
 #endif
 
 #include <GLFW/glfw3.h>
+#define MINIAUDIO_IMPLEMENTATION
+#include <miniaudio/miniaudio.h>
+
 
 #include "include/core/SkFontScanner.h"
 #include "include/core/SkFontArguments.h"
@@ -261,6 +264,9 @@ targetPtr* validated(void* ptr){
 
 // #include "src/FontFace/FontCache.cpp"
 // #include "src/FontFace/FontFaceSet.cpp"
+#include "src/Audio.cpp"
+
+
 #include "src/KeywordColors.h"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"

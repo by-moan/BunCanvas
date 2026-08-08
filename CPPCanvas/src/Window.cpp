@@ -124,7 +124,7 @@ void window_refresh_callback(GLFWwindow* window) {
 
 typedef int (*JSCallback_WRefresh)(int);
 typedef int (*JSCallback_WClose)();
-JSCallback_WRefresh* wRefreshCallback = nullptr;
+
 void window_move_callback(GLFWwindow* wnd, int x, int y){
             canvas->clear(SK_ColorTRANSPARENT);
             for (auto element : canvases) {
@@ -219,6 +219,9 @@ extern "C" {
         // noAlphaClearColor.setBlendMode(SkBlendMode::kSrc);
         g_noAlphaClearColor.setAntiAlias(1);
         pImageDataColor.setBlendMode(SkBlendMode::kSrc);
+
+        // globalAudioBackend.init();
+        // globalAudioBackend.start();
     }
 
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
@@ -291,15 +294,13 @@ extern "C" {
             glfwGetFramebufferSize(window, &width, &height);
             
             glfwPollEvents();
-            
-            
-            canvas->clear(SK_ColorTRANSPARENT);
-            
             if (pendingResize == true){
                 pendingResize = false;
                 glViewport(0, 0, pendingW, pendingH);
                 width = pendingW;
                 height = pendingH;
+                renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                auto tmp = sWrapper->surface->makeTemporaryImage()->makeRasterImage();
                 sWrapper->surface.reset();
                 sWrapper->surface = createSurface(
                     renderThreadContext->context.get(),
@@ -307,11 +308,15 @@ extern "C" {
                     pendingH
                 );
                 canvas = sWrapper->surface->getCanvas();
-                // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                canvas->drawImage(tmp,0,0);
                 wResizeViewer[0] = true;
                 wResizeViewer[1] = pendingW;
                 wResizeViewer[2] = pendingH;
             }
+            
+            canvas->clear(SK_ColorTRANSPARENT);
+            
+            
             
             for (auto element : canvases) {
                 std::lock_guard<std::mutex> lock(element->mutex);
@@ -362,8 +367,8 @@ extern "C" {
             onrefresh(0);
             
             glfwSwapBuffers(window);
-            std::unique_lock<std::mutex> lock(frameMtx);
-            frameCv.wait(lock, [] { return frameReady; });
+            // std::unique_lock<std::mutex> lock(frameMtx);
+            // frameCv.wait(lock, [] { return frameReady; });
             frameReady = false;
             // lock.unlock();
 

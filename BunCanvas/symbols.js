@@ -321,6 +321,27 @@ export const lib = dlopen(dlPath, {
 		args: ["cstring"],
 		returns: "ptr",
 	},
+
+	audio_backend_init : {
+		args: [],
+		returns: "void",
+	},
+	audio_create : {
+		args: ["cstring"],
+		returns: "ptr",
+	},
+	audio_set_src : {
+		args: ["ptr","cstring"],
+		returns: "void",
+	},
+	audio_play : {
+		args: ["ptr"],
+		returns: "void",
+	},
+	audio_destroy : {
+		args: ["ptr"],
+		returns: "void",
+	},
 	// font_create_from_face: {
 	// 	args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
 	// 	returns: "ptr",

@@ -2,8 +2,9 @@ import { Window, requestAnimationFrame } from "./BunCanvas/Window.ts";
 import { Canvas } from "./BunCanvas/Canvas.ts";
 import { Image } from "./BunCanvas/Image";
 import { DOMMatrix } from "./BunCanvas/DOMMatrix.ts";
+import { Audio } from "./BunCanvas/Audio.ts";
 
-const window = new Window(800,600, "spiiin", {vsync:false});
+const window = new Window(800,600, "spiiin", {vsync:true});
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);
@@ -12,6 +13,19 @@ window.onresize = (evt)=>{
 	canvas.width = window.innerWidth
 	canvas.height = window.innerHeight
 }
+
+const ad = new Audio("./Kawkaw_voiceclip_happy_1.wav")
+const ad2 = new Audio("./Kawkaw_voiceclip_sad_1.wav")
+
+window.addEventListener("click",()=>{
+  const rand = Math.random()
+  if (rand > 0.7){
+    ad2.play()
+    return
+  }
+  ad.play();
+
+})
 
 const ctx = canvas.getContext('2d');
 

@@ -32,7 +32,6 @@ std::unordered_map<std::string,SkBlendMode> compositeOperations{{
 }};
 
 
-
 // std::unordered_map<std::string,SkFilterMode> smoothingQualities{{
 //     {"low",SkFilterMode::kLinear},
 //     {"medium",SkFilterMode::kLinear},
@@ -425,8 +424,7 @@ class BunCanvas {
             hasBackendTex = false;
         }
         #endif
-        auto tmp = surface->makeTemporaryImage();
-        surface.reset();
+        sk_sp<SkImage> tmp;
         
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
@@ -436,6 +434,14 @@ class BunCanvas {
         }
         #else
         if (gpuContextReady) {
+            tmp = SkImages::BorrowTextureFrom(
+                mainThreadCtx->context.get(),
+                backendTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
             backendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
@@ -444,6 +450,7 @@ class BunCanvas {
                 GrProtected::kNo
             );
             if (backendTex.isValid()) {
+                surface.reset();
                 surface = SkSurfaces::WrapBackendTexture(
                     mainThreadCtx->context.get(),
                     backendTex,
@@ -454,9 +461,18 @@ class BunCanvas {
                     nullptr
                 );
                 hasBackendTex = true;
+            } else {
+                //Fallback, very unlikely that it happens.
+                auto img = surface->makeTemporaryImage();
+                surface.reset();
+                surface = SkSurfaces::Raster(
+                    SkImageInfo::MakeN32Premul(w,h)
+                );
+                hasBackendTex = false;
             }
-        }
-        if (!surface) {
+        }else {
+            auto img = surface->makeTemporaryImage();;
+            surface.reset();
             surface = SkSurfaces::Raster(
                 SkImageInfo::MakeN32Premul(w,h)
             );

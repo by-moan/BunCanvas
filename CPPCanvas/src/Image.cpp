@@ -10,23 +10,15 @@ class ImageWrapper {
     ImageWrapper(){}
 };
 
-ImageWrapper* validated_image(void* imagePtr){
-    ImageWrapper* obj = static_cast<ImageWrapper*>(imagePtr);
-    
-    if (obj->magic != ImageWrapper::MAGIC)
-    return nullptr;
-    
-    
-    return obj;
-}
-
 extern "C" {
     WINDOWS_EXPORT void* image_create() {
         return new ImageWrapper();
     }
 
     WINDOWS_EXPORT bool image_set_src(void* imgObj, const char* path){
-        ImageWrapper* obj = validated_image(imgObj);
+        ImageWrapper* obj = validated<ImageWrapper>(imgObj);
+        if (!obj) return false;
+
         obj->imageValid = false;
         obj->data.reset();
         obj->data = SkData::MakeFromFileName(path);

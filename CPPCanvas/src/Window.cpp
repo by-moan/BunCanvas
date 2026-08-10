@@ -26,7 +26,7 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     prevY = ypos;
 }
 
-bool clickStarted = 0;
+bool clickStarted = false;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (pollingEvents == true) return;
     
@@ -125,68 +125,6 @@ void window_refresh_callback(GLFWwindow* window) {
 typedef int (*JSCallback_WRefresh)(int);
 typedef int (*JSCallback_WClose)();
 
-void window_move_callback(GLFWwindow* wnd, int x, int y){
-    canvas->clear(SK_ColorTRANSPARENT);
-    for (auto element : canvases) {
-        std::lock_guard<std::mutex> lock(element->mutex);
-        #ifndef __APPLE__
-        if (element->hasBackendTex) {
-            auto img = SkImages::BorrowTextureFrom(
-                renderThreadContext->context.get(),
-                element->backendTex,
-                kTopLeft_GrSurfaceOrigin,
-                kN32_SkColorType,
-                kPremul_SkAlphaType,
-                nullptr
-            );
-            if (img) {
-                canvas->drawImage(img, 0, 0);
-            }
-        } else {
-            canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-        }
-        
-        // Clean up retired textures after the frame delay
-        // ensures the render thread has finished using them
-        auto& retired = element->retiredTextures;
-        for (auto it = retired.begin(); it != retired.end(); ) {
-            it->framesLeft--;
-            if (it->framesLeft <= 0) {
-                GrGLTextureInfo info;
-                if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
-                    glDeleteTextures(1, &info.fID);
-                }
-                it = retired.erase(it);
-            } else {
-                ++it;
-            }
-        }
-        
-        // for (int it : vsyncQueue){
-        //     glfwSwapInterval(it);
-        // }
-        // vsyncQueue.clear();
-        
-        #else
-        canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-        #endif
-    }
-    
-    // if (wRefreshCallback) (*wRefreshCallback)(0);
-    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-    
-    glfwSwapBuffers(window);
-    // std::unique_lock<std::mutex> lock(frameMtx);
-    // frameCv.wait(lock, [] { return frameReady; });
-    // frameReady = false;
-    // lock.unlock();
-    
-    // loop_mutex.unlock();
-}
-
-
-
-
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title){
     }
@@ -216,13 +154,12 @@ extern "C" {
         // globalAudioBackend.init();
         // globalAudioBackend.start();
     }
-    WINDOWS_EXPORT void set_vsync(bool v){}
-    #ifndef __APPLE__
-    // Called in the bun worker thread.
-    
     WINDOWS_EXPORT void set_vsync(bool v){
         vsyncQueue.push_back(v);
+
     }
+    #ifndef __APPLE__
+    // Called in the bun worker thread.
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
         width = w;
         height = h;
@@ -243,7 +180,6 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window,keyboard_key_callback);
-        glfwSetWindowPosCallback(window,window_move_callback);
         
         // glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion

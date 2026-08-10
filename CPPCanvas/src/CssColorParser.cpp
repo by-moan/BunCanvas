@@ -60,6 +60,7 @@ std::optional<SkColor4f> parseCssColor(const char* c){
     if (!c) return std::nullopt;
     
     auto len = std::strlen(c);
+    if (len <= 0) return std::nullopt;
     //Comparing length
     if (len == 4 && c[0] == '#') {
         uint8_t r = hexTable[(uint8_t)c[1]];

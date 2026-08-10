@@ -842,11 +842,6 @@ extern "C" {
     
     WINDOWS_EXPORT void canvas_clear_rect(void* canvasObj, int x, int y, int w, int h) {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        // if (!obj) return;
-        // std::cout << "(*obj)() = " << (*obj)() << "\n";
-        // std::cout << "obj = " << obj << "\n";
-        // std::cout << "obj->owner->magic == BunCanvas::MAGIC = " << (obj->owner->magic == BunCanvas::MAGIC) << "\n";
-        // std::cout << "obj->magic == BunCanvasRenderingContext2d::MAGIC = " << (obj->magic == BunCanvasRenderingContext2D::MAGIC) << "\n";
         
         if (!obj) return;
         nonapple(
@@ -1052,7 +1047,7 @@ extern "C" {
         );
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock2;
-            if (!obj->desynchronized) lock2.emplace(img->mutex);
+            if (img->rendering2D && !img->rendering2D->desynchronized) lock2.emplace(img->mutex);
         );
         #ifndef __APPLE__
         if (img->hasBackendTex) {

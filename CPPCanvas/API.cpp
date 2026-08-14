@@ -150,36 +150,39 @@ sk_sp<SkFontMgr> CreateFontManager() {
 #endif
 }
 
-sk_sp<SkSurface> createSurface(
-    GrDirectContext* context,
-    int width,
-    int height
-) {
-    GrGLFramebufferInfo fbInfo;
-    fbInfo.fFBOID = 0;
-    fbInfo.fFormat = GL_RGBA8;
+// sk_sp<SkSurface> createSurface(
+//     GrDirectContext* context,
+//     int width,
+//     int height
+// ) {
+//     GrGLFramebufferInfo fbInfo;
+//     fbInfo.fFBOID = 0;
+//     fbInfo.fFormat = GL_RGBA8;
     
-    auto backendRT = GrBackendRenderTargets::MakeGL(
-        width,
-        height,
-        0,
-        8,
-        fbInfo
-    );
-    return SkSurfaces::WrapBackendRenderTarget(
-        context,
-        backendRT,
-        kBottomLeft_GrSurfaceOrigin,
-        kRGBA_8888_SkColorType,
-        nullptr,
-        nullptr
-    );
-}
+    // auto backendRT = GrBackendRenderTargets::MakeGL(
+//         width,
+//         height,
+//         0,
+//         8,
+//         fbInfo
+//     );
+//     return SkSurfaces::WrapBackendRenderTarget(
+//         context,
+//         backendRT,
+//         kBottomLeft_GrSurfaceOrigin,
+//         kRGBA_8888_SkColorType,
+//         nullptr,
+//         nullptr
+//     );
+// }
 
-class SurfaceWrapper {
-	public:
-	sk_sp<SkSurface> surface;
-	SurfaceWrapper(sk_sp<SkSurface> sfc) : surface(sfc){}
+
+class BackedSurface{
+    public:
+    GrBackendRenderTarget backendRT;
+    sk_sp<SkSurface> surface;
+
+    BackedSurface(GrBackendRenderTarget bRT, sk_sp<SkSurface> sfc) : backendRT{bRT}, surface{sfc} {}
 };
 
 class ContextWrapper {
@@ -188,6 +191,11 @@ class ContextWrapper {
 	ContextWrapper(sk_sp<GrDirectContext> ctx) : context(ctx){}
 };
 
+class SurfaceWrapper {
+	public:
+	sk_sp<SkSurface> surface;
+	SurfaceWrapper(sk_sp<SkSurface> sfc) : surface(sfc){}
+};
 
 class InterfaceWrapper {
     public:
@@ -198,6 +206,33 @@ class InterfaceWrapper {
 
 InterfaceWrapper* renderThreadInterface = nullptr;
 ContextWrapper* renderThreadContext = nullptr;
+
+BackedSurface* createSurface(
+    int w,
+    int h
+) {
+    GrGLFramebufferInfo fbInfo;
+    fbInfo.fFBOID = 0;
+    fbInfo.fFormat = GL_RGBA8;
+    auto backendRT = GrBackendRenderTargets::MakeGL(
+        w,
+        h,
+        0,
+        8,
+        fbInfo
+    );
+    return new BackedSurface{
+        backendRT,
+        SkSurfaces::WrapBackendRenderTarget(
+            renderThreadContext->context.get(),
+            backendRT,
+            kBottomLeft_GrSurfaceOrigin,
+            kRGBA_8888_SkColorType,
+            nullptr,
+            nullptr
+        )
+    };
+}
 
 int currentWidth = 0;
 int currentHeight = 0;
@@ -270,6 +305,7 @@ targetPtr* validated(void* ptr){
 #include "src/KeywordColors.h"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"
+// #include "src/CssFontParser.cpp"
 #include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Canvas.cpp"

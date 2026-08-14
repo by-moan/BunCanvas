@@ -4,6 +4,7 @@ import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
 import { DOMMatrix } from "./DOMMatrix.js";
+import { TextMetrics } from "./TextMetrics.js";
 
 const ptrs = new WeakMap();
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
@@ -58,6 +59,8 @@ class Render2DState {
 	compositeOperation = "source-over";
 	filter = "none";
 	fontCss = "10px sans-serif";
+	textBaseline = "alphabetic";
+	textAlign = "start";
 	lineDash : number[] = []
 	lineDashOffset = 0;
 	lineJoin = "miter";
@@ -84,7 +87,10 @@ class CanvasRenderingContext2D {
 		// The native side will parse the CSS string, resolve a typeface and cache it.
 		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`));
 	}
-	get font(): string { return this.#currentState.fontCss; }
+	get font(): string { 
+
+		return this.#currentState.fontCss;
+	}
 	
 	set fillStyle(style : string | CanvasGradient) {
 		if (style == this.#currentState.fillStyle) return;
@@ -370,6 +376,77 @@ class CanvasRenderingContext2D {
 		lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,v)
 		this.#currentState.lineDashOffset = v;
 	}
+
+	set textBaseline(baseline : string){
+		let bl = -1;
+		switch (baseline) {
+			case "top":
+				bl = 0;
+				break;
+			case "hanging":
+				bl = 1
+				break;
+			case "middle":
+				bl = 2
+				break;
+			case "alphabetic":
+				bl = 3
+				break;
+			case "ideographic":
+				bl = 4
+				break;
+			case "bottom":
+				bl = 5
+				break;
+		}
+		if (bl != -1) {
+			// console.log(bl)
+			lib.symbols.canvas_set_text_baseline(ptrs.get(this),bl)
+		}
+	}
+
+	set textAlign(alignment : string){
+		let al = -1;
+		switch (alignment) {
+			case "left":
+				al = 0;
+				break;
+			case "right":
+				al = 1
+				break;
+			case "center":
+				al = 2
+				break;
+			case "start":
+				al = 3
+				break;
+			case "end":
+				al = 4
+				break;
+		}
+		if (al != -1) {
+			// console.log(al)
+			lib.symbols.canvas_set_text_align(ptrs.get(this),al)
+		}
+	}
+	measureText(text : string) : TextMetrics {
+		const pArr = new Float32Array(12)
+		lib.symbols.canvas_measure_text(ptrs.get(this),encoder.encode(`${text}\0`),ptr(pArr))
+		return new TextMetrics(
+			pArr[0], 
+			pArr[1], 
+			pArr[2], 
+			pArr[3], 
+			pArr[4], 
+			pArr[5], 
+			pArr[6], 
+			pArr[7],
+			pArr[8],
+			pArr[9], 
+			pArr[10], 
+			pArr[11]
+		)
+	}
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
@@ -382,7 +459,6 @@ class CanvasRenderingContext2D {
 		const { desynchronized = false, alpha = true } = args ?? {};
 		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr, desynchronized, alpha)
 		ptrs.set(this, renderContextPtr)
-		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`))
 	}
 }
 
@@ -419,27 +495,39 @@ export class Canvas {
 		return ptrs.get(this)
 	}
 	
-	set width(v){
-		this.#dim[0] = v
+	set width(v : string){
+		this.#dim[0] = Number.parseInt(v)
 		this.#rCapture.cb()
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
 	}
-	set height(v){
-		this.#dim[1] = v
+	set height(v : string){
+		this.#dim[1] = Number.parseInt(v)
 		this.#rCapture.cb()
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
 	}
-	get width(){
+	get width() : number{
 		return this.#dim[0]
 	}
-	get height(){
+	get height() : number {
 		return this.#dim[1]
 	}
 	
 	getContext(contextType : string, args : any) {
 		if (contextType == "2d") {
-			
 			return new CanvasRenderingContext2D(ptrs.get(this),this, args)
+		}
+	}
+
+	getBoundingClientRect(){
+		return {
+			x: 0,
+			y: 0,
+			width: this.#dim[0],
+			height: this.#dim[1],
+			top: 0,
+			bottom: this.#dim[1],
+			left: 0,
+			right: this.#dim[0],
 		}
 	}
 }

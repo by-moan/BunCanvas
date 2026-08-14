@@ -41,6 +41,15 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_5 && !((int)mClickViewer[4]&0b10000))?0b10000:0;
         //Buttons field for mouseMove viewer
         mMoveViewer[5] = mClickViewer[4];
+
+        mDownViewer[0] = true;
+        mDownViewer[1] = mMoveViewer[1];
+        mDownViewer[2] = mMoveViewer[2];
+        mDownViewer[4] = mClickViewer[4];
+        mDownViewer[5] = kDownViewer[3];
+        mDownViewer[6] = kDownViewer[4];
+        mDownViewer[7] = kDownViewer[5];
+        mDownViewer[8] = kDownViewer[6];
     } 
     if (action == GLFW_RELEASE) {
         mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_LEFT && (int)mClickViewer[4]&0b1)?0b1:0;
@@ -52,6 +61,15 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_5 && (int)mClickViewer[4]&0b10000)?0b10000:0;
         //Buttons field for mouseMove viewer
         mMoveViewer[5] = mClickViewer[4];
+
+        mUpViewer[0] = true;
+        mUpViewer[1] = mMoveViewer[1];
+        mUpViewer[2] = mMoveViewer[2];
+        mUpViewer[4] = mClickViewer[4];
+        mUpViewer[5] = kDownViewer[3];
+        mUpViewer[6] = kDownViewer[4];
+        mUpViewer[7] = kDownViewer[5];
+        mUpViewer[8] = kDownViewer[6];
     }
     //Mouse pressed down was done and now is being released? Then mark the event as dirty so it can be triggered on js window.
     if (button == GLFW_MOUSE_BUTTON_LEFT && clickStarted == true && action == GLFW_RELEASE) {
@@ -209,11 +227,12 @@ extern "C" {
         currentWidth = width;
         currentHeight = height;
         
-        sWrapper = new SurfaceWrapper(createSurface(
-            renderThreadContext->context.get(),
+        BackedSurface* cSurface = createSurface(
             width,
             height
-        ));
+        );
+
+        sWrapper = new SurfaceWrapper(cSurface->surface);
         
         if (!sWrapper->surface) {
             std::cout << "Surface was not created!\n";
@@ -235,24 +254,25 @@ extern "C" {
                 width = pendingW;
                 height = pendingH;
                 renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-                auto tmp = sWrapper->surface->makeTemporaryImage()->makeRasterImage();
+                auto tmp = sWrapper->surface->makeImageSnapshot();
                 sWrapper->surface.reset();
-                sWrapper->surface = createSurface(
-                    renderThreadContext->context.get(),
+                cSurface->surface.reset();
+                delete cSurface;
+                cSurface = createSurface(
                     pendingW,
                     pendingH
                 );
+                sWrapper->surface = cSurface->surface;
                 canvas = sWrapper->surface->getCanvas();
                 canvas->drawImage(tmp,0,0);
+                tmp.reset();
                 wResizeViewer[0] = true;
                 wResizeViewer[1] = pendingW;
                 wResizeViewer[2] = pendingH;
+            }else {
+                canvas->clear(SK_ColorTRANSPARENT);
             }
-            
-            canvas->clear(SK_ColorTRANSPARENT);
-            
-            
-            
+
             for (auto element : canvases) {
                 std::lock_guard<std::mutex> lock(element->mutex);
                 #ifndef __APPLE__
@@ -288,15 +308,18 @@ extern "C" {
                     }
                 }
                 
-                for (int it : vsyncQueue){
-                    glfwSwapInterval(it);
-                }
-                vsyncQueue.clear();
+                
                 
                 #else
                 canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 #endif
             }
+
+            for (int it : vsyncQueue){
+                    glfwSwapInterval(it);
+                }
+                vsyncQueue.clear();
+
             renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
             
             onrefresh(0);

@@ -46,6 +46,23 @@ enum class GradientType {
     Conic
 };
 
+enum class CanvasTextBaseLine {
+    Top,
+    Hanging,
+    Middle,
+    Alphabetic,
+    Ideographic,
+    Bottom,
+};
+
+enum class CanvasTextAlignment {
+    Left,
+    Right,
+    Center,
+    Start,
+    End
+};
+
 struct ColorStop {
     float offset;      // 0..1
     SkColor4f color;
@@ -81,6 +98,8 @@ typedef int (*JSCallback_CReset)();
 class Rendering2DState {
     public:
     SkPathBuilder pathBuilder;
+    CanvasTextBaseLine textBaseline = CanvasTextBaseLine::Alphabetic;
+    CanvasTextAlignment textAlign = CanvasTextAlignment::Left;
     SkPaint fillColor;
     sk_sp<SkShader> fillShader;
     SkPaint strokeColor;
@@ -91,7 +110,7 @@ class Rendering2DState {
     sk_sp<SkImageFilter> resolvedFilters;
     SkPaint imageColor;
     SkPaint shadowBlurColor;
-    std::string cssFont = "10px sans-serif";
+    // std::string cssFont = "10px sans-serif";
     SkFont font_current;
     float shadowBlurAmount = 0.f;
     float shadowBlurOffsetX = 0.f;
@@ -100,45 +119,83 @@ class Rendering2DState {
     SkSamplingOptions sampling = SkFilterMode::kLinear;
     float globalAlpha = 1.f;
 
-    Rendering2DState() = default;
+    Rendering2DState() {
+        pathBuilder.reset();
+        fillColor.setBlendMode(SkBlendMode::kSrcOver);
+        fillColor.setColor(SK_ColorBLACK);
+        fillColor.setStyle(SkPaint::kFill_Style);
+        fillColor.setImageFilter(nullptr);
+        fillColor.setAntiAlias(1);
+        
+        strokeColor.setBlendMode(SkBlendMode::kSrcOver);
+        strokeColor.setColor(SK_ColorBLACK);
+        strokeColor.setStrokeJoin(SkPaint::Join::kMiter_Join);
+        strokeColor.setStyle(SkPaint::kStroke_Style);
+        strokeColor.setStrokeWidth(1);
+        strokeColor.setImageFilter(nullptr);
+        strokeColor.setAntiAlias(1);
+        strokeColor.setStrokeCap(SkPaint::kDefault_Cap);
+        
+        shadowBlurAmount = 0.f;
+        shadowBlurOffsetX = 0.f;
+        shadowBlurOffsetY = 0.f;
+        shadowBlurFilter = nullptr;
+        // SkImageFilters::DropShadow(
+        //     shadowBlurOffsetX,           // dx
+        //     shadowBlurOffsetX,           // dy
+        //     shadowBlurAmount * 0.5f, // sigmaX
+        //     shadowBlurAmount * 0.5f, // sigmaY
+        //     shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
+        //     nullptr,                      // input (no input filter)
+        //     nullptr                       // cropRect (optional, can omit)
+        // );
+        shadowBlurColor.setImageFilter(shadowBlurFilter);
 
-    Rendering2DState(
-        SkPath sPath,
-        SkPaint fillColor,
-        sk_sp<SkShader> fillShader,
-        SkPaint strokeColor,
-        sk_sp<SkPathEffect> lineDashEffect,
-        sk_sp<SkShader> strokeShader,
-        sk_sp<SkImageFilter> filters,
-        sk_sp<SkImageFilter> shadowBlurFilter,
-        sk_sp<SkImageFilter> resolvedFilters,
-        SkPaint imageColor,
-        SkPaint shadowBlurColor,
-        std::string cssFont,
-        CanvasFontCache font_cache,
-        SkFont font_current,
-        float shadowBlurAmount,
-        float shadowBlurOffsetX,
-        float shadowBlurOffsetY,
-        SkSamplingOptions sampling
-    ) : pathBuilder{sPath},
-        fillColor{fillColor},
-        fillShader{fillShader},
-        strokeColor{strokeColor},
-        lineDashEffect{lineDashEffect},
-        strokeShader{strokeShader},
-        filters{filters},
-        shadowBlurFilter{shadowBlurFilter},
-        resolvedFilters{resolvedFilters},
-        imageColor{imageColor},
-        shadowBlurColor{shadowBlurColor},
-        cssFont{cssFont},
-        font_current{font_current},
-        shadowBlurAmount{shadowBlurAmount},
-        shadowBlurOffsetX{shadowBlurOffsetX},
-        shadowBlurOffsetY{shadowBlurOffsetY},
-        sampling{SkFilterMode::kLinear}
-        {}
+        samplingQuality = 1;
+        sampling = SkFilterMode::kLinear;
+        
+        imageColor.setBlendMode(SkBlendMode::kSrcOver);
+        imageColor.setImageFilter(nullptr);
+
+        filters = nullptr;
+    };
+
+    // Rendering2DState(
+    //     SkPath sPath,
+    //     SkPaint fillColor,
+    //     sk_sp<SkShader> fillShader,
+    //     SkPaint strokeColor,
+    //     sk_sp<SkPathEffect> lineDashEffect,
+    //     sk_sp<SkShader> strokeShader,
+    //     sk_sp<SkImageFilter> filters,
+    //     sk_sp<SkImageFilter> shadowBlurFilter,
+    //     sk_sp<SkImageFilter> resolvedFilters,
+    //     SkPaint imageColor,
+    //     SkPaint shadowBlurColor,
+    //     std::string cssFont,
+    //     CanvasFontCache font_cache,
+    //     SkFont font_current,
+    //     float shadowBlurAmount,
+    //     float shadowBlurOffsetX,
+    //     float shadowBlurOffsetY,
+    //     SkSamplingOptions sampling
+    // ) : pathBuilder{sPath},
+    //     fillColor{fillColor},
+    //     fillShader{fillShader},
+    //     strokeColor{strokeColor},
+    //     lineDashEffect{lineDashEffect},
+    //     strokeShader{strokeShader},
+    //     filters{filters},
+    //     shadowBlurFilter{shadowBlurFilter},
+    //     resolvedFilters{resolvedFilters},
+    //     imageColor{imageColor},
+    //     shadowBlurColor{shadowBlurColor},
+    //     font_current{font_current},
+    //     shadowBlurAmount{shadowBlurAmount},
+    //     shadowBlurOffsetX{shadowBlurOffsetX},
+    //     shadowBlurOffsetY{shadowBlurOffsetY},
+    //     sampling{SkFilterMode::kLinear}
+    //     {}
 
     // Rendering2DState& operator=(const Rendering2DState& other) {
     //     if (this != &other) {
@@ -198,45 +255,40 @@ class BunCanvasRenderingContext2D {
     Rendering2DState savedState;
     
     
-    BunCanvasRenderingContext2D(sk_sp<SkSurface> surface, BunCanvas* owner, JSCallback_CReset cb, bool desync, bool alpha) : sfc(surface), jsResetCanvas(cb), desynchronized(desync), alpha(alpha) {
-        this->owner = owner;
-        if (alpha) {
-            clearColor = g_clearColor;
-        }else {
-            clearColor = g_noAlphaClearColor;
-        }
-        currentState.strokeColor.setColor(SK_ColorBLACK);
-        currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
-        currentState.strokeColor.setAlpha(255);
-        currentState.strokeColor.setStrokeWidth(1);
-        currentState.strokeColor.setAntiAlias(1);
-        currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
-        currentState.strokeColor.setPathEffect(nullptr);
-        currentState.strokeColor.setShader(nullptr);
-        currentState.strokeColor.setStrokeCap(SkPaint::kButt_Cap);
+    BunCanvasRenderingContext2D(sk_sp<SkSurface> surface, BunCanvas* owner, JSCallback_CReset cb, bool desync, bool alpha) : sfc(surface), owner{owner}, jsResetCanvas(cb), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {
+        // currentState.strokeColor.setColor(SK_ColorBLACK);
+        // currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
+        // currentState.strokeColor.setAlpha(255);
+        // currentState.strokeColor.setStrokeWidth(1);
+        // currentState.strokeColor.setAntiAlias(1);
+        // currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
+        // currentState.strokeColor.setPathEffect(nullptr);
+        // currentState.strokeColor.setShader(nullptr);
+        // currentState.strokeColor.setStrokeCap(SkPaint::kButt_Cap);
 
-        currentState.imageColor.setColor(SK_ColorWHITE);
-        currentState.imageColor.setAlpha(255);
-        currentState.imageColor.setStyle(SkPaint::kFill_Style);
-        currentState.imageColor.setAntiAlias(1);
-        currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
+        // currentState.imageColor.setColor(SK_ColorWHITE);
+        // currentState.imageColor.setAlpha(255);
+        // currentState.imageColor.setStyle(SkPaint::kFill_Style);
+        // currentState.imageColor.setAntiAlias(1);
+        // currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
         
-        currentState.fillColor.setColor(SK_ColorBLACK);
-        currentState.fillColor.setStyle(SkPaint::kFill_Style);
-        currentState.fillColor.setShader(nullptr);
-        currentState.fillColor.setAlpha(255);
-        currentState.fillColor.setAntiAlias(1);
-        currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
+        // currentState.fillColor.setColor(SK_ColorBLACK);
+        // currentState.fillColor.setStyle(SkPaint::kFill_Style);
+        // currentState.fillColor.setShader(nullptr);
+        // currentState.fillColor.setAlpha(255);
+        // currentState.fillColor.setAntiAlias(1);
+        // currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
         
-        currentState.shadowBlurFilter = SkImageFilters::DropShadow(
-            currentState.shadowBlurOffsetX,           // dx
-            currentState.shadowBlurOffsetX,           // dy
-            currentState.shadowBlurAmount * 0.5f, // sigmaX
-            currentState.shadowBlurAmount * 0.5f, // sigmaY
-            currentState.shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-            nullptr,                      // input (no input filter)
-            nullptr                       // cropRect (optional, can omit)
-        );
+        // currentState.shadowBlurFilter = SkImageFilters::DropShadow(
+        //     currentState.shadowBlurOffsetX,           // dx
+        //     currentState.shadowBlurOffsetX,           // dy
+        //     currentState.shadowBlurAmount * 0.5f, // sigmaX
+        //     currentState.shadowBlurAmount * 0.5f, // sigmaY
+        //     currentState.shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
+        //     nullptr,                      // input (no input filter)
+        //     nullptr                       // cropRect (optional, can omit)
+        // );
+
     }
 
     void save(){
@@ -255,50 +307,14 @@ class BunCanvasRenderingContext2D {
         // ctx = surface->getCanvas();
         sfc = surface;
         sfc->getCanvas()->resetMatrix();
-        currentState.pathBuilder.reset();
-        currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
-        currentState.fillColor.setColor(SK_ColorBLACK);
-        currentState.fillColor.setStyle(SkPaint::kFill_Style);
-        currentState.fillColor.setImageFilter(nullptr);
-        currentState.fillColor.setAntiAlias(1);
+        currentState = Rendering2DState{};
+        savedState = Rendering2DState{};
         
-        currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
-        currentState.strokeColor.setColor(SK_ColorBLACK);
-        currentState.strokeColor.setStrokeJoin(SkPaint::Join::kMiter_Join);
-        currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
-        currentState.strokeColor.setStrokeWidth(1);
-        currentState.strokeColor.setImageFilter(nullptr);
-        currentState.strokeColor.setAntiAlias(1);
-        currentState.strokeColor.setStrokeCap(SkPaint::kDefault_Cap);
-        
-        currentState.shadowBlurAmount = 0.f;
-        currentState.shadowBlurOffsetX = 0.f;
-        currentState.shadowBlurOffsetY = 0.f;
-        currentState.shadowBlurFilter = SkImageFilters::DropShadow(
-            currentState.shadowBlurOffsetX,           // dx
-            currentState.shadowBlurOffsetX,           // dy
-            currentState.shadowBlurAmount * 0.5f, // sigmaX
-            currentState.shadowBlurAmount * 0.5f, // sigmaY
-            currentState.shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-            nullptr,                      // input (no input filter)
-            nullptr                       // cropRect (optional, can omit)
-        );
-        currentState.shadowBlurColor.setImageFilter(currentState.shadowBlurFilter);
-
-        currentState.samplingQuality = 1;
-        currentState.sampling = SkFilterMode::kLinear;
-        
-        currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
-        currentState.imageColor.setImageFilter(nullptr);
-
         
         sfc->getCanvas()->drawImage(tmpImage,0.f,0.f);
-        
-        currentState.cssFont = "10px sans-serif";
 
-        currentState.filters = nullptr;
         
-        font_cache.setFont(currentState.cssFont.c_str(),currentState.font_current);
+        font_cache.setFont("10px sans-serif",currentState.font_current);
 
         jsResetCanvas();
     }
@@ -441,7 +457,7 @@ class BunCanvas {
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
                 nullptr
-            );
+            )->makeRasterImage();
             backendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
@@ -794,7 +810,6 @@ extern "C" {
     }
     
     WINDOWS_EXPORT void canvas_fill_rect(void* canvasObj, int x, int y, int w, int h) {
-        if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) return;
         nonapple(
@@ -854,16 +869,14 @@ extern "C" {
     WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
         if (!canvasObj) return;
         BunCanvas* obj = validated<BunCanvas>(canvasObj);
-        
-        if (obj == nullptr) {
+        if (obj == nullptr || std::isnan(w) || std::isnan(h)) {
             return;
         };
-        
         {
             //This should lock at all costs. Otherwise it will cause a segfault
             //because the surface becomes invalid for a brief period
             nonapple(std::lock_guard<std::mutex> lock(obj->mutex));
-            obj->resize(w,h);
+            obj->resize(std::clamp(w, 1, 2147483647),std::clamp(h, 1, 2147483647));
         }
     }
     
@@ -969,21 +982,22 @@ extern "C" {
         auto alphaf = obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha;
         sColor.setAlphaf(alphaf);
         sColor.setAntiAlias(false);
-        // if(obj->shadowBlurAmount > 0.5f) {
-        //     SkPaint shColor = obj->shadowBlurColor;
-        //     // shColor.setStyle(SkPaint::Style::kFill_Style);
-        //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
-        //     shColor.setAlphaf(_af);
-        //     // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-        //     int w = obj->owner->surface->width();
-        //     int h = obj->owner->surface->height();
-        //     sk_sp<SkSurface> sfc = SkSurfaces::Raster(
-        //         SkImageInfo::MakeN32Premul(w,h)
-        //     );
-        //     // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
-        //     sfc->getCanvas()->drawPath(obj->pathBuilder.snapshot(), sColor);
-        //     for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->sampling, &shColor);
-        // }
+        if(obj->currentState.shadowBlurAmount > 0.5f) {
+            SkPaint shColor = obj->currentState.shadowBlurColor;
+            // shColor.setStyle(SkPaint::Style::kFill_Style);
+            auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
+            shColor.setAlphaf(_af);
+            // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+            int w = obj->owner->surface->width();
+            int h = obj->owner->surface->height();
+            sk_sp<SkSurface> sfc = SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
+            sfc->getCanvas()->drawPath(obj->currentState.pathBuilder.snapshot(), sColor);
+            (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
+            // for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
+        }
         (*obj)()->drawPath(obj->currentState.pathBuilder.snapshot(), sColor);
     }
 
@@ -1328,14 +1342,66 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
+        
         float width = ctx->currentState.font_current.measureText(
             txt,
             std::strlen(txt),
             SkTextEncoding::kUTF8
         );
+        
         SkPaint fColor = ctx->currentState.fillColor;
-        auto alphaf = fColor.getAlphaf()*ctx->currentState.globalAlpha;
+        auto alphaf = fColor.getAlphaf() * ctx->currentState.globalAlpha;
         fColor.setAlphaf(alphaf);
+
+        SkFontMetrics m;
+        ctx->currentState.font_current.getMetrics(&m);
+        float finalY = 0.f;
+        switch (ctx->currentState.textBaseline) {
+            case CanvasTextBaseLine::Top :
+                finalY = y - m.fTop;
+                break;
+
+            case CanvasTextBaseLine::Middle:
+                finalY = y - (m.fAscent + m.fDescent) * 0.5f;
+                break;
+
+            case CanvasTextBaseLine::Alphabetic:
+                finalY = y;
+                break;
+
+            case CanvasTextBaseLine::Bottom:
+                finalY = y - m.fBottom;
+                break;
+
+            case CanvasTextBaseLine::Hanging:
+                finalY = y - m.fAscent;
+                break;
+
+            case CanvasTextBaseLine::Ideographic:
+                finalY = y - m.fDescent;
+                break;
+            default: break;
+        }
+        float finalX = 0.f;
+        switch (ctx->currentState.textAlign) {
+            case CanvasTextAlignment::Left :
+                finalX = x;
+                break;
+            case CanvasTextAlignment::Right :
+                finalX = x - width;
+                break;
+            case CanvasTextAlignment::Center :
+                finalX = x - width/2;
+                break;
+            case CanvasTextAlignment::Start :
+                finalX = x;
+                break;
+            case CanvasTextAlignment::End :
+                finalX = x - width;
+                break;
+            default: break;
+        }
+        
         if (width > maxWidth && maxWidth > -1) {
             float scale = maxWidth / width;
             (*ctx)()->save();
@@ -1352,7 +1418,10 @@ extern "C" {
         } else {
             (*ctx)()->drawString(txt, x, y, ctx->currentState.font_current, fColor);
         }
+
+        // (*ctx)()->drawString(txt, finalX, finalY, ctx->currentState.font_current, fColor);
     }
+
     WINDOWS_EXPORT void canvas_stroke_text(void* ctxPtr, const char* txt, float x, float y, float maxWidth) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1550,6 +1619,7 @@ extern "C" {
         }
         delete cnv;
     }
+
     WINDOWS_EXPORT void canvas_get_transform(void* ctxPtr, float* mtx){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1561,6 +1631,7 @@ extern "C" {
         auto matrix = (*ctx)()->getLocalToDevice();
         matrix.getRowMajor(mtx);
     }
+    
     WINDOWS_EXPORT void canvas_set_transform(void* ctxPtr, double* mtx){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1648,5 +1719,58 @@ extern "C" {
             }
         }
         return false;
+    }
+
+    WINDOWS_EXPORT void canvas_set_text_baseline(void* ctxPtr, int bl){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+        CanvasTextBaseLine baseline = static_cast<CanvasTextBaseLine>(bl);
+        ctx->currentState.textBaseline = baseline;
+    }
+
+    WINDOWS_EXPORT void canvas_set_text_align(void* ctxPtr, int al){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+        CanvasTextAlignment alignment = static_cast<CanvasTextAlignment>(al);
+        ctx->currentState.textAlign = alignment;
+    }
+
+    WINDOWS_EXPORT void canvas_measure_text(void* ctxPtr, const char* txt, float* fMetrics){
+        BunCanvasRenderingContext2D* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx || !txt || !fMetrics) return;
+        SkRect bounds;
+        float width = ctx->currentState.font_current.measureText(
+            txt,
+            std::strlen(txt),
+            SkTextEncoding::kUTF8, &bounds
+        );
+        
+        SkPaint fColor = ctx->currentState.fillColor;
+        auto alphaf = fColor.getAlphaf() * ctx->currentState.globalAlpha;
+        fColor.setAlphaf(alphaf);
+
+        SkFontMetrics m;
+        ctx->currentState.font_current.getMetrics(&m);
+
+        fMetrics[0] = width;
+        fMetrics[1] = bounds.fLeft;
+        fMetrics[2] = bounds.fRight;
+        fMetrics[3] = -bounds.fTop;
+        fMetrics[4] = bounds.fBottom;
+        fMetrics[5] = -m.fAscent;
+        fMetrics[6] = m.fDescent;
+        // fMetrics[7] TODO
+        // fMetrics[8] TODO
+        fMetrics[9] = ctx->currentState.textBaseline == CanvasTextBaseLine::Alphabetic;
+        fMetrics[10] = ctx->currentState.textBaseline == CanvasTextBaseLine::Hanging;
+        fMetrics[11] = ctx->currentState.textBaseline == CanvasTextBaseLine::Ideographic;
     }
 }

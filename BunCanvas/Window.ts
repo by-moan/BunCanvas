@@ -29,6 +29,8 @@ export class Window {
 	
 	#rEvts = new Map();
 	#mMoveEvts = new Map();
+	#mDownEvts = new Map();
+	#mMUpEvts = new Map();
 	#mClickEvts = new Map();
 	#keyDownEvts = new Map();
 	
@@ -74,9 +76,6 @@ export class Window {
 	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
 	
 	constructor(width : number, height : number, title = "App", args : any) {
-		if (windowWasCreated) {
-			console.error("")
-		}
 		windowWasCreated = true;
 		this.#dim[0] = width;
 		this.#dim[1] = height;
@@ -170,6 +169,77 @@ export class Window {
 					)
 					if (this.onmousemove) this.onmousemove(evt)
 						this.#mMoveEvts.forEach((item,key)=>{
+						item.cb(evt);
+					})
+				}
+				if(this.#mMoveViewer[0] != 0) {
+					this.#mMoveViewer[0] = 0				
+					const evt = new MouseEvent("move",
+						{
+							altKey:false,
+							button:0,
+							buttons:this.#mMoveViewer[5],
+							clientX:this.#mMoveViewer[1],
+							clientY:this.#mMoveViewer[2],
+							movementX: this.#mMoveViewer[3],
+							movementY: this.#mMoveViewer[4],
+							ctrlKey:false,
+							metaKey:false,
+							screenX:0,
+							screenY:0,
+							shiftKey:false
+						}
+					)
+					if (this.onmousemove) this.onmousemove(evt)
+						this.#mMoveEvts.forEach((item,key)=>{
+						item.cb(evt);
+					})
+				}
+				if(this.#mDownViewer[0] != 0) {
+					this.#mDownViewer[0] = 0
+					const evt = new MouseEvent("click",
+						{
+							altKey:this.#mDownViewer[7],
+							button:this.#mDownViewer[3],
+							buttons:this.#mDownViewer[4],
+							clientX:this.#mDownViewer[1],
+							clientY:this.#mDownViewer[2],
+							movementX: 0,
+							movementY: 0,
+							ctrlKey:this.#mDownViewer[6],
+							metaKey:this.#mDownViewer[8],
+							screenX:this.#mDownViewer[1],
+							screenY:this.#mDownViewer[2],
+							shiftKey:this.#mDownViewer[5]
+						}
+					)
+					if (this.onmousedown) this.onmousedown(evt);
+
+					this.#mDownEvts.forEach((item,key)=>{
+						item.cb(evt);
+					})
+				}
+				if(this.#mUpViewer[0] != 0) {
+					this.#mUpViewer[0] = 0
+					const evt = new MouseEvent("click",
+						{
+							altKey:this.#mUpViewer[7],
+							button:this.#mUpViewer[3],
+							buttons:this.#mUpViewer[4],
+							clientX:this.#mUpViewer[1],
+							clientY:this.#mUpViewer[2],
+							movementX: 0,
+							movementY: 0,
+							ctrlKey:this.#mUpViewer[6],
+							metaKey:this.#mUpViewer[8],
+							screenX:this.#mUpViewer[1],
+							screenY:this.#mUpViewer[2],
+							shiftKey:this.#mUpViewer[5]
+						}
+					)
+					if (this.onclick) this.onclick(evt);
+
+					this.#mMUpEvts.forEach((item,key)=>{
 						item.cb(evt);
 					})
 				}
@@ -328,6 +398,12 @@ export class Window {
 			this.#evtDetails.set(fn,usedIndex)
 		} else if (name == "mousemove") {
 			this.#mMoveEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "mousedown") {
+			this.#mDownEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "mouseup") {
+			this.#mMUpEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
 		}else if (name == "click") {
 			this.#mClickEvts.set(usedIndex, {name: name, cb: fn})

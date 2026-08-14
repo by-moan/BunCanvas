@@ -88,7 +88,6 @@ private:
         if (iequals(kw, "oblique")) return SkFontStyle::kOblique_Slant;
         return SkFontStyle::kUpright_Slant;
     }
-    
     struct ParsedFont {
         SkFontStyle::Weight weight = SkFontStyle::kNormal_Weight;
         SkFontStyle::Width  width  = SkFontStyle::kNormal_Width;
@@ -97,11 +96,11 @@ private:
         std::string         family;
     };
     
-    float cssSizeToPixels(const std::string& token) {
+    std::optional<float> cssSizeToPixels(const std::string& token) {
         static const std::regex re(R"(^(-?[\d.]+)\s*(px|pt|pc|in|cm|mm|q|em|rem|ex|ch|%|vw|vh|vmin|vmax)?$)", std::regex_constants::icase);
         std::smatch m;
-        if (!std::regex_match(token, m, re))
-            throw std::runtime_error("toPixels: cannot parse \"" + token + "\"");
+        if (!std::regex_match(token, m, re)) return std::nullopt;
+            // throw std::runtime_error("toPixels: cannot parse \"" + token + "\"");
     
         float val = std::stof(m[1].str());
         std::string unit = m[2].str();
@@ -189,7 +188,13 @@ private:
             }
         }
 
-        out.sizePx = cssSizeToPixels(sizeTok);
+        auto pxSize = cssSizeToPixels(sizeTok);
+
+        if (!pxSize) {
+            out.sizePx = 0;
+            return out;
+        }
+        out.sizePx = *pxSize;
 
         // Collect remaining tokens as family
         while (tok.hasMore()) {

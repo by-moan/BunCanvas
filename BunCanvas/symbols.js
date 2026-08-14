@@ -301,6 +301,18 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr"],
 		returns: "void",
 	},
+	canvas_set_text_baseline: {
+		args: ["ptr", "int"],
+		returns: "void",
+	},
+	canvas_set_text_align: {
+		args: ["ptr", "int"],
+		returns: "void",
+	},
+	canvas_measure_text: {
+		args: ["ptr", "cstring", "ptr"],
+		returns: "void",
+	},
 	canvas_destroy: {
 		args: ["ptr"],
 		returns: "void",

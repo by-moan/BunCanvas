@@ -140,6 +140,12 @@ void window_refresh_callback(GLFWwindow* window) {
     glfwSwapBuffers(window);
 }
 
+void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    mWheelViewer[0] = true;
+    mWheelViewer[1] = xoffset;
+    mWheelViewer[2] = yoffset;
+}
+
 typedef int (*JSCallback_WRefresh)(int);
 typedef int (*JSCallback_WClose)();
 
@@ -198,7 +204,7 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window,keyboard_key_callback);
-        
+        glfwSetScrollCallback(window,window_scroll_callback);
         // glfwSetWindowRefreshCallback(window, window_refresh_callback);
         #pragma endregion
         
@@ -258,6 +264,7 @@ extern "C" {
                 sWrapper->surface.reset();
                 cSurface->surface.reset();
                 delete cSurface;
+                renderThreadContext->context->freeGpuResources();
                 cSurface = createSurface(
                     pendingW,
                     pendingH

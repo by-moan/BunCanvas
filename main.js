@@ -3,7 +3,7 @@ import { requestAnimationFrame, Window } from "./BunCanvas/Window";
 import { Image } from "./BunCanvas/Image";
 const WIDTH = 1000;
 const HEIGHT = 600;
-const window = new Window(WIDTH, HEIGHT);
+globalThis.window = new Window(WIDTH, HEIGHT);
 const canvas = new Canvas(WIDTH, HEIGHT);
 const ctx = canvas.getContext("2d");
 
@@ -20,7 +20,7 @@ function loop(){
     ctx.shadowOffsetY = 30
     ctx.shadowColor = "#00f"
     ctx.fillText("the quick brown fox jumps over the lazy dog", 100,100);
-    console.log(ctx.measureText("the quick brown fox jumps over the lazy dog").width)
+    // console.log(ctx.measureText("the quick brown fox jumps over the lazy dog").width)
     ctx.filter = "none"
     requestAnimationFrame(loop)
 }

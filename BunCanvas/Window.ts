@@ -8,6 +8,7 @@ import { FontFace } from "./FontFace.js";
 
 import WindowThread from "./WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
+import { WheelEvent } from "./WheelEvent.js";
 
 let requestedFrames : any[] = []
 
@@ -31,13 +32,196 @@ export class Window {
 	#mMoveEvts = new Map();
 	#mDownEvts = new Map();
 	#mMUpEvts = new Map();
+	#mWheelEvts = new Map();
 	#mClickEvts = new Map();
 	#keyDownEvts = new Map();
+
+	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer()!,0, 3 * 4));
+	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
+	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
+	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
+	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
+	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
+	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
+	
+	#mWheelViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mWheelViewer()!,0, 5 * 8));
 	
 	#evtDetails = new WeakMap();
 	
 	#freeIndex = new Array();
 	#eIndex = 0
+
+	#processEvents(){
+		if (this.#wResizeViewer[0] != 0) {
+			this.#wResizeViewer[0] = 0
+			const details = new Event("resize",this);
+			
+			this.#dim[0] = this.#wResizeViewer[1]
+			this.#dim[1] = this.#wResizeViewer[2]
+			if (this.onresize) this.onresize(details)
+			this.#rEvts.forEach((item,key)=>{
+				item.cb(details);
+			})
+		}
+		if(this.#mMoveViewer[0] != 0) {
+			this.#mMoveViewer[0] = 0				
+			const evt = new MouseEvent("move",
+				{
+					target:this,
+					altKey:false,
+					button:0,
+					buttons:this.#mMoveViewer[5],
+					clientX:this.#mMoveViewer[1],
+					clientY:this.#mMoveViewer[2],
+					movementX: this.#mMoveViewer[3],
+					movementY: this.#mMoveViewer[4],
+					ctrlKey:false,
+					metaKey:false,
+					screenX:0,
+					screenY:0,
+					shiftKey:false
+				}
+			)
+			if (this.onmousemove) this.onmousemove(evt)
+				this.#mMoveEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#mMoveViewer[0] != 0) {
+			this.#mMoveViewer[0] = 0				
+			const evt = new MouseEvent("move",
+				{
+					target:this,
+					altKey:false,
+					button:0,
+					buttons:this.#mMoveViewer[5],
+					clientX:this.#mMoveViewer[1],
+					clientY:this.#mMoveViewer[2],
+					movementX: this.#mMoveViewer[3],
+					movementY: this.#mMoveViewer[4],
+					ctrlKey:false,
+					metaKey:false,
+					screenX:0,
+					screenY:0,
+					shiftKey:false
+				}
+			)
+			if (this.onmousemove) this.onmousemove(evt)
+				this.#mMoveEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#mDownViewer[0] != 0) {
+			this.#mDownViewer[0] = 0
+			const evt = new MouseEvent("click",
+				{
+					target:this,
+					altKey:this.#mDownViewer[7],
+					button:this.#mDownViewer[3],
+					buttons:this.#mDownViewer[4],
+					clientX:this.#mDownViewer[1],
+					clientY:this.#mDownViewer[2],
+					movementX: 0,
+					movementY: 0,
+					ctrlKey:this.#mDownViewer[6],
+					metaKey:this.#mDownViewer[8],
+					screenX:this.#mDownViewer[1],
+					screenY:this.#mDownViewer[2],
+					shiftKey:this.#mDownViewer[5]
+				}
+			)
+			if (this.onmousedown) this.onmousedown(evt);
+
+			this.#mDownEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#mUpViewer[0] != 0) {
+			this.#mUpViewer[0] = 0
+			const evt = new MouseEvent("click",
+				{
+					target:this,
+					altKey:this.#mUpViewer[7],
+					button:this.#mUpViewer[3],
+					buttons:this.#mUpViewer[4],
+					clientX:this.#mUpViewer[1],
+					clientY:this.#mUpViewer[2],
+					movementX: 0,
+					movementY: 0,
+					ctrlKey:this.#mUpViewer[6],
+					metaKey:this.#mUpViewer[8],
+					screenX:this.#mUpViewer[1],
+					screenY:this.#mUpViewer[2],
+					shiftKey:this.#mUpViewer[5]
+				}
+			)
+			if (this.onmouseup) this.onmouseup(evt);
+
+			this.#mMUpEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#mClickViewer[0] != 0) {
+			this.#mClickViewer[0] = 0
+			const evt = new MouseEvent("click",
+				{
+					target:this,
+					altKey:this.#mClickViewer[7],
+					button:this.#mClickViewer[3],
+					buttons:this.#mClickViewer[4],
+					clientX:this.#mClickViewer[1],
+					clientY:this.#mClickViewer[2],
+					movementX: 0,
+					movementY: 0,
+					ctrlKey:this.#mClickViewer[6],
+					metaKey:this.#mClickViewer[8],
+					screenX:this.#mClickViewer[1],
+					screenY:this.#mClickViewer[2],
+					shiftKey:this.#mClickViewer[5]
+				}
+			)
+			if (this.onclick) this.onclick(evt)
+				this.#mClickEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+
+		if(this.#mWheelViewer[0] != 0) {
+			this.#mWheelViewer[0] = 0
+			const evt = new WheelEvent("click",
+				{
+					target:this,
+					altKey:this.#mMoveViewer[7],
+					button:this.#mWheelViewer[3],
+					buttons:this.#mWheelViewer[4],
+					clientX:this.#mMoveViewer[3],
+					clientY:this.#mMoveViewer[4],
+					deltaX: -this.#mWheelViewer[1]*120,
+					deltaY: -this.#mWheelViewer[2]*120,
+					movementX: 0,
+					movementY: 0,
+					ctrlKey:this.#mMoveViewer[6],
+					metaKey:this.#mMoveViewer[8],
+					screenX:this.#mMoveViewer[3],
+					screenY:this.#mMoveViewer[4],
+					shiftKey:this.#mMoveViewer[5]
+				}
+			)
+			if (this.onwheel) this.onwheel(evt)
+
+			this.#mWheelEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#kDownViewer[0] != 0) {
+			this.#kDownViewer[0] = 0;
+			const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
+			if (this.onkeydown) this.onkeydown(evt)
+				this.#keyDownEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+	}
 
 	maxFramerate = 0
 
@@ -57,24 +241,21 @@ export class Window {
 	
 	onresize : ((this: Window, evt: Event) => any) | null = null;
 	onmousemove : ((evt: MouseEvent) => any) | null = null;
+	onmousedown : ((evt: MouseEvent) => any) | null = null;
+	onmouseup : ((evt: MouseEvent) => any) | null = null;
 	onclick : ((evt: MouseEvent) => any) | null = null;
 	onkeydown : ((evt: KeyboardEvent) => any) | null = null;
 	
+	onwheel : ((evt: MouseEvent) => any) | null = null;
+
+
 	get innerWidth(){
 		return this.#dim[0]
 	}
 	get innerHeight(){
 		return this.#dim[1]
 	}
-	
-	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer()!,0, 3 * 4));
-	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
-	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
-	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
-	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
-	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
-	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
-	
+
 	constructor(width : number, height : number, title = "App", args : any) {
 		windowWasCreated = true;
 		this.#dim[0] = width;
@@ -137,147 +318,10 @@ export class Window {
 				
 				
 				// lib.symbols.update_window();
-				
-				if (this.#wResizeViewer[0] != 0) {
-					this.#wResizeViewer[0] = 0
-					const details = new Event("resize",this);
-					
-					this.#dim[0] = this.#wResizeViewer[1]
-					this.#dim[1] = this.#wResizeViewer[2]
-					if (this.onresize) this.onresize(details)
-					this.#rEvts.forEach((item,key)=>{
-						item.cb(details);
-					})
-				}
-				if(this.#mMoveViewer[0] != 0) {
-					this.#mMoveViewer[0] = 0				
-					const evt = new MouseEvent("move",
-						{
-							altKey:false,
-							button:0,
-							buttons:this.#mMoveViewer[5],
-							clientX:this.#mMoveViewer[1],
-							clientY:this.#mMoveViewer[2],
-							movementX: this.#mMoveViewer[3],
-							movementY: this.#mMoveViewer[4],
-							ctrlKey:false,
-							metaKey:false,
-							screenX:0,
-							screenY:0,
-							shiftKey:false
-						}
-					)
-					if (this.onmousemove) this.onmousemove(evt)
-						this.#mMoveEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#mMoveViewer[0] != 0) {
-					this.#mMoveViewer[0] = 0				
-					const evt = new MouseEvent("move",
-						{
-							altKey:false,
-							button:0,
-							buttons:this.#mMoveViewer[5],
-							clientX:this.#mMoveViewer[1],
-							clientY:this.#mMoveViewer[2],
-							movementX: this.#mMoveViewer[3],
-							movementY: this.#mMoveViewer[4],
-							ctrlKey:false,
-							metaKey:false,
-							screenX:0,
-							screenY:0,
-							shiftKey:false
-						}
-					)
-					if (this.onmousemove) this.onmousemove(evt)
-						this.#mMoveEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#mDownViewer[0] != 0) {
-					this.#mDownViewer[0] = 0
-					const evt = new MouseEvent("click",
-						{
-							altKey:this.#mDownViewer[7],
-							button:this.#mDownViewer[3],
-							buttons:this.#mDownViewer[4],
-							clientX:this.#mDownViewer[1],
-							clientY:this.#mDownViewer[2],
-							movementX: 0,
-							movementY: 0,
-							ctrlKey:this.#mDownViewer[6],
-							metaKey:this.#mDownViewer[8],
-							screenX:this.#mDownViewer[1],
-							screenY:this.#mDownViewer[2],
-							shiftKey:this.#mDownViewer[5]
-						}
-					)
-					if (this.onmousedown) this.onmousedown(evt);
-
-					this.#mDownEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#mUpViewer[0] != 0) {
-					this.#mUpViewer[0] = 0
-					const evt = new MouseEvent("click",
-						{
-							altKey:this.#mUpViewer[7],
-							button:this.#mUpViewer[3],
-							buttons:this.#mUpViewer[4],
-							clientX:this.#mUpViewer[1],
-							clientY:this.#mUpViewer[2],
-							movementX: 0,
-							movementY: 0,
-							ctrlKey:this.#mUpViewer[6],
-							metaKey:this.#mUpViewer[8],
-							screenX:this.#mUpViewer[1],
-							screenY:this.#mUpViewer[2],
-							shiftKey:this.#mUpViewer[5]
-						}
-					)
-					if (this.onclick) this.onclick(evt);
-
-					this.#mMUpEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#mClickViewer[0] != 0) {
-					this.#mClickViewer[0] = 0
-					const evt = new MouseEvent("click",
-						{
-							altKey:this.#mClickViewer[7],
-							button:this.#mClickViewer[3],
-							buttons:this.#mClickViewer[4],
-							clientX:this.#mClickViewer[1],
-							clientY:this.#mClickViewer[2],
-							movementX: 0,
-							movementY: 0,
-							ctrlKey:this.#mClickViewer[6],
-							metaKey:this.#mClickViewer[8],
-							screenX:this.#mClickViewer[1],
-							screenY:this.#mClickViewer[2],
-							shiftKey:this.#mClickViewer[5]
-						}
-					)
-					if (this.onclick) this.onclick(evt)
-						this.#mClickEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#kDownViewer[0] != 0) {
-					this.#kDownViewer[0] = 0;
-					const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
-					if (this.onkeydown) this.onkeydown(evt)
-						this.#keyDownEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				
+				this.#processEvents()
 				
 			}
-		} else {
+		} else /* MACOS JS LOOP */ {
 			let sleeping = false;
 			let cb = new JSCallback(async ()=>{
 				if (sleeping) return;
@@ -404,6 +448,9 @@ export class Window {
 			this.#evtDetails.set(fn,usedIndex)
 		}else if (name == "mouseup") {
 			this.#mMUpEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "wheel") {
+			this.#mWheelEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
 		}else if (name == "click") {
 			this.#mClickEvts.set(usedIndex, {name: name, cb: fn})

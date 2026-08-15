@@ -64,6 +64,10 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
+	get_mWheelViewer:{
+		args: [],
+		returns: "ptr",
+	},
 	signal_frame_ready:{
 		args: [],
 		returns: "void",

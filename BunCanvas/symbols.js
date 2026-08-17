@@ -172,16 +172,36 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "float", "float","float","float","float","float"],
 		returns: "void",
 	},
+	canvas_path_quad_to: {
+		args: ["ptr", "float", "float","float","float"],
+		returns: "void",
+	},
+	canvas_path_ellipse: {
+		args: ["ptr", "float", "float","float","float","float","float","float","bool"],
+		returns: "void",
+	},
 	canvas_path_fill: {
-		args: ["ptr"],
+		args: ["ptr", "ptr"],
 		returns: "void",
 	},
 	canvas_path_stroke: {
-		args: ["ptr"],
+		args: ["ptr", "ptr"],
 		returns: "void",
 	},
 	canvas_path_close: {
 		args: ["ptr"],
+		returns: "void",
+	},
+	canvas_path_rect: {
+		args: ["ptr", "float", "float", "float", "float"],
+		returns: "void",
+	},
+	canvas_path_roundrect: {
+		args: ["ptr", "float", "float", "float", "float", "float"],
+		returns: "void",
+	},
+	canvas_path_roundrect_array: {
+		args: ["ptr", "float", "float", "float", "float", "ptr", "int"],
 		returns: "void",
 	},
 	canvas_set_composite_operation: {
@@ -289,6 +309,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "ptr"],
 		returns: "void",
 	},
+	canvas_reset_transform: {
+		args: ["ptr"],
+		returns: "void",
+	},
 	canvas_set_filter: {
 		args: ["ptr", "cstring"],
 		returns: "bool",
@@ -358,6 +382,65 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr"],
 		returns: "void",
 	},
+
+	path2d_create : {
+		args: [],
+		returns: "ptr",
+	},
+	path2d_create_from_copy : {
+		args: ["ptr"],
+		returns: "ptr",
+	},
+	path2d_destroy : {
+		args: ["ptr"],
+		returns: "void",
+	},
+
+	path2d_move_to: {
+		args: ["ptr", "int", "int"],
+		returns: "void",
+	},
+	path2d_line_to: {
+		args: ["ptr", "int", "int"],
+		returns: "void",
+	},
+	path2d_arc: {
+		args: ["ptr", "float", "float","float","float","float"],
+		returns: "void",
+	},
+	path2d_arc_to: {
+		args: ["ptr", "float", "float","float","float","float"],
+		returns: "void",
+	},
+	path2d_bezier_to: {
+		args: ["ptr", "float", "float","float","float","float","float"],
+		returns: "void",
+	},
+	path2d_quad_to: {
+		args: ["ptr", "float", "float","float","float"],
+		returns: "void",
+	},
+	path2d_ellipse: {
+		args: ["ptr", "float", "float","float","float","float","float","float","bool"],
+		returns: "void",
+	},
+	path2d_close: {
+		args: ["ptr"],
+		returns: "void",
+	},
+	path2d_rect: {
+		args: ["ptr", "float", "float", "float", "float"],
+		returns: "void",
+	},
+	path2d_roundrect: {
+		args: ["ptr", "float", "float", "float", "float", "float"],
+		returns: "void",
+	},
+	path2d_roundrect_array: {
+		args: ["ptr", "float", "float", "float", "float", "ptr", "int"],
+		returns: "void",
+	},
+
 	// font_create_from_face: {
 	// 	args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
 	// 	returns: "ptr",

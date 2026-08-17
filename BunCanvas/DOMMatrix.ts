@@ -8,7 +8,7 @@ function isMatrixArray(
         (ArrayBuffer.isView(value) && !(value instanceof DataView));
 }
 
-function multipliedMatrices(a : Float64Array, b : Float64Array) {
+export function multipliedMatrices(a : Float64Array | Float32Array, b : Float64Array | Float32Array) {
         // returns a * b
     const out = new Float64Array(16);
     out[0]  = a[0]*b[0]  + a[1]*b[4]  + a[2]*b[8]  + a[3]*b[12];

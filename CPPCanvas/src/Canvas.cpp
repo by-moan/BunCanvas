@@ -97,7 +97,7 @@ typedef int (*JSCallback_CReset)();
 
 class Rendering2DState {
     public:
-    SkPathBuilder pathBuilder;
+    Path2D path;
     CanvasTextBaseLine textBaseline = CanvasTextBaseLine::Alphabetic;
     CanvasTextAlignment textAlign = CanvasTextAlignment::Left;
     SkPaint fillColor;
@@ -120,7 +120,7 @@ class Rendering2DState {
     float globalAlpha = 1.f;
 
     Rendering2DState() {
-        pathBuilder.reset();
+        path.reset();
         fillColor.setBlendMode(SkBlendMode::kSrcOver);
         fillColor.setColor(SK_ColorBLACK);
         fillColor.setStyle(SkPaint::kFill_Style);
@@ -817,15 +817,15 @@ extern "C" {
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
         
-        // SkPaint fColor = obj->currentState.fillColor;
-        // fColor.setAlphaf(obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha);
-        // if(obj->currentState.shadowBlurAmount > 0.5f) {
-        //     SkPaint shColor = obj->currentState.shadowBlurColor;
-        //     auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
-        //     shColor.setAlphaf(_af);
-        //     (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-        // }
-        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->currentState.fillColor);
+        SkPaint fColor = obj->currentState.fillColor;
+        fColor.setAlphaf(obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha);
+        if(obj->currentState.shadowBlurAmount > 0.01f) {
+            SkPaint shColor = obj->currentState.shadowBlurColor;
+            auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
+            shColor.setAlphaf(_af);
+            (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
+        }
+        (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), fColor);
     }
     
     WINDOWS_EXPORT void canvas_stroke_rect(void* canvasObj, int x, int y, int w, int h) {
@@ -888,7 +888,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.reset();
+        obj->currentState.path.reset();
     }
     
     WINDOWS_EXPORT void canvas_path_move_to(void* canvasObj, int x, int y) {
@@ -900,7 +900,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.moveTo(x,y);
+        obj->currentState.path.moveTo(x,y);
     }
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
@@ -911,7 +911,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.lineTo(x,y);
+        obj->currentState.path.lineTo(x,y);
     }
     
     WINDOWS_EXPORT void canvas_path_arc(void* canvasObj, float x1, float y1, float radius, float startAngle, float sweepangle) {
@@ -923,7 +923,28 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.addArc(SkRect::MakeXYWH(x1 - radius,y1 - radius,radius * 2,radius * 2), startAngle*57.29577958f, sweepangle*57.29577958f);
+        obj->currentState.path.arc(x1,y1,radius,startAngle,sweepangle);
+    }
+
+    WINDOWS_EXPORT void canvas_path_ellipse(
+        void* canvasObj,
+        float x,
+        float y,
+        float radiusX,
+        float radiusY,
+        float rotation,
+        float startAngle,
+        float endAngle,
+        bool counterclockwise
+    )   {
+        if (radiusX < 0 || radiusY < 0) {
+            return;
+        }
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) return;
+
+        obj->currentState.path.ellipse(x,y,radiusX,radiusY,rotation,startAngle,endAngle,counterclockwise);
     }
     
     WINDOWS_EXPORT void canvas_path_arc_to(void* canvasObj, float x1, float y1, float x2, float y2, float radius) {
@@ -935,7 +956,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.arcTo({x1,y1},{x2,y2},radius);
+        obj->currentState.path.arcTo(x1,y1,x2,y2,radius);
     }
     
     WINDOWS_EXPORT void canvas_path_bezier_to(void* canvasObj, float x1, float y1, float x2, float y2, float x3, float y3) {
@@ -947,11 +968,23 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.cubicTo(x1,y1,x2,y2,x3,y3);
+        obj->currentState.path.bezierTo(x1,y1,x2,y2,x3,y3);
     }
-    WINDOWS_EXPORT void canvas_path_fill(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_path_quad_to(void* canvasObj, float x1, float y1, float x2, float y2) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        obj->currentState.path.quadraticCurveTo(x1,y1,x2,y2);
+    }
+    WINDOWS_EXPORT void canvas_path_fill(void* canvasObj, void* path2d) {
+        if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        Path2D* path = validated<Path2D>(path2d);
         
         if (obj == nullptr) {
             return;
@@ -961,14 +994,21 @@ extern "C" {
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
         
+        SkPath finalPath = path?(*path)():obj->currentState.path();
         SkPaint fColor = obj->currentState.fillColor;
-        auto alphaf = obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha;
-        fColor.setAlphaf(alphaf);
-        (*obj)()->drawPath(obj->currentState.pathBuilder.snapshot(), fColor);
+        fColor.setAlphaf(obj->currentState.fillColor.getAlphaf()*obj->currentState.globalAlpha);
+        if(obj->currentState.shadowBlurColor.getAlpha() > 0) {
+            SkPaint shColor = obj->currentState.shadowBlurColor;
+            auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
+            shColor.setAlphaf(_af);
+            (*obj)()->drawPath(finalPath, shColor);
+        }
+        (*obj)()->drawPath(finalPath, fColor);
     }
-    WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj) {
+    WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        Path2D* path = validated<Path2D>(path2d);
         
         if (obj == nullptr) {
             return;
@@ -977,12 +1017,12 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        
+
+        SkPath finalPath = path?(*path)():obj->currentState.path();
         SkPaint sColor = obj->currentState.strokeColor;
         auto alphaf = obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha;
         sColor.setAlphaf(alphaf);
-        sColor.setAntiAlias(false);
-        if(obj->currentState.shadowBlurAmount > 0.5f) {
+        if(obj->currentState.shadowBlurColor.getAlpha() > 0) {
             SkPaint shColor = obj->currentState.shadowBlurColor;
             // shColor.setStyle(SkPaint::Style::kFill_Style);
             auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
@@ -994,11 +1034,11 @@ extern "C" {
                 SkImageInfo::MakeN32Premul(w,h)
             );
             // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
-            sfc->getCanvas()->drawPath(obj->currentState.pathBuilder.snapshot(), sColor);
+            sfc->getCanvas()->drawPath(finalPath, sColor);
             (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
             // for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
         }
-        (*obj)()->drawPath(obj->currentState.pathBuilder.snapshot(), sColor);
+        (*obj)()->drawPath(finalPath, sColor);
     }
 
     WINDOWS_EXPORT void canvas_path_clip(void* canvasObj) {
@@ -1012,7 +1052,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        (*obj)()->clipPath(obj->currentState.pathBuilder.snapshot());
+        (*obj)()->clipPath(obj->currentState.path());
     }
     
     WINDOWS_EXPORT void canvas_path_close(void* canvasObj) {
@@ -1024,7 +1064,38 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        obj->currentState.pathBuilder.close();
+        obj->currentState.path.close();
+    }
+
+    WINDOWS_EXPORT void canvas_path_rect(void* canvasObj, float x, float y, float w, float h) {
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        obj->currentState.path.rect(x,y,w,h);
+    }
+    WINDOWS_EXPORT void canvas_path_roundrect(void* canvasObj, float x, float y, float w, float h, float radii) {
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        obj->currentState.path.roundRect(x,y,w,h,radii);
+    }
+    WINDOWS_EXPORT void canvas_path_roundrect_array(void* canvasObj, float x, float y, float w, float h, float* radii, int len) {
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        
+        if (obj == nullptr) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        );
+        obj->currentState.path.roundRect_array(x,y,w,h,radii,len);
     }
     
     WINDOWS_EXPORT void canvas_draw_image_imageType(void* canvasObj, void* image, float x,float y,float w,float h) {
@@ -1407,7 +1478,7 @@ extern "C" {
             (*ctx)()->save();
             (*ctx)()->translate(x, y);
             (*ctx)()->scale(scale, 1.0f);
-            if(ctx->currentState.shadowBlurAmount > 0.5f) {
+            if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
                 SkPaint shColor = ctx->currentState.shadowBlurColor;
                 auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
                 shColor.setAlphaf(_af);
@@ -1441,7 +1512,7 @@ extern "C" {
             (*ctx)()->save();
             (*ctx)()->translate(x, y);
             (*ctx)()->scale(scale, 1.0f);
-            if(ctx->currentState.shadowBlurAmount > 0.5f) {
+            if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
                 SkPaint shColor = ctx->currentState.shadowBlurColor;
                 auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
                 shColor.setAlphaf(_af);
@@ -1639,6 +1710,7 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
+        (*ctx)()->resetMatrix();
         (*ctx)()->setMatrix(SkM44{
             (float)mtx[0],  (float)mtx[1],  (float)mtx[2],  (float)mtx[3],
             (float)mtx[4],  (float)mtx[5],  (float)mtx[6],  (float)mtx[7],
@@ -1647,6 +1719,15 @@ extern "C" {
         });
 
         // SkImageFilters::Compose
+    }
+    WINDOWS_EXPORT void canvas_reset_transform(void* ctxPtr){
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+        (*ctx)()->resetMatrix();
     }
     WINDOWS_EXPORT bool canvas_set_filter(void* ctxPtr, const char* fltr){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);

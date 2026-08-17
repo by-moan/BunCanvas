@@ -312,5 +312,6 @@ targetPtr* validated(void* ptr){
 // #include "src/CssFontParser.cpp"
 #include "src/Font.cpp"
 #include "src/Image.cpp"
+#include "src/Path2D.cpp"
 #include "src/Canvas.cpp"
 #include "src/Window.cpp"

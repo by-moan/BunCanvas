@@ -640,8 +640,8 @@ private:
     static sk_sp<SkImageFilter> createDropShadowFilter(const DropShadowParams& params,
                                                         sk_sp<SkImageFilter> input,
                                                         const SkRect* cropRect) {
-        SkScalar sigmaX = params.blurRadius / 2;
-        SkScalar sigmaY = params.blurRadius / 2;
+        SkScalar sigmaX = params.blurRadius *1.25f;
+        SkScalar sigmaY = params.blurRadius *1.25f;
         
         // DropShadow draws the shadow *behind* the content using the input as mask
         // The input content is preserved and drawn on top

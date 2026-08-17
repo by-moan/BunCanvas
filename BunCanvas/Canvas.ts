@@ -3,8 +3,9 @@ import { lib,encoder, dlPath, encodeCString } from "./symbols.js";
 import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
-import { DOMMatrix } from "./DOMMatrix.js";
+import { DOMMatrix, multipliedMatrices } from "./DOMMatrix.js";
 import { TextMetrics } from "./TextMetrics.js";
+import { Path2D } from "./Path2D.js";
 
 const ptrs = new WeakMap();
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
@@ -217,20 +218,40 @@ class CanvasRenderingContext2D {
 	arc(x : number, y : number, radius : number, startAngle : number, endAngle : number){
 		lib.symbols.canvas_path_arc(ptrs.get(this),x, y, radius, startAngle, endAngle)
 	}
+	ellipse(x : number, y : number, radiusX : number, radiusY : number, rotation : number, startAngle : number, endAngle : number, counterclockwise : boolean = false){
+		lib.symbols.canvas_path_ellipse(ptrs.get(this),x, y, radiusX, radiusY, rotation, startAngle, endAngle, counterclockwise)
+	}
 	arcTo(x1 : number, y1 : number, x2 : number, y2 : number, radius : number){
 		lib.symbols.canvas_path_arc_to(ptrs.get(this),x1, y1, x2, y2, radius)
 	}
 	bezierCurveTo(cp1x : number, cp1y : number, cp2x : number, cp2y : number, x : number, y : number){
 		lib.symbols.canvas_path_bezier_to(ptrs.get(this),cp1x, cp1y, cp2x, cp2y, x, y)
 	}
+	quadraticCurveTo(cpx : number, cpy : number, x : number, y : number){
+		lib.symbols.canvas_path_quad_to(ptrs.get(this),cpx,cpy, x, y)
+	}
 	closePath(){
 		lib.symbols.canvas_path_close(ptrs.get(this))
 	}
-	fill(){
-		lib.symbols.canvas_path_fill(ptrs.get(this))
+	rect(x : number, y : number, width : number, height : number){
+		lib.symbols.canvas_path_rect(ptrs.get(this),x,y,width,height)
 	}
-	stroke(){
-		lib.symbols.canvas_path_stroke(ptrs.get(this))
+	roundRect(x : number, y : number, width : number, height : number, radii: any){
+		if (radii.constructor.name.toLowerCase().includes("array")){
+			const arr = new Float32Array(radii);
+			if(arr.some(Number.isNaN)) return;
+			const len =arr.length;
+			lib.symbols.canvas_path_roundrect_array(ptrs.get(this),x,y,width,height,ptr(arr), len)
+			return;
+		}else {
+			lib.symbols.canvas_path_roundrect(ptrs.get(this),x,y,width,height,radii)
+		}
+	}
+	fill(path : Path2D | undefined){
+		lib.symbols.canvas_path_fill(ptrs.get(this), path?path.ptr:undefined)
+	}
+	stroke(path : Path2D | undefined){
+		lib.symbols.canvas_path_stroke(ptrs.get(this), path?path.ptr:undefined)
 	}
 	set shadowBlur(blur : number){
 		lib.symbols.canvas_set_shadow_blur(ptrs.get(this),blur)
@@ -340,6 +361,17 @@ class CanvasRenderingContext2D {
 			lib.symbols.canvas_set_transform(ptrs.get(this),mtx.ptr)
 		}
 		if (args.length == 16) lib.symbols.canvas_set_transform(ptrs.get(this),new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5],args[5],args[6],args[7],args[8],args[9],args[10],args[11],args[12],args[13],args[14],args[15]]).ptr)
+	}
+
+	transform(a : number, b : number, c : number, d : number, e : number, f : number){
+		const tf = this.getTransform();
+		const mul = new DOMMatrix([a,b,c,d,e,f]);
+		tf.multiplySelf(mul)
+		this.setTransform(tf)
+	}
+
+	resetTransform() : void {
+		lib.symbols.canvas_reset_transform(ptrs.get(this))
 	}
 
 	setLineDash(lines : number[]){

@@ -254,6 +254,8 @@ extern "C" {
             glfwGetFramebufferSize(window, &width, &height);
             
             glfwPollEvents();
+                canvas->clear(SK_ColorTRANSPARENT);
+
             if (pendingResize == true){
                 pendingResize = false;
                 glViewport(0, 0, pendingW, pendingH);
@@ -271,13 +273,13 @@ extern "C" {
                 );
                 sWrapper->surface = cSurface->surface;
                 canvas = sWrapper->surface->getCanvas();
-                canvas->drawImage(tmp,0,0);
+                auto tw = tmp->width();
+                auto th = tmp->height();
+                canvas->drawImageRect(tmp, SkRect::MakeXYWH(0,0,tw,th), SkFilterMode::kLinear);
                 tmp.reset();
                 wResizeViewer[0] = true;
                 wResizeViewer[1] = pendingW;
                 wResizeViewer[2] = pendingH;
-            }else {
-                canvas->clear(SK_ColorTRANSPARENT);
             }
 
             for (auto element : canvases) {

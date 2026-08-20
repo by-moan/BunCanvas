@@ -149,6 +149,7 @@ class Rendering2DState {
         //     nullptr,                      // input (no input filter)
         //     nullptr                       // cropRect (optional, can omit)
         // );
+        shadowBlurColor.setColor4f({0,0,0,0});
         shadowBlurColor.setImageFilter(shadowBlurFilter);
 
         samplingQuality = 1;
@@ -302,6 +303,22 @@ class BunCanvasRenderingContext2D {
     }
     
     //Mimicking the behavior of values reset when resizing a canvas object.
+    void reset(sk_sp<SkSurface> surface, SkImage* tmpImage) {
+        // std::lock_guard<std::mutex> lock(draw_mutex);
+        // ctx = surface->getCanvas();
+        sfc = surface;
+        sfc->getCanvas()->resetMatrix();
+        currentState = Rendering2DState{};
+        savedState = Rendering2DState{};
+        
+        jsResetCanvas();
+        
+        // sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+
+        
+        font_cache.setFont("10px sans-serif",currentState.font_current);
+
+    }
     void reset(sk_sp<SkSurface> surface, sk_sp<SkImage> tmpImage) {
         // std::lock_guard<std::mutex> lock(draw_mutex);
         // ctx = surface->getCanvas();
@@ -311,12 +328,12 @@ class BunCanvasRenderingContext2D {
         savedState = Rendering2DState{};
         
         
-        sfc->getCanvas()->drawImage(tmpImage,0.f,0.f);
+        sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+        jsResetCanvas();
 
         
         font_cache.setFont("10px sans-serif",currentState.font_current);
 
-        jsResetCanvas();
     }
     
     SkCanvas* operator()() {
@@ -426,7 +443,7 @@ class BunCanvas {
     }
     
     void resize(int w, int h) {
-        if (rendering2D == nullptr) return;
+        if (!rendering2D) return;
         // processRetiredTextures();
         #ifndef __APPLE__
         // Flush main thread GPU commands and wait for completion
@@ -450,14 +467,23 @@ class BunCanvas {
         }
         #else
         if (gpuContextReady) {
-            tmp = SkImages::BorrowTextureFrom(
+            auto borrow = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
                 backendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
                 nullptr
-            )->makeRasterImage();
+            );
+            if (borrow) tmp = borrow->makeRasterImage();
+            // tmp = SkImages::BorrowTextureFrom(
+            //     mainThreadCtx->context.get(),
+            //     backendTex,
+            //     kTopLeft_GrSurfaceOrigin,
+            //     kN32_SkColorType,
+            //     kPremul_SkAlphaType,
+            //     nullptr
+            // );
             backendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
@@ -496,7 +522,7 @@ class BunCanvas {
         }
         #endif
         
-        if (ctxType == CanvasContextType::Rendering2D) rendering2D->reset(surface, tmp);
+        if (ctxType == CanvasContextType::Rendering2D) rendering2D->reset(surface, tmp.release());
     }
 };
 
@@ -1007,40 +1033,44 @@ extern "C" {
     }
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
-        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+
+        BunCanvasRenderingContext2D* obj =
+            validated<BunCanvasRenderingContext2D>(canvasObj);
+
         Path2D* path = validated<Path2D>(path2d);
-        
-        if (obj == nullptr) {
-            return;
-        };
+
+        if (!obj) return;
+
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized)
+                lock.emplace(obj->owner->mutex);
         );
 
-        SkPath finalPath = path?(*path)():obj->currentState.path();
-        SkPaint sColor = obj->currentState.strokeColor;
-        auto alphaf = obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha;
-        sColor.setAlphaf(alphaf);
-        if(obj->currentState.shadowBlurColor.getAlpha() > 0) {
-            SkPaint shColor = obj->currentState.shadowBlurColor;
-            // shColor.setStyle(SkPaint::Style::kFill_Style);
-            auto _af = shColor.getAlphaf()*obj->currentState.globalAlpha;
-            shColor.setAlphaf(_af);
-            // for (int i = 0 ; i < 10 ; i++) (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), shColor);
-            int w = obj->owner->surface->width();
-            int h = obj->owner->surface->height();
-            sk_sp<SkSurface> sfc = SkSurfaces::Raster(
-                SkImageInfo::MakeN32Premul(w,h)
-            );
-            // sfc->getCanvas()->drawRect(SkRect::MakeXYWH(0,0,w,h),obj->strokeColor);
-            sfc->getCanvas()->drawPath(finalPath, sColor);
-            (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
-            // for (int i = 0 ; i < 2 ; i++) (*obj)()->drawImageRect(sfc->makeTemporaryImage(),SkRect::MakeXYWH(0,0,w,h), obj->currentState.sampling, &shColor);
-        }
-        (*obj)()->drawPath(finalPath, sColor);
-    }
+        SkPath finalPath =
+            path ? (*path)() : obj->currentState.path();
 
+
+        if (obj->currentState.shadowBlurColor.getAlpha() > 0) {
+
+            SkPaint shadowPaint = obj->currentState.shadowBlurColor;
+
+            float alpha =
+                obj->currentState.shadowBlurColor.getAlphaf() *
+                obj->currentState.globalAlpha;
+
+            (*obj)()->drawPath(finalPath, shadowPaint);
+        }
+
+        SkPaint strokePaint = obj->currentState.strokeColor;
+
+        strokePaint.setAlphaf(
+            obj->currentState.strokeColor.getAlphaf() *
+            obj->currentState.globalAlpha
+        );
+
+        (*obj)()->drawPath(finalPath, strokePaint);
+    }
     WINDOWS_EXPORT void canvas_path_clip(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1482,12 +1512,12 @@ extern "C" {
                 SkPaint shColor = ctx->currentState.shadowBlurColor;
                 auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
                 shColor.setAlphaf(_af);
-                (*ctx)()->drawString(txt, x+ctx->currentState.shadowBlurOffsetX, y+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
+                (*ctx)()->drawString(txt, finalX+ctx->currentState.shadowBlurOffsetX, finalY+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
             }
-            (*ctx)()->drawString(txt, x, y, ctx->currentState.font_current, fColor);
+            (*ctx)()->drawString(txt, finalX, finalY, ctx->currentState.font_current, fColor);
             (*ctx)()->restore();
         } else {
-            (*ctx)()->drawString(txt, x, y, ctx->currentState.font_current, fColor);
+            (*ctx)()->drawString(txt, finalX, finalY, ctx->currentState.font_current, fColor);
         }
 
         // (*ctx)()->drawString(txt, finalX, finalY, ctx->currentState.font_current, fColor);
@@ -1535,7 +1565,7 @@ extern "C" {
         ctx->currentState.shadowBlurAmount = std::max(b,0.f);
         
         if (ctx->currentState.shadowBlurAmount > 0.2f){
-            ctx->currentState.shadowBlurFilter = SkImageFilters::DropShadow(
+            ctx->currentState.shadowBlurFilter = SkImageFilters::DropShadowOnly(
                 ctx->currentState.shadowBlurOffsetX,           // dx
                 ctx->currentState.shadowBlurOffsetY,           // dy
                 ctx->currentState.shadowBlurAmount * 0.5f, // sigmaX

@@ -24,7 +24,7 @@ $ git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /op
 
 The following packages are needed in your system to build skia. Install them using your package manager
 ```
-gn ninja
+gn ninja make clang make
 ```
 
 Inside CPPCanvas/Thirdparty run the following:
@@ -38,7 +38,7 @@ $ ninja -C out/Release
 ```
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
 
-**NOTE: The `./build.sh` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\Release\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
+**NOTE: `make run` and `make build` expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\Release\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
 
 <br>
 <br>
@@ -54,7 +54,7 @@ $ git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /op
 
 The following packages are needed in your system to build skia. Install them using brew
 ```
-libpng glfw
+libpng glfw make
 ```
 Inside CPPCanvas/Thirdparty run the following:
 
@@ -82,7 +82,7 @@ $ ninja -C "out/$(uname -o)_$(uname -m)"
 
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
 
-**NOTE: The `./build.sh` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\[OS]_[ARCH]\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
+**NOTE: `make run` and `make build` expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\[OS]_[ARCH]\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
 
 <br>
 <br>
@@ -132,7 +132,7 @@ gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args='is_official_build=true targe
 ninja -C out/Release
 ```
 
-**NOTE: The `.\build.bat` script expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\windows_[ARCHITECTURE_VARIABLE]\skia.lib`, by following the steps accordingly you will get the dev environment ready to go**
+**NOTE: `make run` and `make build` expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\windows_[ARCHITECTURE_VARIABLE]\skia.lib`, by following the steps accordingly you will get the dev environment ready to go**
 
 
 ## License & Third-Party Components

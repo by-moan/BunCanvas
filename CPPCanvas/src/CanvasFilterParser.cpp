@@ -647,7 +647,7 @@ private:
         // The input content is preserved and drawn on top
         if (cropRect) {
             SkImageFilters::CropRect c(*cropRect);
-            return SkImageFilters::DropShadow(
+            return SkImageFilters::DropShadowOnly(
                 params.dx, params.dy, 
                 sigmaX, sigmaY, 
                 params.color,

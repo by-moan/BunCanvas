@@ -349,8 +349,16 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
+	images_cleanup: {
+		args: [],
+		returns: "void",
+	},
 	image_set_src: {
-		args: ["ptr","cstring"],
+		args: ["ptr","cstring", "bool"],
+		returns: "void",
+	},
+	image_load: {
+		args: ["ptr"],
 		returns: "bool",
 	},
 	image_destroy: {

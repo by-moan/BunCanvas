@@ -281,6 +281,7 @@ export class Window {
 
 				if (msg.data == 2) {
 					lib.symbols.destroy_window();
+					lib.symbols.images_cleanup();
 					process.exit(0);
 				}
 				if (msg.data == 1){

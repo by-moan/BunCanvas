@@ -310,8 +310,34 @@ class CanvasRenderingContext2D {
 		lib.symbols.canvas_get_image_data(ptrs.get(this),x,y,w,h, ptr(arr));
 		return new ImageData(w,h,arr);
 	}
-	putImageData(data : ImageData,dx : number,dy : number ,dirtyX = 0, dirtyY = 0,dirtyWidth = (data instanceof ImageData)?data.width:(()=>{throw new TypeError("Failed to execute 'putImageData' on 'CanvasRenderingContext2D': parameter 1 is not of type 'ImageData'")})(), dirtyHeight = data.height) {
-		lib.symbols.canvas_put_image_data(ptrs.get(this),dx,dy,dirtyWidth,dirtyHeight, ptr(data.data));
+	putImageData(
+		data: ImageData,
+		dx: number,
+		dy: number,
+		dirtyX = 0,
+		dirtyY = 0,
+		dirtyWidth = data.width,
+		dirtyHeight = data.height
+	) {
+		if (!(data instanceof ImageData)) {
+			throw new TypeError(
+				"Failed to execute 'putImageData' on 'CanvasRenderingContext2D': " +
+				"parameter 1 is not of type 'ImageData'"
+			);
+		}
+
+		lib.symbols.canvas_put_image_data(
+			ptrs.get(this),
+			dx,
+			dy,
+			data.width,
+			data.height,
+			dirtyX,
+			dirtyY,
+			dirtyWidth,
+			dirtyHeight,
+			ptr(data.data)
+		);
 	}
 	save(){
 		this.#savedState = structuredClone(this.#currentState)

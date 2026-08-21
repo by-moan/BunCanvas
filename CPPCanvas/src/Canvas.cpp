@@ -1342,31 +1342,111 @@ extern "C" {
     // }
     
     
-    WINDOWS_EXPORT bool canvas_put_image_data(void* canvasObj, int x, int y, int w, int h, uint8_t* buffer){
-        if (!canvasObj) return false;
-        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        
-        if (obj == nullptr) return false;
+    WINDOWS_EXPORT bool canvas_put_image_data(
+        void* canvasObj,
+        int dx,
+        int dy,
+        int imageWidth,
+        int imageHeight,
+        int dirtyX,
+        int dirtyY,
+        int dirtyWidth,
+        int dirtyHeight,
+        uint8_t* buffer
+    ) {
+        if (!canvasObj || !buffer)
+            return false;
+
+        BunCanvasRenderingContext2D* obj =
+            validated<BunCanvasRenderingContext2D>(canvasObj);
+
+        if (obj == nullptr)
+            return false;
+
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized)
+                lock.emplace(obj->owner->mutex);
         );
-        SkImageInfo imageInfo = SkImageInfo::Make(
-            w,h,
-            kRGBA_8888_SkColorType,
-            kPremul_SkAlphaType
-        );
-        
-        SkBitmap bitmap;
-        
-        
-        if(bitmap.installPixels(imageInfo,buffer,w *4)){
-            
-            (*obj)()->drawImage(bitmap.asImage(),x,y,obj->currentState.sampling,&pImageDataColor);
-            // std::cout << "Success " << x << " " << y << " " << w << " " << h << " " << "\n";
-            return true;
+
+        // Normalize negative dirty dimensions.
+        if (dirtyWidth < 0) {
+            dirtyX += dirtyWidth;
+            dirtyWidth = -dirtyWidth;
         }
-        return false;
+
+        if (dirtyHeight < 0) {
+            dirtyY += dirtyHeight;
+            dirtyHeight = -dirtyHeight;
+        }
+
+        // Empty rectangle.
+        if (dirtyWidth == 0 || dirtyHeight == 0)
+            return true;
+
+        // Clip dirty rectangle against ImageData.
+        int srcX = std::max(dirtyX, 0);
+        int srcY = std::max(dirtyY, 0);
+
+        int srcRight = std::min(
+            dirtyX + dirtyWidth,
+            imageWidth
+        );
+
+        int srcBottom = std::min(
+            dirtyY + dirtyHeight,
+            imageHeight
+        );
+
+        if (srcX >= srcRight || srcY >= srcBottom)
+            return true;
+
+        int width = srcRight - srcX;
+        int height = srcBottom - srcY;
+
+        // Destination must move along with the clipped source rectangle.
+        int destX = dx + (srcX - dirtyX);
+        int destY = dy + (srcY - dirtyY);
+
+        // Create an SkBitmap representing the selected region.
+        SkImageInfo imageInfo = SkImageInfo::Make(
+            width,
+            height,
+            kRGBA_8888_SkColorType,
+            kUnpremul_SkAlphaType
+        );
+
+        SkBitmap bitmap;
+
+        // Point into the original ImageData buffer.
+        uint8_t* src = buffer +
+            (static_cast<size_t>(srcY) * imageWidth + srcX) * 4;
+
+        if (!bitmap.installPixels(
+            imageInfo,
+            src,
+            static_cast<size_t>(imageWidth) * 4
+        )) {
+            return false;
+        }
+
+        SkCanvas* canvas = (*obj)();
+
+        if (!canvas)
+            return false;
+
+        SkPaint paint;
+        paint.setBlendMode(SkBlendMode::kSrc);
+
+        canvas->drawImage(
+            bitmap.asImage(),
+            destX,
+            destY,
+            obj->currentState.sampling,
+            &paint
+        );
+
+        return true;
     }
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
         float _a = std::clamp(a, 0.0f, 1.0f);

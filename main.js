@@ -18,5 +18,7 @@ const img = new Image()
 img.src = "https://media.discordapp.net/attachments/1379212171506094171/1540150588573220904/magesuwu_2.png?ex=6a88e882&is=6a879702&hm=21d3ae06ae5468359f9c39eb69b1a1f1661a0fcf5b7c94e559e039aba628bb68&animated=true&width=1711&height=1403"
 img.onload = ()=>{
     console.log(img.src)
+    console.time("draw")
     ctx.drawImage(img,0,0,1711,1403)
+    console.timeEnd("draw")
 }

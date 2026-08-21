@@ -24,7 +24,6 @@ extern "C" {
             if (!img.empty()) {
                 std::error_code ec;
                 std::filesystem::remove(img, ec);
-                std::cout << "removed: " << img << "\n";
             }
         }
     }
@@ -58,7 +57,10 @@ extern "C" {
         obj->data = SkData::MakeFromFileName(obj->src.c_str());
         if(obj->data) {
             obj->imageValid = true;
-            obj->image = SkImages::DeferredFromEncodedData(obj->data);
+            auto img = SkImages::DeferredFromEncodedData(obj->data);
+            if (img){
+                obj->image = gpuContextReady ? SkImages::TextureFromImage(mainThreadCtx->context.get(),img) : img;
+            }
             return true;
         }
         return false;

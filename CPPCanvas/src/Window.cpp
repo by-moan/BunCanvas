@@ -267,6 +267,7 @@ extern "C" {
                 cSurface->surface.reset();
                 delete cSurface;
                 renderThreadContext->context->freeGpuResources();
+                mainThreadCtx->context->freeGpuResources();
                 cSurface = createSurface(
                     pendingW,
                     pendingH

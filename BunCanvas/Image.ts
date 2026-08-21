@@ -6,10 +6,8 @@ import { Event } from "./Event.js";
 
 const ptrs = new WeakMap();
 const fRegistry = new FinalizationRegistry((ptr: any)=>{
-    let tm = setTimeout(()=>{
-		lib.symbols.image_destroy(ptr)
-		clearTimeout(tm)
-	},5000)
+    lib.symbols.image_destroy(ptr)
+	console.log("destroy!")
 });
 
 function computePath(url: string) : string {

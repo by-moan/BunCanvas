@@ -40,10 +40,6 @@ const MessagePost = new JSCallback((instruction)=>{
         returns: "void"
     }
 );
-let w;
-let h;
-let t;
-let vsync;
 
 self.onmessage = (msg)=>{
     const { w = 1, h = 1, t = "App", vsync = true } = msg.data ?? {};

@@ -172,12 +172,12 @@ static AudioBackend globalAudioBackend;
 
 extern "C" {
 
-    void audio_backend_init(){
+    WINDOWS_EXPORT void audio_backend_init(){
         globalAudioBackend.init();
         globalAudioBackend.start();
     }
 
-    AudioObject* audio_create(const char* path){
+    WINDOWS_EXPORT AudioObject* audio_create(const char* path){
         if (path) {
             return new AudioObject(globalAudioBackend,path);
 
@@ -185,19 +185,19 @@ extern "C" {
         return new AudioObject(globalAudioBackend);
     }
 
-    void audio_play(void* ptr){
+    WINDOWS_EXPORT void audio_play(void* ptr){
         auto obj = validated<AudioObject>(ptr);
         if (!obj) return;
         obj->play();
     }
     
-    void audio_set_src(void* ptr, const char* path){
+    WINDOWS_EXPORT void audio_set_src(void* ptr, const char* path){
         auto obj = validated<AudioObject>(ptr);
         if (!obj) return;
         obj->setSource(path);    
     }
 
-    void audio_destroy(void* ptr){
+    WINDOWS_EXPORT void audio_destroy(void* ptr){
         auto obj = validated<AudioObject>(ptr);
         if (obj) delete obj; 
     }

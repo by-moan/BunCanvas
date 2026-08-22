@@ -61,6 +61,7 @@ build: $(TARGET)
 
 # Build (if needed) and run
 run: $(COPIED_LIB)
+	echo $(OUTPUT_DIR)
 	cd $(OUTPUT_DIR) && bun ../main.js
 
 # Run without building
@@ -80,7 +81,7 @@ clean:
 # Windows build (clang-cl)
 ifeq ($(IS_WINDOWS),1)
     ifeq ($(ARCH),x64)
-        SKIA_LIB := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/windows_x64/skia.lib
+        SKIA_LIB := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/windows_AMD64/skia.lib
     else
         SKIA_LIB := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/windows_arm64/skia.lib
     endif
@@ -90,6 +91,7 @@ ifeq ($(IS_WINDOWS),1)
 		clang-cl /LD /std:c++20 /EHsc $(API_CPP) \
 			/I$(CANVAS_DIR)/Thirdparty/skia_build/skia \
 			/I$(CANVAS_DIR)/Thirdparty/glfw-3.4.bin.WIN64\include \
+			/I$(CANVAS_DIR)/Thirdparty/miniaudio \
 			"$(SKIA_LIB)" \
 			opengl32.lib user32.lib gdi32.lib shell32.lib dwrite.lib \
 			$(CANVAS_DIR)/Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib \

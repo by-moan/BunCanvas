@@ -313,7 +313,7 @@ class BunCanvasRenderingContext2D {
         
         jsResetCanvas();
         
-        // sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+        sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
 
         
         font_cache.setFont("10px sans-serif",currentState.font_current);
@@ -328,12 +328,12 @@ class BunCanvasRenderingContext2D {
         savedState = Rendering2DState{};
         
         
-        sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+        // sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
         jsResetCanvas();
 
         
         font_cache.setFont("10px sans-serif",currentState.font_current);
-
+        tmpImage.reset();
     }
     
     SkCanvas* operator()() {
@@ -445,18 +445,18 @@ class BunCanvas {
     void resize(int w, int h) {
         if (!rendering2D) return;
         // processRetiredTextures();
-        #ifndef __APPLE__
-        // Flush main thread GPU commands and wait for completion
-        // before retiring the old texture
-        if (hasBackendTex && mainThreadCtx) {
-            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-            // Retire the texture instead of deleting it immediately.
-            // The render thread might still have pending draw commands
-            // that reference this texture from the previous frame.
-            retiredTextures.push_back({backendTex, 3});
-            hasBackendTex = false;
-        }
-        #endif
+        // #ifndef __APPLE__
+        // // Flush main thread GPU commands and wait for completion
+        // // before retiring the old texture
+        // if (hasBackendTex && mainThreadCtx) {
+        //     mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+        //     // Retire the texture instead of deleting it immediately.
+        //     // The render thread might still have pending draw commands
+        //     // that reference this texture from the previous frame.
+        //     retiredTextures.push_back({backendTex, 3});
+        //     hasBackendTex = false;
+        // }
+        // #endif
         sk_sp<SkImage> tmp;
         
         #ifdef __APPLE__
@@ -467,6 +467,26 @@ class BunCanvas {
         }
         #else
         if (gpuContextReady) {
+
+            if (!retiredTextures.empty()) {
+                // Clean up retired textures after the frame delay
+                // ensures the render thread has finished using them
+                auto& retired = retiredTextures;
+                for (auto it = retired.begin(); it != retired.end(); ) {
+                    it->framesLeft--;
+                    if (it->framesLeft <= 0) {
+                        GrGLTextureInfo info;
+                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
+                            glDeleteTextures(1, &info.fID);
+                        }
+                        it = retired.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+                
+
             auto borrow = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
                 backendTex,
@@ -476,14 +496,14 @@ class BunCanvas {
                 nullptr
             );
             if (borrow) tmp = borrow->makeRasterImage();
-            // tmp = SkImages::BorrowTextureFrom(
-            //     mainThreadCtx->context.get(),
-            //     backendTex,
-            //     kTopLeft_GrSurfaceOrigin,
-            //     kN32_SkColorType,
-            //     kPremul_SkAlphaType,
-            //     nullptr
-            // );
+            if (hasBackendTex && mainThreadCtx) {
+                mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+                // Retire the texture instead of deleting it immediately.
+                // The render thread might still have pending draw commands
+                // that reference this texture from the previous frame.
+                retiredTextures.push_back({backendTex, 0});
+                hasBackendTex = false;
+            }
             backendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
@@ -522,7 +542,7 @@ class BunCanvas {
         }
         #endif
         
-        if (ctxType == CanvasContextType::Rendering2D) rendering2D->reset(surface, tmp.release());
+        if (ctxType == CanvasContextType::Rendering2D) rendering2D->reset(surface, std::move(tmp));
     }
 };
 

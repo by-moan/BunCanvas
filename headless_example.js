@@ -1,4 +1,4 @@
-import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/Canvas";
+import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/src/Canvas";
 
 
 

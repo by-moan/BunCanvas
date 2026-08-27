@@ -223,11 +223,6 @@ extern "C" {
             return;
         };
         
-        GrGLFramebufferInfo fbInfo;
-        fbInfo.fFBOID = 0;
-        fbInfo.fFormat = GL_RGBA8;
-        
-        
         glfwGetFramebufferSize(window, &width, &height);
         
         currentWidth = width;
@@ -267,7 +262,6 @@ extern "C" {
                 cSurface->surface.reset();
                 delete cSurface;
                 renderThreadContext->context->freeGpuResources();
-                mainThreadCtx->context->freeGpuResources();
                 cSurface = createSurface(
                     pendingW,
                     pendingH
@@ -296,27 +290,12 @@ extern "C" {
                         nullptr
                     );
                     if (img) {
-                        canvas->drawImage(img, 0, 0);
+                        canvas->drawImageRect(img, SkRect::MakeXYWH(0,0,img->width(),img->height()), SkFilterMode::kNearest);
                     }
                 } else {
                     canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
                 }
                 
-                // Clean up retired textures after the frame delay
-                // ensures the render thread has finished using them
-                auto& retired = element->retiredTextures;
-                for (auto it = retired.begin(); it != retired.end(); ) {
-                    it->framesLeft--;
-                    if (it->framesLeft <= 0) {
-                        GrGLTextureInfo info;
-                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
-                            glDeleteTextures(1, &info.fID);
-                        }
-                        it = retired.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
                 
                 
                 

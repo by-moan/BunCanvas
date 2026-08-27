@@ -1,4 +1,4 @@
-import { encoder, lib } from "./symbols";
+import { encoder, lib } from "../internal/symbols";
 
 const ptrs = new WeakMap();
 

@@ -1,4 +1,4 @@
-import { lib,encoder, dlPath } from "./symbols.js";
+import { lib,encoder, dlPath } from "../internal/symbols.js";
 import { Event } from "./Event.js";
 import { MouseEvent } from "./MouseEvent.js"
 
@@ -6,7 +6,7 @@ import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent";
 import { FontFace } from "./FontFace.js";
 
-import WindowThread from "./WindowThread.js" with { type:"text" };
+import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 
@@ -83,7 +83,7 @@ export class Window {
 				}
 			)
 			if (this.onmousemove) this.onmousemove(evt)
-				this.#mMoveEvts.forEach((item,key)=>{
+			this.#mMoveEvts.forEach((item,key)=>{
 				item.cb(evt);
 			})
 		}
@@ -278,6 +278,7 @@ export class Window {
 
 			render_thread.onmessage = async(msg)=>{
 				const frameTime = 1000 / this.maxFramerate;
+				// lib.symbols.update_window();
 
 				if (msg.data == 2) {
 					lib.symbols.destroy_window();
@@ -303,6 +304,7 @@ export class Window {
 						requestedFrames.splice(0, end);
 					});
 				}
+				this.#processEvents()
 
 				const now = performance.now();
 				if (now - lastFrame >= frameTime) {
@@ -316,10 +318,6 @@ export class Window {
 				}else if (this.#vsync) {
 					pendingFrame = false;
 				}
-				
-				
-				// lib.symbols.update_window();
-				this.#processEvents()
 				
 			}
 		} else /* MACOS JS LOOP */ {
@@ -513,9 +511,17 @@ export class Window {
 	}
 }
 
-export function requestAnimationFrame(callback :(cb : any)=>void) : void {
-	setImmediate(()=>{requestedFrames.push(callback);})
+
+let rAf;
+if (globalThis.requestAnimationFrame!) {
+	rAf = globalThis.requestAnimationFrame
+}else {
+	rAf = function requestAnimationFrame(callback :(cb : any)=>void) : void {
+		setImmediate(()=>{requestedFrames.push(callback);})
+	}
+	rAf.toString = () =>
+		`function requestAnimationFrame() { [native code] }`;
 }
 
-requestAnimationFrame.toString = () =>
-`function requestAnimationFrame() { [native code] }`;
+export const requestAnimationFrame = rAf
+

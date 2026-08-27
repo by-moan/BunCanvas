@@ -1,8 +1,8 @@
-import { Window, requestAnimationFrame } from "../BunCanvas/Window.ts";
-import { Canvas } from "../BunCanvas/Canvas.ts";
-import { Image } from "../BunCanvas/Image.ts";
-import { DOMMatrix } from "../BunCanvas/DOMMatrix.ts";
-import { Audio } from "../BunCanvas/Audio.ts";
+import { Window, requestAnimationFrame } from "../BunCanvas/src/Window.ts";
+import { Canvas } from "../BunCanvas/src/Canvas.ts";
+import { Image } from "../BunCanvas/src/Image.ts";
+import { DOMMatrix } from "../BunCanvas/dom/DOMMatrix.ts";
+import { Audio } from "../BunCanvas/src/Audio.ts";
 
 const window = new Window(800,600, "spiiin", {vsync:true});
 // Create and append canvas

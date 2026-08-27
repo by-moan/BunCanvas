@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
-import { lib,encoder } from "./symbols.js";
+import { lib,encoder } from "../internal/symbols.js";
 import { Event } from "./Event.js";
 
 const ptrs = new WeakMap();

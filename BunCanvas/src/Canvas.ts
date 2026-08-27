@@ -1,13 +1,14 @@
-import { lib,encoder, dlPath, encodeCString } from "./symbols.js";
+import { lib,encoder, dlPath, encodeCString } from "../internal/symbols.js";
 
 import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
-import { DOMMatrix, multipliedMatrices } from "./DOMMatrix.js";
+import { DOMMatrix, multipliedMatrices } from "../dom/DOMMatrix.js";
 import { TextMetrics } from "./TextMetrics.js";
 import { Path2D } from "./Path2D.js";
 
 const ptrs = new WeakMap();
+
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
 	console.log("destroyed Canvas!")
@@ -509,13 +510,14 @@ class CanvasRenderingContext2D {
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
 	constructor(iptr : Pointer | null, cnv : Canvas, args: any) {
+		const { desynchronized = false, alpha = true } = args ?? {};
 		const cb = new JSCallback(this.#reset.bind(this),{
 			args: [],
 			returns: "void"
 		})
-		this.#owner = cnv
-		const { desynchronized = false, alpha = true } = args ?? {};
 		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr, desynchronized, alpha)
+		this.#owner = cnv
+		
 		ptrs.set(this, renderContextPtr)
 	}
 }
@@ -556,7 +558,9 @@ export class Canvas {
 	set width(v : string){
 		this.#dim[0] = Number.parseInt(v)
 		this.#rCapture.cb()
+		// console.log("before")
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
+		// console.log("after")
 	}
 	set height(v : string){
 		this.#dim[1] = Number.parseInt(v)

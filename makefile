@@ -63,6 +63,7 @@ build: $(TARGET)
 run: $(COPIED_LIB)
 	echo $(OUTPUT_DIR)
 	cd $(OUTPUT_DIR) && bun ../main.js
+# 	cd $(OUTPUT_DIR) && gdb -ex "set pagination off" -ex "handle SIGPWR nostop noprint pass" --args bun ../main.js bun ../main.js
 
 # Run without building
 run_dry:
@@ -108,9 +109,10 @@ else ifeq ($(PLATFORM),linux)
 			clang++ -shared -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
 				"$(GLFW_LIB)" \
-				-std=c++23 -O3 \
+				-std=c++23 -O0 \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
 				-I$(CANVAS_DIR)/Thirdparty/glad/include \
+				-L/usr/lib/clang/22/lib/linux \
 				-lGL -lEGL -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg \
 				-o $@
     else

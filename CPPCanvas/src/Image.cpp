@@ -49,9 +49,9 @@ extern "C" {
     //     obj->src = path;
     // }
 
-    WINDOWS_EXPORT bool image_load(void* imgObj){
+    WINDOWS_EXPORT bool image_load(void* imgObj, int32_t* dimensions){
         ImageWrapper* obj = validated<ImageWrapper>(imgObj);
-        if (!obj || obj->src.empty()) return false;
+        if (!obj || obj->src.empty() || !dimensions) return false;
         if (obj->imageValid) return true;
         obj->data.reset();
         obj->data = SkData::MakeFromFileName(obj->src.c_str());
@@ -60,6 +60,8 @@ extern "C" {
             auto img = SkImages::DeferredFromEncodedData(obj->data);
             if (img){
                 obj->image = gpuContextReady ? SkImages::TextureFromImage(mainThreadCtx->context.get(),img) : img;
+                dimensions[0] = obj->image->width();
+                dimensions[1] = obj->image->height();
             }
             return true;
         }

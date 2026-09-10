@@ -6,6 +6,7 @@
 /CPPCanvas/build/*
 *.BAK
 *_BAK*
+*sync-conflict-*
 node_modules
 bun.lock
 package-lock.json

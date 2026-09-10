@@ -549,6 +549,21 @@ class BunCanvas {
 
 std::vector<BunCanvas*> canvases;
 
+void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, int argc){
+    if (argc == 4) {
+        (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(0[d],1[d],2[d],3[d]),ctx->currentState.sampling,&(ctx->currentState.imageColor));
+    }
+    if (argc == 8) {
+        (*ctx)()->drawImageRect(
+            img.get(),
+            SkRect::MakeXYWH(0[d],1[d],2[d],3[d]),
+            SkRect::MakeXYWH(4[d],5[d],6[d],7[d]),
+            ctx->currentState.sampling,
+            &(ctx->currentState.imageColor),
+            {}
+        );
+    }
+}
 
 extern "C" {
     
@@ -1148,11 +1163,11 @@ extern "C" {
         obj->currentState.path.roundRect_array(x,y,w,h,radii,len);
     }
     
-    WINDOWS_EXPORT void canvas_draw_image_imageType(void* canvasObj, void* image, float x,float y,float w,float h) {
+    WINDOWS_EXPORT void canvas_draw_image_imageType(void* canvasObj, void* image, float* dimensions, int argc) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         ImageWrapper* img = static_cast<ImageWrapper*>(image);
-        if (obj == nullptr || img == nullptr) return;
+        if (obj == nullptr || img == nullptr || !dimensions) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
@@ -1168,10 +1183,13 @@ extern "C" {
         //     (*obj)()->restore();
         //     (*obj)()->setMatrix(savedMatrix);
         // }
-        (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+        drawImage(obj,img->image,dimensions,argc);
+        // if (argc == 4) {
+            // (*obj)()->drawImageRect(img->image.get(),SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+        // }
     }
     
-    WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float x,float y,float w,float h) {
+    WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float* dimensions, int argc) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         BunCanvas* img = validated<BunCanvas>(image);
@@ -1201,7 +1219,7 @@ extern "C" {
                 //     shColor.setAlphaf(_af);
                 //     (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
                 // }
-                (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+                drawImage(obj,_img,dimensions,argc);
             }
         } else {
             auto _img = img->surface->makeTemporaryImage();
@@ -1211,7 +1229,8 @@ extern "C" {
             //     shColor.setAlphaf(_af);
             //     (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->sampling,&(shColor));
             // }
-            (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+            // (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+            drawImage(obj,_img,dimensions,argc);
         }
         #else
         auto _img = img->surface->makeTemporaryImage();

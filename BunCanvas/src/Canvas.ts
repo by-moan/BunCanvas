@@ -291,16 +291,19 @@ class CanvasRenderingContext2D {
 		return this.#currentState.lineJoin
 	}
 	
-	drawImage(img : Image, x : number, y : number, w : number,h : number) : void;
-	drawImage(img : Canvas, x : number, y : number, w : number,h : number) : void;
+	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) : void;
+	drawImage(img : Image | Canvas, sx : number, sy : number, sw : number, sh : number, dx : number, dy : number, dw : number, dh : number) : void;
 	
-	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) {
+	drawImage(img : Image | Canvas, ...args : Array<number>) {
+		let _arr : number[] | Float32Array = args.length==2?[...args,img.width,img.height]:args;
+		const arr = new Float32Array(_arr)
+		const len = arr.length
 		if (img instanceof Image) {
-			lib.symbols.canvas_draw_image_imageType(ptrs.get(this),img.ptr,Number(x),Number(y),Number(w),Number(h))
+			lib.symbols.canvas_draw_image_imageType(ptrs.get(this),img.ptr,ptr(arr),len)
 			return;
 		}
 		if (img instanceof Canvas) {
-			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),Number(x),Number(y),Number(w??img.width),Number(h??img.height))
+			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),ptr(arr),len)
 			return;
 		}
 		

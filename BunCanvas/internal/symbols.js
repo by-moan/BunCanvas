@@ -209,11 +209,11 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	canvas_draw_image_imageType: {
-		args: ["ptr","ptr","float","float","float","float"],
+		args: ["ptr", "ptr", "ptr", "int"],
 		returns: "void",
 	},
 	canvas_draw_image_canvasType: {
-		args: ["ptr","ptr","float","float","float","float"],
+		args: ["ptr", "ptr","ptr", "int"],
 		returns: "void",
 	},
 	canvas_get_image_data: {
@@ -357,7 +357,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	image_load: {
-		args: ["ptr"],
+		args: ["ptr","ptr"],
 		returns: "bool",
 	},
 	image_destroy: {

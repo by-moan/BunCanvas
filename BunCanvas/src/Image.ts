@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { lib,encoder } from "../internal/symbols.js";
 import { Event } from "./Event.js";
-
+import { ptr } from "bun:ffi"
 const ptrs = new WeakMap();
 const fRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.image_destroy(ptr)
@@ -31,7 +31,6 @@ function fetchToTemp(url: string, precomputedPath? : string): Promise<string> {
 		//Tried using Promise<Response> as type, but it still errors
 		// So.... cheers ¯\_(ツ)_/¯
         const response : Response = await fetch(url);
-
         if (!response.ok || !response.body) {
             throw new Error(`HTTP ${response.status}: ${url}`);
         }
@@ -47,6 +46,12 @@ const urlRegex = /^https?:\/\/(?:www\.)?[^\s/$.?#].[^\s]*$/;
 
 export class Image {
 	#queue : any = null;
+
+	#width : number = 0;
+	#setWidth = false
+	#height : number = 0;
+	#setHeight = false
+
 	#src : string = "";
 	constructor() {
 		let ptr = lib.symbols.image_create();
@@ -62,20 +67,23 @@ export class Image {
 		if (urlRegex.test(path)) {
 			const weakThis = new WeakRef(this);
 			const precomp = computePath(path)
-			const ptr = ptrs.get(this);
-			lib.symbols.image_set_src(ptr, encoder.encode(`${precomp}\0`), true)
+			const iptr = ptrs.get(this);
+			lib.symbols.image_set_src(iptr, encoder.encode(`${precomp}\0`), true)
 			fetchToTemp(path,precomp).then(() => {
+				const tArr = new Int32Array(2)
 				const self = weakThis.deref();
 				if (!self) {
 					return
 				};
-				
-				if (lib.symbols.image_load(ptr)) {
+				if (lib.symbols.image_load(iptr,ptr(tArr))) {
+					this.#width = !this.#setWidth?tArr[0]:this.#width;
+					this.#height = !this.#setHeight?tArr[1]:this.#height;
 					self.onload?.call(self, new Event("load", self));
 				} else {
 					self.onerror?.call(self, new Event("error", self));
 				}
-			}).catch(() => {
+				
+			}).catch((ex) => {
 				const self = weakThis.deref();
 				if (!self) return;
 				self.onerror?.call(self, new Event("error", self));
@@ -91,8 +99,11 @@ export class Image {
 					clearTimeout(tm)
 					return;
 				}
-				const ptr = ptrs.get(self);
-				if (lib.symbols.image_load(ptr)) {
+				const _ptr = ptrs.get(self);
+				const tArr = new Int32Array(2)
+				if (lib.symbols.image_load(_ptr,ptr(tArr))) {
+					this.#width = !this.#setWidth?tArr[0]:this.#width;
+					this.#height = !this.#setHeight?tArr[1]:this.#height;
 					self.onload?.call(self, new Event("load", self));
 				} else {
 					self.onerror?.call(self, new Event("error", self));
@@ -112,6 +123,22 @@ export class Image {
     get ptr(){
         return ptrs.get(this);
     }
+
+	get width(){
+		return this.#width
+	}
+	get height(){
+		return this.#height
+	}
+
+	set width(v : number){
+		this.#setWidth = true
+		this.#width = v
+	}
+	set height(v : number){
+		this.#setHeight = true
+		this.#height = v
+	}
 }
 
 {

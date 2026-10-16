@@ -1,4 +1,5 @@
 import { dlopen, FFIType, suffix } from "bun:ffi";
+import { getNativePath } from "./loader";
 
 // let extension;
 
@@ -9,7 +10,8 @@ import { dlopen, FFIType, suffix } from "bun:ffi";
 // }else if (process.platform === "linux") {
 // 	extension = "so"
 // }
-export const dlPath = `BunCanvas.${process.platform}.${process.arch}.${suffix}`;
+export const dlPath = `BunCanvas.${process.arch}.${suffix}`;
+
 
 const exists = await Bun.file(dlPath).exists();
 
@@ -385,6 +387,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr"],
 		returns: "void",
 	},
+	audio_stop : {
+		args: ["ptr"],
+		returns: "void",
+	},
 	audio_destroy : {
 		args: ["ptr"],
 		returns: "void",
@@ -457,9 +463,3 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 });
-
-// const cnv = document.createElement("canvas")
-
-// let ctx= cnv.getContext("2d")
-
-// ctx.fillRect

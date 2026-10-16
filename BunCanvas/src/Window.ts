@@ -271,7 +271,7 @@ export class Window {
 			render_thread.onerror = (msg)=>{
 				console.log(msg)
 			}
-			render_thread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync});
+			render_thread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync, nativePath : dlPath});
 
 			let pendingFrame = false;
 			

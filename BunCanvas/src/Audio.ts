@@ -22,4 +22,7 @@ export class Audio {
     play(){
         lib.symbols.audio_play(ptrs.get(this))
     }
+    stop(){
+        lib.symbols.audio_stop(ptrs.get(this))
+    }
 }

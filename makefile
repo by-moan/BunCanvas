@@ -49,8 +49,8 @@ SRC_FILES := $(wildcard $(SRC_DIR)/*.cpp)
 ALL_SOURCES := $(API_CPP) $(SRC_FILES)
 
 # Target library paths
-TARGET := $(BUILD_DIR)/BunCanvas.$(PLATFORM).$(ARCH).$(EXT)
-COPIED_LIB := $(OUTPUT_DIR)/BunCanvas.$(PLATFORM).$(ARCH).$(EXT)
+TARGET := $(BUILD_DIR)/BunCanvas.$(ARCH).$(EXT)
+COPIED_LIB := $(ROOT)/build/BunCanvas.$(ARCH).$(EXT)
 
 .PHONY: all build run run_dry clean
 
@@ -61,7 +61,6 @@ build: $(TARGET)
 
 # Build (if needed) and run
 run: $(COPIED_LIB)
-	echo $(OUTPUT_DIR)
 	cd $(OUTPUT_DIR) && bun ../main.js
 # 	cd $(OUTPUT_DIR) && gdb -ex "set pagination off" -ex "handle SIGPWR nostop noprint pass" --args bun ../main.js bun ../main.js
 

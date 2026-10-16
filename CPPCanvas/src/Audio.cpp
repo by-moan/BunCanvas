@@ -1,16 +1,7 @@
-// #include <iostream>
-// #include <vector>
-// #include <string>
-// #include <mutex>
-// #include <memory>
-// #include <algorithm>
-
-// #define MINIAUDIO_IMPLEMENTATION
-// #include "miniaudio.h"
-
 // Represents a single active playback instance
 struct AudioVoice {
     ma_decoder decoder;
+    const void* owner = nullptr; // Track which AudioObject created this voice
     bool active = true;
 
     ~AudioVoice() {
@@ -72,6 +63,21 @@ public:
     void addVoice(std::unique_ptr<AudioVoice> voice) {
         std::lock_guard<std::mutex> lock(voiceMutex);
         activeVoices.push_back(std::move(voice));
+    }
+
+    void stopVoicesForOwner(const void* owner) {
+        std::lock_guard<std::mutex> lock(voiceMutex);
+        // Erase any existing voices belonging to this owner
+        activeVoices.erase(
+            std::remove_if(
+                activeVoices.begin(),
+                activeVoices.end(),
+                [owner](const std::unique_ptr<AudioVoice>& voice) {
+                    return voice->owner == owner;
+                }
+            ),
+            activeVoices.end()
+        );
     }
 
     static void dataCallback(
@@ -148,10 +154,15 @@ public:
     void play() {
         if (!backend.isValid() || !hasSrc) {
             return;
-        };
+        }
+
+        // Cut off any previously playing voices for this object
+        backend.stopVoicesForOwner(this);
+
         auto voice = std::make_unique<AudioVoice>();
-        
-        // Use standard decoder config
+        // Set ownership tag
+        voice->owner = this;
+
         ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
         
         if (ma_decoder_init_file(path.c_str(), &decoderConfig, &voice->decoder) != MA_SUCCESS) {
@@ -161,6 +172,10 @@ public:
         std::cout << "playing!\n";
 
         backend.addVoice(std::move(voice));
+    }
+
+    void stop() {
+        backend.stopVoicesForOwner(this);
     }
 
     void setSource(const std::string& newPath) {
@@ -190,6 +205,11 @@ extern "C" {
         if (!obj) return;
         obj->play();
     }
+    WINDOWS_EXPORT void audio_stop(void* ptr){
+        auto obj = validated<AudioObject>(ptr);
+        if (!obj) return;
+        obj->stop();
+    }
     
     WINDOWS_EXPORT void audio_set_src(void* ptr, const char* path){
         auto obj = validated<AudioObject>(ptr);
@@ -203,19 +223,3 @@ extern "C" {
     }
 
 }
-// int main() {
-//     try {
-//         AudioBackend backend;
-//         backend.start();
-
-//         AudioObject sound1(backend, "test.wav");
-        
-//         std::cout << "Playing... Press Enter to quit." << std::endl;
-//         sound1.play();
-
-//         std::cin.get();
-//     } catch (const std::exception& e) {
-//         std::cerr << "Error: " << e.what() << std::endl;
-//     }
-//     return 0;
-// }

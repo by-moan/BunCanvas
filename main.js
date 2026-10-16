@@ -1,7 +1,7 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio } from "./BunCanvas/index";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio } from "./BunCanvas";
 
 
-const window = new Window(800,600, "spiiin", {vsync:false});
+const window = new Window(800,600, "spiiin", {vsync:false, maxFramerate:165});
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);
@@ -13,20 +13,30 @@ window.onresize = (evt)=>{
 
 const ctx = canvas.getContext('2d');
 
-const img = new Image()
-img.src = "https://cdn.discordapp.com/attachments/1496392566545846282/1547125417746366484/52E2294F-07C9-41F4-9BD8-8E412CA3C49A.png?ex=6aa24853&is=6aa0f6d3&hm=aa31a38944ed2ea678f4eaf32422d4fab73676c1c9fedbb7ced86cde05526324&animated=true"
+const mPos = {x:0,y:0}
 
-img.onload =()=>{
-	console.log("load!")
+window.onmousemove = (evt)=>{
+	mPos.x = evt.clientX
+	mPos.y = evt.clientY
 }
-img.onerror =()=>{
-	console.log("error!")
+
+let snd = new Audio("./Kawkaw_voiceclip_happy_1.wav")
+
+window.onmousedown = (evt)=>{
+	console.log(evt)
+	if (evt.buttons == 1) {
+		snd.play()
+	}
+	if (evt.buttons == 2) {
+		snd.stop()
+	}
 }
+
 function loop(){
 	ctx.clearRect(0,0,window.innerWidth,window.innerHeight)
 	ctx.fillStyle = "red"
-	// ctx.fillRect(100,100,500,700)
-	ctx.drawImage(img, 100,100, 100,100,200,200,100,100)
+	ctx.fillRect(mPos.x-50,mPos.y-50,100,100)
+	// ctx.drawImage(img, 100,100, 100,100,200,200,100,100)
 
 	requestAnimationFrame(loop)
 }

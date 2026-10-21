@@ -1235,7 +1235,7 @@ extern "C" {
         }
         #else
         auto _img = img->surface->makeTemporaryImage();
-        (*obj)()->drawImageRect(_img,SkRect::MakeXYWH(x,y,w,h),obj->currentState.sampling,&(obj->currentState.imageColor));
+        drawImage(obj,_img,dimensions,argc);
         #endif
     }
     

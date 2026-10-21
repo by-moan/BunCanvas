@@ -401,18 +401,16 @@ extern "C" {
         
         currentWidth = width;
         currentHeight = height;
-        
-        sWrapper = new SurfaceWrapper(createSurface(
-            renderThreadContext->context.get(),
+
+        sWrapper = createSurface(
             width,
             height
-        ));
+        );;
         
         if (!sWrapper->surface) {
             std::cout << "Surface was not created!\n";
             return;
         };
-        std::cout << vsync << "\n";
         glfwSwapInterval(vsync);
         
         canvas = sWrapper->surface->getCanvas();
@@ -445,8 +443,9 @@ extern "C" {
             width = pendingW;
             height = pendingH;
             sWrapper->surface.reset();
-            sWrapper->surface = createSurface(
-                renderThreadContext->context.get(),
+            renderThreadContext->context->freeGpuResources();
+            delete sWrapper;
+            sWrapper = createSurface(
                 pendingW,
                 pendingH
             );

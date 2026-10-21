@@ -196,6 +196,7 @@ class SurfaceWrapper {
 	public:
 	sk_sp<SkSurface> surface;
 	SurfaceWrapper(sk_sp<SkSurface> sfc) : surface(sfc){}
+	SurfaceWrapper(BackedSurface* sfc) : surface(sfc->surface){}
 };
 
 class InterfaceWrapper {
@@ -240,7 +241,7 @@ int currentHeight = 0;
 int width, height;
 SkCanvas* canvas = nullptr;
 GLFWwindow* window = nullptr;
-SurfaceWrapper* sWrapper = nullptr;
+BackedSurface* sWrapper = nullptr;
 sk_sp<SkFontMgr> fontMgr = CreateFontManager();
 bool ready = false;
 bool mainThreadReady = false;

@@ -59,7 +59,11 @@ extern "C" {
             obj->imageValid = true;
             auto img = SkImages::DeferredFromEncodedData(obj->data);
             if (img){
-                obj->image = gpuContextReady ? SkImages::TextureFromImage(mainThreadCtx->context.get(),img) : img;
+                #ifndef __APPLE__
+                    obj->image = gpuContextReady ? SkImages::TextureFromImage(mainThreadCtx->context.get(),img) : img;
+                #else
+                    obj->image = img;
+                #endif
                 dimensions[0] = obj->image->width();
                 dimensions[1] = obj->image->height();
             }

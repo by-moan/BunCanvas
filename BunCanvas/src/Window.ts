@@ -259,7 +259,7 @@ export class Window {
 	}
 
 	constructor(width : number, height : number, title = "App", args : any) {
-		(render_thread as any).ref?.();
+		if (process.platform !== "darwin") (render_thread as any).ref?.();
 		windowWasCreated = true;
 		this.#dim[0] = width;
 		this.#dim[1] = height;
@@ -333,76 +333,76 @@ export class Window {
 					return
 				}
 				
-				
-				if (this.#wResizeViewer[0] != 0) {
-					this.#wResizeViewer[0] = 0
-					console.log("wresize!")
-					const details = new Event("resize",this);
+				this.#processEvents()
+				// if (this.#wResizeViewer[0] != 0) {
+				// 	this.#wResizeViewer[0] = 0
+				// 	console.log("wresize!")
+				// 	const details = new Event("resize",this);
 					
-					this.#dim[0] = this.#wResizeViewer[1]
-					this.#dim[1] = this.#wResizeViewer[2]
-					if (this.onresize) {
-						this.onresize(details)
-					}
-					this.#rEvts.forEach((item,key)=>{
-							item.cb(details);
-						})
-				}
-				if(this.#mMoveViewer[0] != 0) {
-					this.#mMoveViewer[0] = 0	
-					const evt = new MouseEvent("move",
-						{
-							target: this,
-							altKey:false,
-							button:0,
-							buttons:this.#mMoveViewer[5],
-							clientX:this.#mMoveViewer[1],
-							clientY:this.#mMoveViewer[2],
-							movementX: this.#mMoveViewer[3],
-							movementY: this.#mMoveViewer[4],
-							ctrlKey:false,
-							metaKey:false,
-							screenX:0,
-							screenY:0,
-							shiftKey:false
-						}
-					)
-					if (this.onmousemove) {this.onmousemove(evt)}
-					this.#mMoveEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#mClickViewer[0] != 0) {
-					this.#mClickViewer[0] = 0
-					const evt = new MouseEvent("click",
-						{
-							altKey:this.#mClickViewer[7],
-							button:this.#mClickViewer[3],
-							buttons:this.#mClickViewer[4],
-							clientX:this.#mClickViewer[1],
-							clientY:this.#mClickViewer[2],
-							movementX: 0,
-							movementY: 0,
-							ctrlKey:this.#mClickViewer[6],
-							metaKey:this.#mClickViewer[8],
-							screenX:this.#mClickViewer[1],
-							screenY:this.#mClickViewer[2],
-							shiftKey:this.#mClickViewer[5]
-						}
-					)
-					if (this.onclick) this.onclick(evt)
-						this.#mClickEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
-				if(this.#kDownViewer[0] != 0) {
-					this.#kDownViewer[0] = 0;
-					const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
-					if (this.onkeydown) this.onkeydown(evt)
-						this.#keyDownEvts.forEach((item,key)=>{
-						item.cb(evt);
-					})
-				}
+				// 	this.#dim[0] = this.#wResizeViewer[1]
+				// 	this.#dim[1] = this.#wResizeViewer[2]
+				// 	if (this.onresize) {
+				// 		this.onresize(details)
+				// 	}
+				// 	this.#rEvts.forEach((item,key)=>{
+				// 			item.cb(details);
+				// 		})
+				// }
+				// if(this.#mMoveViewer[0] != 0) {
+				// 	this.#mMoveViewer[0] = 0	
+				// 	const evt = new MouseEvent("move",
+				// 		{
+				// 			target: this,
+				// 			altKey:false,
+				// 			button:0,
+				// 			buttons:this.#mMoveViewer[5],
+				// 			clientX:this.#mMoveViewer[1],
+				// 			clientY:this.#mMoveViewer[2],
+				// 			movementX: this.#mMoveViewer[3],
+				// 			movementY: this.#mMoveViewer[4],
+				// 			ctrlKey:false,
+				// 			metaKey:false,
+				// 			screenX:0,
+				// 			screenY:0,
+				// 			shiftKey:false
+				// 		}
+				// 	)
+				// 	if (this.onmousemove) {this.onmousemove(evt)}
+				// 	this.#mMoveEvts.forEach((item,key)=>{
+				// 		item.cb(evt);
+				// 	})
+				// }
+				// if(this.#mClickViewer[0] != 0) {
+				// 	this.#mClickViewer[0] = 0
+				// 	const evt = new MouseEvent("click",
+				// 		{
+				// 			altKey:this.#mClickViewer[7],
+				// 			button:this.#mClickViewer[3],
+				// 			buttons:this.#mClickViewer[4],
+				// 			clientX:this.#mClickViewer[1],
+				// 			clientY:this.#mClickViewer[2],
+				// 			movementX: 0,
+				// 			movementY: 0,
+				// 			ctrlKey:this.#mClickViewer[6],
+				// 			metaKey:this.#mClickViewer[8],
+				// 			screenX:this.#mClickViewer[1],
+				// 			screenY:this.#mClickViewer[2],
+				// 			shiftKey:this.#mClickViewer[5]
+				// 		}
+				// 	)
+				// 	if (this.onclick) this.onclick(evt)
+				// 		this.#mClickEvts.forEach((item,key)=>{
+				// 		item.cb(evt);
+				// 	})
+				// }
+				// if(this.#kDownViewer[0] != 0) {
+				// 	this.#kDownViewer[0] = 0;
+				// 	const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
+				// 	if (this.onkeydown) this.onkeydown(evt)
+				// 		this.#keyDownEvts.forEach((item,key)=>{
+				// 		item.cb(evt);
+				// 	})
+				// }
 				
 				const pLen = requestedFrames.length
 				for (let i = 0; i < pLen; i++) {

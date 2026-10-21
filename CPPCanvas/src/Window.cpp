@@ -228,12 +228,10 @@ extern "C" {
         currentWidth = width;
         currentHeight = height;
         
-        BackedSurface* cSurface = createSurface(
+        sWrapper = createSurface(
             width,
             height
         );
-
-        sWrapper = new SurfaceWrapper(cSurface->surface);
         
         if (!sWrapper->surface) {
             std::cout << "Surface was not created!\n";
@@ -259,14 +257,12 @@ extern "C" {
                 renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
                 auto tmp = sWrapper->surface->makeImageSnapshot();
                 sWrapper->surface.reset();
-                cSurface->surface.reset();
-                delete cSurface;
+                delete sWrapper;
                 renderThreadContext->context->freeGpuResources();
-                cSurface = createSurface(
+                sWrapper = createSurface(
                     pendingW,
                     pendingH
                 );
-                sWrapper->surface = cSurface->surface;
                 canvas = sWrapper->surface->getCanvas();
                 auto tw = tmp->width();
                 auto th = tmp->height();

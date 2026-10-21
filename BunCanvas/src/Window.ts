@@ -3,7 +3,7 @@ import { Event } from "./Event.js";
 import { MouseEvent } from "./MouseEvent.js"
 
 import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
-import { KeyboardEvent } from "./KeyboardEvent";
+import { KeyboardEvent } from "./KeyboardEvent.js";
 import { FontFace } from "./FontFace.js";
 
 import WindowThread from "../internal/WindowThread.js" with { type:"text" };

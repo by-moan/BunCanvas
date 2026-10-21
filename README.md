@@ -8,7 +8,7 @@
 
 The project relies on [Google Skia](https://github.com/google/skia), being the graphics engine used on google chrome for its use on canvas
 
-This proyect is still in its early infancy, and it core methods from the current canvas implementation are still missing.
+This proyect is now at an advanced stage, main functionality and overloads can be used, some implementations are buggy, overall, usable.
 
 <br>
 <br>

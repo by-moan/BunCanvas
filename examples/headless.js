@@ -1,19 +1,9 @@
-import {Window, Canvas, requestAnimationFrame, Image} from "./BunCanvas/src/Canvas";
+import {Window, Canvas, requestAnimationFrame, Image} from "BunCanvas";
 
 
 
 const canvas = new Canvas(600,500)
 const ctx = canvas.getContext("2d")
-
-const img = new Image();
-
-img.onload = (evt)=>{
-    console.log("image loaded!", evt.timeStamp)
-}
-img.onerror = (evt)=>{
-    console.log("error loading image!", evt.timeStamp)
-}
-img.src = "./face.png";
 
 ctx.fillStyle = "cornflowerblue"
     ctx.strokeStyle = "#413b72"
@@ -38,8 +28,7 @@ ctx.fillStyle = "cornflowerblue"
     
 
     ctx.globalCompositeOperation = "screen"
-    ctx.drawImage(img, 40,40,150,150);
-    // ctx.fillRect(x-25,y-25,50,50)
+    ctx.fillRect(5,5,50,50)
     ctx.globalCompositeOperation = "source-over"
 
     let data = ctx.getImageData(10,10,10,10);

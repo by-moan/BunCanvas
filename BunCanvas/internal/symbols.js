@@ -1,24 +1,28 @@
 import { dlopen, FFIType, suffix } from "bun:ffi";
 import { getNativePath } from "./loader";
 
-// let extension;
+const candidates = [
+	`./node_modules/BunCanvas/bin/BunCanvas.${process.arch}.${suffix}`,
+	`./BunCanvas/bin/BunCanvas.${process.arch}.${suffix}`,
+	`BunCanvas.${process.arch}.${suffix}`,
+];
 
-// if (process.platform === "win32") {
-// 	extension = "dll"
-// }else if (process.platform === "darwin") {
-// 	extension = "dylib"
-// }else if (process.platform === "linux") {
-// 	extension = "so"
-// }
-export const dlPath = `BunCanvas.${process.arch}.${suffix}`;
+let selected;
 
+for (const item of candidates) {
+	let exists = await Bun.file(item).exists()
+	if (exists) {
+		selected = item
+		break
+	}
+}
 
-const exists = await Bun.file(dlPath).exists();
-
-if(!exists) {
-	console.error(`${dlPath} was not found in the working directory!`)
+if(!selected) {
+	console.error(`BunCanvas.${process.arch}.${suffix} binary was not found in the working directory!`)
 	process.exit(-1)
 }
+
+export const dlPath = selected
 
 export const encoder = new TextEncoder();
 
@@ -119,7 +123,7 @@ export const lib = dlopen(dlPath, {
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
-		args: ["ptr",FFIType.cstring],
+		args: ["ptr",'cstring'],
 		returns: "bool",
 	},
 	canvas_set_fill_style_gradient: {
@@ -453,11 +457,6 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "float", "float", "float", "float", "ptr", "int"],
 		returns: "void",
 	},
-
-	// font_create_from_face: {
-	// 	args: ["cstring","cstring","int","int","int","cstring","cstring","cstring",],
-	// 	returns: "ptr",
-	// },
 	font_add_to_registry: {
 		args: ["cstring","ptr"],
 		returns: "void",

@@ -348,7 +348,7 @@ class CanvasRenderingContext2D {
 	}
 	getImageData(x : number, y : number, w : number,h : number) {
 		const arr = new Uint8Array(w*h*4);
-		lib.symbols.canvas_get_image_data(ptrs.get(this),x,y,w,h, ptr(arr));
+		lib.symbols.canvas_get_image_data(ptrs.get(this),x,y,w,h, ptr(arr))
 		return new ImageData(w,h,arr);
 	}
 	putImageData(
@@ -583,10 +583,13 @@ export class Canvas {
 	#rCapture = {
 		cb : ()=>{}
 	}
-	constructor(w=1,h=1) {
+	constructor(w=1,h=1, options? : { gpu : boolean }) {
 		this.#dim[0] = w;
 		this.#dim[1] = h;
-		let ptr = lib.symbols.canvas_create(w,h);
+
+		const {gpu = true} = options??{}
+
+		let ptr = lib.symbols.canvas_create(w,h,gpu);
 		ptrs.set(this,ptr)
 		canvasFinalizationRegistry.register(this,ptr)
 	}

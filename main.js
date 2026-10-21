@@ -11,6 +11,7 @@ window.onresize = (evt)=>{
 	canvas.height = window.innerHeight
 }
 
+
 const ctx = canvas.getContext('2d', {desynchronized:true});
 
 // Forward native canvas events to canvas/window callback properties

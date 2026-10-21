@@ -1,16 +1,20 @@
 {
   "compilerOptions": {
-    "types": ["bun", "node"],
+    "types": ["bun"],
     "module": "preserve",
     "moduleResolution": "bundler",
     "allowJs": true,
     "checkJs": false,
-    "noEmit": true,
-    "allowImportingTsExtensions": true
+    "target": "ESNext",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
+    "rootDir": "./BunCanvas",
+    "outDir": "./dist"
   },
+  "include": ["./BunCanvas/**/*"],
   "exclude": [
-    "BunCanvas_BAK",
-    "CPPCanvas/Thirdparty",
+    "CPPCanvas",
     "node_modules"
   ]
 }

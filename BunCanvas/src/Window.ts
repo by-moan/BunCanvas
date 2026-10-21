@@ -6,6 +6,7 @@ import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
 import { KeyboardEvent } from "./KeyboardEvent.js";
 import { FontFace } from "./FontFace.js";
 
+// @ts-expect-error Suppressing missing default export for text asset import
 import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
@@ -18,7 +19,8 @@ lib.symbols.glfw_init();
 
 if (process.platform !== "darwin"){
 	render_thread = new Worker(
-		URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"}))
+		URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"})),
+		{ref:false}
 	);
 }
 
@@ -257,6 +259,7 @@ export class Window {
 	}
 
 	constructor(width : number, height : number, title = "App", args : any) {
+		(render_thread as any).ref?.();
 		windowWasCreated = true;
 		this.#dim[0] = width;
 		this.#dim[1] = height;

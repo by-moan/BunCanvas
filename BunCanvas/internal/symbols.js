@@ -13,6 +13,7 @@ for (const item of candidates) {
 	let exists = await Bun.file(item).exists()
 	if (exists) {
 		selected = item
+		console.log(selected)
 		break
 	}
 }
@@ -107,7 +108,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_create: {
-		args: ["int","int"],
+		args: ["int","int",'bool'],
 		returns: "ptr",
 	},
 	canvas_resize: {

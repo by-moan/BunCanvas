@@ -1,8 +1,8 @@
-import {Window, Canvas, requestAnimationFrame, Image} from "BunCanvas";
+import {Canvas} from "BunCanvas";
 
 
 
-const canvas = new Canvas(600,500)
+const canvas = new Canvas(600,500, {gpu:false})
 const ctx = canvas.getContext("2d")
 
 ctx.fillStyle = "cornflowerblue"
@@ -28,14 +28,8 @@ ctx.fillStyle = "cornflowerblue"
     
 
     ctx.globalCompositeOperation = "screen"
-    ctx.fillRect(5,5,50,50)
+    ctx.fillRect(0,0,50,50)
     ctx.globalCompositeOperation = "source-over"
 
-    let data = ctx.getImageData(10,10,10,10);
-    ctx.putImageData(data,30,200)
-
-
-setTimeout(()=>{
-    let dat = ctx.getImageData(20,20,50,50);
+let dat = ctx.getImageData(20,20,50,50);
     console.log(dat)
-},2000)

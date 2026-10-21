@@ -1,6 +1,7 @@
 .DS_Store
 *.ignore*
 /build/*
+/dist/*
 /nvg_demo
 /CPPCanvas/Thirdparty/*
 /CPPCanvas/build/*

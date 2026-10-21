@@ -88,7 +88,7 @@ ifeq ($(IS_WINDOWS),1)
     
     $(TARGET): $(ALL_SOURCES)
 		@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-		clang-cl /LD /std:c++20 /EHsc $(API_CPP) \
+		clang-cl /LD /std:c++20 /O3 /EHsc $(API_CPP) \
 			/I$(CANVAS_DIR)/Thirdparty/skia_build/skia \
 			/I$(CANVAS_DIR)/Thirdparty/glfw-3.4.bin.WIN64\include \
 			/I$(CANVAS_DIR)/Thirdparty/miniaudio \
@@ -108,7 +108,7 @@ else ifeq ($(PLATFORM),linux)
 			clang++ -shared -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
 				"$(GLFW_LIB)" \
-				-std=c++23 -O0 \
+				-std=c++23 -O3 \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
 				-I$(CANVAS_DIR)/Thirdparty/glad/include \
 				-L/usr/lib/clang/22/lib/linux \
@@ -151,7 +151,7 @@ else ifeq ($(PLATFORM),darwin)
 			@mkdir -p $(BUILD_DIR)
 			clang++ -dynamiclib -shared -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
-				-std=c++23 -stdlib=libc++ \
+				-std=c++23 -O3 -stdlib=libc++ \
 				-DGL_SILENCE_DEPRECATION \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
 				-I$(CANVAS_DIR)/Thirdparty/glad/include \

@@ -352,6 +352,7 @@ struct RetiredTexture {
 };
 
 class BunCanvas {
+    bool useGPU = true;
     public:
     
     static constexpr uint64_t MAGIC = 0xBCA1155A;
@@ -370,7 +371,7 @@ class BunCanvas {
     #endif
     
     
-    BunCanvas(int w, int h){
+    BunCanvas(int w, int h, bool gpu = true) : useGPU(gpu){
         // nonapple(std::lock_guard lock(mutex, std::defer_lock));
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
@@ -379,7 +380,7 @@ class BunCanvas {
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         }
         #else
-        if (gpuContextReady) {
+        if (gpuContextReady && useGPU) {
             backendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
@@ -466,7 +467,7 @@ class BunCanvas {
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         }
         #else
-        if (gpuContextReady) {
+        if (gpuContextReady && useGPU) {
 
             if (!retiredTextures.empty()) {
                 // Clean up retired textures after the frame delay
@@ -567,8 +568,8 @@ void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, i
 
 extern "C" {
     
-    WINDOWS_EXPORT void* canvas_create(int w, int h) {
-        return new BunCanvas(w,h);
+    WINDOWS_EXPORT void* canvas_create(int w, int h, bool useGPU) {
+        return new BunCanvas(w,h,useGPU);
     }
     
     WINDOWS_EXPORT void canvas_append(void* canvasObj) {

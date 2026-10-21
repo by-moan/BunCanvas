@@ -66,12 +66,49 @@ class Render2DState {
 	lineDash : number[] = []
 	lineDashOffset = 0;
 	lineJoin = "miter";
-	constructor(){}
+
+	constructor(other? : Render2DState){
+		if (other instanceof Render2DState) {
+			this.lineWidth = other.lineWidth
+			this.globalAlpha = other.globalAlpha
+			this.imageSmoothingQuality = other.imageSmoothingQuality
+			this.imageSmoothingEnabled = other.imageSmoothingEnabled
+			this.fillStyle = other.fillStyle
+			this.strokeStyle = other.strokeStyle
+			this.compositeOperation = other.compositeOperation
+			this.filter = other.filter
+			this.fontCss = other.fontCss
+			this.textBaseline = other.textBaseline
+			this.textAlign = other.textAlign
+			this.lineDash = other.lineDash
+			this.lineDashOffset = other.lineDashOffset
+			this.lineJoin = other.lineJoin
+		}
+	}
+
+	copyFrom(other : Render2DState){
+		if (other instanceof Render2DState) {
+			this.lineWidth = other.lineWidth
+			this.globalAlpha = other.globalAlpha
+			this.imageSmoothingQuality = other.imageSmoothingQuality
+			this.imageSmoothingEnabled = other.imageSmoothingEnabled
+			this.fillStyle = other.fillStyle
+			this.strokeStyle = other.strokeStyle
+			this.compositeOperation = other.compositeOperation
+			this.filter = other.filter
+			this.fontCss = other.fontCss
+			this.textBaseline = other.textBaseline
+			this.textAlign = other.textAlign
+			this.lineDash = other.lineDash
+			this.lineDashOffset = other.lineDashOffset
+			this.lineJoin = other.lineJoin
+		}
+	}
 }
 
 class CanvasRenderingContext2D {
 	#currentState : Render2DState = new Render2DState();
-	#savedState : Render2DState | null = null;
+	#savedState : Render2DState = new Render2DState();
 	#owner : Canvas;
 
 	get canvas() : Canvas {
@@ -248,10 +285,10 @@ class CanvasRenderingContext2D {
 			lib.symbols.canvas_path_roundrect(ptrs.get(this),x,y,width,height,radii)
 		}
 	}
-	fill(path : Path2D | undefined){
+	fill(path? : Path2D){
 		lib.symbols.canvas_path_fill(ptrs.get(this), path?path.ptr:undefined)
 	}
-	stroke(path : Path2D | undefined){
+	stroke(path? : Path2D){
 		lib.symbols.canvas_path_stroke(ptrs.get(this), path?path.ptr:undefined)
 	}
 	set shadowBlur(blur : number){
@@ -344,12 +381,12 @@ class CanvasRenderingContext2D {
 		);
 	}
 	save(){
-		this.#savedState = structuredClone(this.#currentState)
+		this.#savedState?.copyFrom(this.#currentState)
 		lib.symbols.canvas_save(ptrs.get(this))
 	}
 	restore(){
 		if (!this.#savedState) return
-		this.#currentState = structuredClone(this.#savedState)
+		this.#currentState?.copyFrom(this.#savedState)
 		lib.symbols.canvas_restore(ptrs.get(this))
 	}
 	translate(x : number,y : number){

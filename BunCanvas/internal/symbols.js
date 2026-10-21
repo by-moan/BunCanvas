@@ -240,7 +240,7 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_translate: {
 		args: ["ptr","float","float"],
-		returns: "float",
+		returns: "void",
 	},
 	canvas_rotate: {
 		args: ["ptr","float"],

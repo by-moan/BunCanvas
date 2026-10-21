@@ -172,10 +172,10 @@ class Path2D {
         auto rect = SkRect::MakeXYWH(x,y,w,h);
 
         SkVector radiiV[4] = {
-            {h,h}, // top-left
-            {h,h}, // top-right
-            {h,h}, // bottom-right
-            {h,h}  // bottom-left
+            {radii,radii}, // top-left
+            {radii,radii}, // top-right
+            {radii,radii}, // bottom-right
+            {radii,radii}  // bottom-left
         };
         SkRRect rRect;
         rRect.setRectRadii(rect,radiiV);

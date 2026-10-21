@@ -10,7 +10,7 @@ import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 
-let requestedFrames : any[] = []
+let requestedFrames : ((arg?: number)=>void)[] = []
 
 let render_thread : Worker;
 
@@ -297,7 +297,7 @@ export class Window {
 						const end = requestedFrames.length;
 					
 						for (let i = 0; i < end; i++) {
-						    requestedFrames[i]();
+						    requestedFrames[i](performance.now());
 						}
 						// lib.symbols.signal_frame_ready();
 					
@@ -403,7 +403,7 @@ export class Window {
 				
 				const pLen = requestedFrames.length
 				for (let i = 0; i < pLen; i++) {
-					(requestedFrames.shift())()
+					(requestedFrames.shift()!)(performance.now())
 				}
 				if (this.maxFramerate > 0) {
 					sleeping = true;

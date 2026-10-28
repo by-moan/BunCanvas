@@ -271,165 +271,115 @@ export class Window {
 
 		
 		if (process.platform !== "darwin") {
-			render_thread.onerror = (msg)=>{
-				console.log(msg)
-			}
-			render_thread.postMessage({ w: width, h: height, t: encoder.encode(`${title}\0`), vsync: this.#vsync, nativePath : dlPath});
+			render_thread.onerror = (msg) => {
+				console.error("Render thread error:", msg);
+			};
+
+			// Pre-encode string buffer once to avoid runtime allocations
+			const titleBuf = encoder.encode(`${title}\0`);
+
+			render_thread.postMessage({ 
+				w: width, 
+				h: height, 
+				t: titleBuf, 
+				vsync: this.#vsync, 
+				nativePath: dlPath 
+			});
 
 			let pendingFrame = false;
-			
+			let lastFrame = performance.now();
 
-			render_thread.onmessage = async(msg)=>{
-				const frameTime = 1000 / this.maxFramerate;
-				// lib.symbols.update_window();
+			// Removed 'async' wrapper to prevent promise allocation overhead
+			render_thread.onmessage = (msg) => {
+				const frameSignal = msg.data;
 
-				if (msg.data == 2) {
+				if (frameSignal === 2) {
 					lib.symbols.destroy_window();
 					lib.symbols.images_cleanup();
 					process.exit(0);
+					return;
 				}
-				if (msg.data == 1){
-					lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
+
+				if (frameSignal === 1) {
+					lib.symbols.create_window(width, height, titleBuf);
 				}
+
 				lib.symbols.signal_frame_ready();
 
-				if (!pendingFrame) {
-					lib.symbols.canvas_flush_gpu();
-					pendingFrame = true;
-					setImmediate(async ()=>{
-						const end = requestedFrames.length;
-					
-						for (let i = 0; i < end; i++) {
-						    requestedFrames[i](performance.now());
-						}
-						// lib.symbols.signal_frame_ready();
-					
-						requestedFrames.splice(0, end);
-					});
-				}
-				this.#processEvents()
-
+				const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
 				const now = performance.now();
-				if (now - lastFrame >= frameTime) {
-				    lastFrame += frameTime;
-				    // Prevent drift if we fell far behind.
-				    if (now - lastFrame >= frameTime)
-				        lastFrame = now;
-					pendingFrame = false;
-				}else if (frameTime == Infinity) {
-					pendingFrame = false;
-				}else if (this.#vsync) {
-					pendingFrame = false;
+				const delta = now - lastFrame;
+
+				// Process frame if maxFramerate is uncapped, vsync is on, or interval elapsed
+				if (frameInterval === 0 || this.#vsync || delta >= frameInterval) {
+					if (frameInterval > 0) {
+						lastFrame = now - (delta % frameInterval);
+					}
+
+					if (!pendingFrame) {
+						pendingFrame = true;
+						lib.symbols.canvas_flush_gpu();
+
+						setImmediate(() => {
+							const queueLen = requestedFrames.length;
+							if (queueLen > 0) {
+								// Atomic swap avoids .splice() O(N) array re-indexing
+								const framesToProcess = requestedFrames;
+								requestedFrames = [];
+								for (let i = 0; i < queueLen; i++) {
+									framesToProcess[i](now);
+								}
+							}
+							pendingFrame = false;
+						});
+					}
 				}
-				
-			}
-		} else /* MACOS JS LOOP */ {
-			let sleeping = false;
-			let cb = new JSCallback(async ()=>{
-				if (sleeping) return;
-				if (lib.symbols.should_window_close()) {
-					lib.symbols.destroy_window();
-					process.exit(0);
-					return
-				}
-				
-				this.#processEvents()
-				// if (this.#wResizeViewer[0] != 0) {
-				// 	this.#wResizeViewer[0] = 0
-				// 	console.log("wresize!")
-				// 	const details = new Event("resize",this);
-					
-				// 	this.#dim[0] = this.#wResizeViewer[1]
-				// 	this.#dim[1] = this.#wResizeViewer[2]
-				// 	if (this.onresize) {
-				// 		this.onresize(details)
-				// 	}
-				// 	this.#rEvts.forEach((item,key)=>{
-				// 			item.cb(details);
-				// 		})
-				// }
-				// if(this.#mMoveViewer[0] != 0) {
-				// 	this.#mMoveViewer[0] = 0	
-				// 	const evt = new MouseEvent("move",
-				// 		{
-				// 			target: this,
-				// 			altKey:false,
-				// 			button:0,
-				// 			buttons:this.#mMoveViewer[5],
-				// 			clientX:this.#mMoveViewer[1],
-				// 			clientY:this.#mMoveViewer[2],
-				// 			movementX: this.#mMoveViewer[3],
-				// 			movementY: this.#mMoveViewer[4],
-				// 			ctrlKey:false,
-				// 			metaKey:false,
-				// 			screenX:0,
-				// 			screenY:0,
-				// 			shiftKey:false
-				// 		}
-				// 	)
-				// 	if (this.onmousemove) {this.onmousemove(evt)}
-				// 	this.#mMoveEvts.forEach((item,key)=>{
-				// 		item.cb(evt);
-				// 	})
-				// }
-				// if(this.#mClickViewer[0] != 0) {
-				// 	this.#mClickViewer[0] = 0
-				// 	const evt = new MouseEvent("click",
-				// 		{
-				// 			altKey:this.#mClickViewer[7],
-				// 			button:this.#mClickViewer[3],
-				// 			buttons:this.#mClickViewer[4],
-				// 			clientX:this.#mClickViewer[1],
-				// 			clientY:this.#mClickViewer[2],
-				// 			movementX: 0,
-				// 			movementY: 0,
-				// 			ctrlKey:this.#mClickViewer[6],
-				// 			metaKey:this.#mClickViewer[8],
-				// 			screenX:this.#mClickViewer[1],
-				// 			screenY:this.#mClickViewer[2],
-				// 			shiftKey:this.#mClickViewer[5]
-				// 		}
-				// 	)
-				// 	if (this.onclick) this.onclick(evt)
-				// 		this.#mClickEvts.forEach((item,key)=>{
-				// 		item.cb(evt);
-				// 	})
-				// }
-				// if(this.#kDownViewer[0] != 0) {
-				// 	this.#kDownViewer[0] = 0;
-				// 	const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
-				// 	if (this.onkeydown) this.onkeydown(evt)
-				// 		this.#keyDownEvts.forEach((item,key)=>{
-				// 		item.cb(evt);
-				// 	})
-				// }
-				
-				const pLen = requestedFrames.length
-				for (let i = 0; i < pLen; i++) {
-					(requestedFrames.shift()!)(performance.now())
-				}
-				if (this.maxFramerate > 0) {
-					sleeping = true;
-					setTimeout(()=>{sleeping = false},Math.round(1000/this.maxFramerate-1))
-				}
-			},{
-				args:[],
-				returns: "void"
-			});
+
+				this.#processEvents();
+			};
+		}else /* MACOS JS LOOP */ {
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {
-					args: ["int","int","cstring","ptr","bool"],
+					args: ["int", "int", "cstring", "ptr", "bool"],
 					returns: "void",
 				}
 			});
-			aaplLib.symbols.setup_render_thread(width,height,encoder.encode(`${title}\0`),cb.ptr,vsync)
 
-			lib.symbols.create_window(width,height,encoder.encode(`${title}\0`))
+			const titleBuf = encoder.encode(`${title}\0`);
+			aaplLib.symbols.setup_render_thread(width, height, titleBuf, 0, vsync);
+			lib.symbols.create_window(width, height, titleBuf);
 
-			
-			setInterval(()=>{
-				lib.symbols.update_window(cb.ptr);
-			},0);
+			const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
+			let lastFrameTime = performance.now();
+
+			const loop = () => {
+				if (lib.symbols.should_window_close()) {
+					lib.symbols.destroy_window();
+					process.exit(0);
+					return;
+				}
+
+				const now = performance.now();
+				const delta = now - lastFrameTime;
+
+				if (frameInterval === 0 || delta >= frameInterval) {
+					lastFrameTime = frameInterval > 0 ? now - (delta % frameInterval) : now;
+
+					this.#processEvents();
+					if (requestedFrames.length > 0) {
+						const framesToProcess = requestedFrames;
+						requestedFrames = [];
+						for (let i = 0; i < framesToProcess.length; i++) {
+							framesToProcess[i](now);
+						}
+					}
+
+					lib.symbols.update_window();
+				}
+				setImmediate(loop);
+			};
+
+			loop();
 		}
 		
 	}

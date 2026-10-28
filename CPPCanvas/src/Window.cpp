@@ -425,9 +425,9 @@ extern "C" {
     #endif
     
     #ifndef __APPLE__
-    WINDOWS_EXPORT void update_window( JSCallback_WRefresh onrefresh){}
+    WINDOWS_EXPORT void update_window(){}
     #else
-    WINDOWS_EXPORT void update_window(JSCallback_WRefresh onrefresh){
+    WINDOWS_EXPORT void update_window(){
         glfwGetFramebufferSize(window, &width, &height);
         
         glfwPollEvents();
@@ -453,7 +453,6 @@ extern "C" {
         }
         
         // processResizes();
-        onrefresh(1);
         
         for (auto element : canvases) {
             canvas->drawImage(element->surface->makeTemporaryImage(),0,0);

@@ -1,6 +1,5 @@
 import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "./BunCanvas";
 
-
 const window = new Window(800,600, "spiiin", {vsync:false, maxFramerate:165});
 // Create and append canvas
 const canvas = new Canvas(800,600)
@@ -10,7 +9,6 @@ window.onresize = (evt)=>{
 	canvas.width = window.innerWidth
 	canvas.height = window.innerHeight
 }
-
 
 const ctx = canvas.getContext('2d', {desynchronized:true});
 
@@ -256,7 +254,7 @@ function resolveCollisions() {
 }
 
 // Overlay rendering
-function drawCanvasHUD(ctx) {
+function drawCanvasHUD() {
 	ctx.save();
 	
 	// Header info box
@@ -330,7 +328,7 @@ function step(now) {
 	}
 	
 	// Render Canvas HUD
-	drawCanvasHUD(ctx);
+	drawCanvasHUD();
 	
 	// FPS Counter
 	frameCount++;

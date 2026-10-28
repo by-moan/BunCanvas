@@ -105,19 +105,28 @@ else ifeq ($(PLATFORM),linux)
     ifeq ($(ARCH),x64)
         $(TARGET): $(ALL_SOURCES)
 			@mkdir -p $(BUILD_DIR)
-			clang++ -shared -fPIC $(API_CPP) \
-				"$(SKIA_OUT)/libskia.a" \
-				"$(GLFW_LIB)" \
-				-std=c++23 -O3 \
-				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
-				-I$(CANVAS_DIR)/Thirdparty/glad/include \
-				-L/usr/lib/clang/22/lib/linux \
-				-lGL -lEGL -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg \
-				-o $@
+			clang++ -std=c++23 -O3 -fPIC -shared \
+			-static-libstdc++ -static-libgcc \
+			-Wl,--exclude-libs,ALL \
+			$(API_CPP) \
+			"$(SKIA_OUT)/libskia.a" \
+			"$(GLFW_LIB)" \
+			-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
+			-I$(CANVAS_DIR)/Thirdparty/glad/include \
+			-L/usr/lib/clang/22/lib/linux \
+			\
+			-Wl,-Bdynamic \
+				-lGL \
+				-lEGL \
+				-lfontconfig \
+				-ldl \
+				-lpthread \
+				-lm \
+			-o $@
     else
         $(TARGET): $(ALL_SOURCES)
 			@mkdir -p $(BUILD_DIR)
-			clang++ -shared -fPIC $(API_CPP) \
+			clang++ -static-libstdc++ -static-libgcc -Wl,-Bstatic -lm -Wl,-Bdynamic -shared -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
 				"$(GLFW_LIB)" \
 				-std=c++23 -O3 \

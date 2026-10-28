@@ -46,9 +46,15 @@
 #endif
 
 #include <GLFW/glfw3.h>
-#define MINIAUDIO_IMPLEMENTATION
-#include <miniaudio/miniaudio.h>
 
+#define MINIAUDIO_IMPLEMENTATION
+#if __has_include(<miniaudio/miniaudio.h>)
+    #include <miniaudio/miniaudio.h>
+#elif __has_include(<miniaudio.h>)
+    #include <miniaudio.h>
+#else
+    #error "No se pudo encontrar miniaudio.h en el sistema"
+#endif
 
 #include "include/core/SkFontScanner.h"
 #include "include/core/SkFontArguments.h"

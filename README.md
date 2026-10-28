@@ -64,7 +64,7 @@ $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ python3 tools/git-sync-deps
-$ gn gen "out/$(uname -o)_$(uname -m)" --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "x64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
+$ gn gen out/$(uname -o)_$(uname -m) --args='is_debug = false is_official_build = true skia_use_fontconfig = false skia_use_system_freetype2 = false skia_use_system_harfbuzz = false skia_use_system_icu = false skia_use_system_expat = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_enable_ganesh = true skia_use_gl = true skia_use_egl = true skia_use_system_libwebp = false'
 $ ninja -C "out/$(uname -o)_$(uname -m)"
 ```
 <br>

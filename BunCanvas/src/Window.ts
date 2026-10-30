@@ -271,7 +271,7 @@ export class Window {
 		return this.#wPropertiesViewer[2]
 	}
 
-	constructor(width : number, height : number, title = "App", args : any) {
+	constructor(width : number, height : number, title = "App", args : {vsync:boolean, maxFramerate:number}) {
 		if (process.platform !== "darwin") (render_thread as any).ref?.();
 		windowWasCreated = true;
 		this.#wPropertiesViewer[1] = width;

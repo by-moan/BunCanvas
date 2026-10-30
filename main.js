@@ -1,6 +1,6 @@
 import { Canvas, Window, requestAnimationFrame } from './BunCanvas'
 
-const window = new Window(800,600)
+const window = new Window(800,600, "app", {vsync:false})
 const canvas = new Canvas(window.innerWidth, window.innerHeight)
 const ctx = canvas.getContext('2d')
 

@@ -28,8 +28,6 @@ lib.symbols.canvas_init_gpu_context();
 
 let windowWasCreated = false;
 export class Window {
-	#dim = new Float64Array(2);
-	
 	#rEvts = new Map();
 	#mMoveEvts = new Map();
 	#mDownEvts = new Map();
@@ -38,7 +36,7 @@ export class Window {
 	#mClickEvts = new Map();
 	#keyDownEvts = new Map();
 
-	#wResizeViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wResizeViewer()!,0, 3 * 4));
+	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 4 * 4));
 	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
 	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
 	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
@@ -54,12 +52,12 @@ export class Window {
 	#eIndex = 0
 
 	#processEvents(){
-		if (this.#wResizeViewer[0] != 0) {
-			this.#wResizeViewer[0] = 0
+		if (this.#wPropertiesViewer[0] != 0) {
+			this.#wPropertiesViewer[0] = 0
 			const details = new Event("resize",this);
 			
-			this.#dim[0] = this.#wResizeViewer[1]
-			this.#dim[1] = this.#wResizeViewer[2]
+			// this.#dim[0] = this.#wResizeViewer[1]
+			// this.#dim[1] = this.#wResizeViewer[2]
 			if (this.onresize) this.onresize(details)
 			this.#rEvts.forEach((item,key)=>{
 				item.cb(details);
@@ -252,17 +250,17 @@ export class Window {
 
 
 	get innerWidth(){
-		return this.#dim[0]
+		return this.#wPropertiesViewer[1]
 	}
 	get innerHeight(){
-		return this.#dim[1]
+		return this.#wPropertiesViewer[2]
 	}
 
 	constructor(width : number, height : number, title = "App", args : any) {
 		if (process.platform !== "darwin") (render_thread as any).ref?.();
 		windowWasCreated = true;
-		this.#dim[0] = width;
-		this.#dim[1] = height;
+		this.#wPropertiesViewer[1] = width;
+		this.#wPropertiesViewer[2] = height;
 
 		const { vsync = true, maxFramerate = 0 } = args ?? {};
 		this.#vsync = vsync;
@@ -353,7 +351,7 @@ export class Window {
 			let lastFrameTime = performance.now();
 
 			const loop = () => {
-				if (lib.symbols.should_window_close()) {
+				if (this.#wPropertiesViewer[3] == 1) {
 					lib.symbols.destroy_window();
 					process.exit(0);
 					return;

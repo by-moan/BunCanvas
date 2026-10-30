@@ -43,7 +43,7 @@ export const lib = dlopen(dlPath, {
         args: [],
         returns: "void"
     },
-	get_wResizeViewer:{
+	get_wPropertiesViewer:{
 		args: [],
 		returns: "ptr",
 	},
@@ -90,10 +90,6 @@ export const lib = dlopen(dlPath, {
 	update_window: {
 		args: ["ptr"],
 		returns: "void",
-	},
-	should_window_close: {
-		args: [],
-		returns: "bool",
 	},
 	destroy_window: {
 		args: [],

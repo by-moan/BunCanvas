@@ -1,7 +1,7 @@
 import { dlopen, FFIType, JSCallback } from "bun:ffi";
 
 const MessagePost = new JSCallback((instruction)=>{
-    self.postMessage(`${instruction}`);
+    self.postMessage(instruction);
     },
     {
         args: ["int"],
@@ -19,7 +19,6 @@ self.onmessage = (msg)=>{
         }
     });
     lib.symbols.setup_render_thread(w,h,t,MessagePost.ptr,vsync);
-    self.postMessage("2")
-    process.exit(0)
+    self.postMessage(2)
 }
 

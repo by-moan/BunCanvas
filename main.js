@@ -1,6 +1,7 @@
 import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "./BunCanvas";
 
 const window = new Window(800,600, "spiiin", {vsync:false, maxFramerate:165});
+console.log(window.innerWidth,window.innerHeight)
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);

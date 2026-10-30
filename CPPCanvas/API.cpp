@@ -262,7 +262,7 @@ bool gpuContextReady = false;
 
 std::recursive_mutex loop_mutex;
 
-static int32_t wResizeViewer[3]{};
+static int32_t wPropertiesViewer[3]{};
 static _Float64_t mMoveViewer[9]{};
 static _Float64_t mClickViewer[9]{};
 static _Float64_t mDownViewer[9]{};
@@ -277,7 +277,7 @@ std::condition_variable frameCv;
 bool frameReady = true;
 
 extern "C" {
-    WINDOWS_EXPORT int32_t* get_wResizeViewer(){return wResizeViewer;}
+    WINDOWS_EXPORT int32_t* get_wPropertiesViewer(){return wPropertiesViewer;}
     WINDOWS_EXPORT _Float64_t* get_mMoveViewer(){return mMoveViewer;}
     WINDOWS_EXPORT _Float64_t* get_mClickViewer(){return mClickViewer;}
     WINDOWS_EXPORT _Float64_t* get_mDownViewer(){return mDownViewer;}

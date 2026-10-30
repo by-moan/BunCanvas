@@ -347,10 +347,8 @@ extern "C" {
     }
     #else
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
-        
         width = w;
         height = h;
-        
         
         window = glfwCreateWindow(width, height, title, NULL, NULL);
         if (!window) {
@@ -401,7 +399,7 @@ extern "C" {
         sWrapper = createSurface(
             width,
             height
-        );;
+        );
         
         if (!sWrapper->surface) {
             std::cout << "Surface was not created!\n";

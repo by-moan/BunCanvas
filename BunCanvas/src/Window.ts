@@ -35,6 +35,7 @@ export class Window {
 	#mWheelEvts = new Map();
 	#mClickEvts = new Map();
 	#keyDownEvts = new Map();
+	#keyUpEvts = new Map();
 
 	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 4 * 4));
 	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
@@ -59,6 +60,7 @@ export class Window {
 			// this.#dim[0] = this.#wResizeViewer[1]
 			// this.#dim[1] = this.#wResizeViewer[2]
 			if (this.onresize) this.onresize(details)
+			
 			this.#rEvts.forEach((item,key)=>{
 				item.cb(details);
 			})
@@ -83,6 +85,7 @@ export class Window {
 				}
 			)
 			if (this.onmousemove) this.onmousemove(evt)
+			
 			this.#mMoveEvts.forEach((item,key)=>{
 				item.cb(evt);
 			})
@@ -107,13 +110,14 @@ export class Window {
 				}
 			)
 			if (this.onmousemove) this.onmousemove(evt)
-				this.#mMoveEvts.forEach((item,key)=>{
+			
+			this.#mMoveEvts.forEach((item,key)=>{
 				item.cb(evt);
 			})
 		}
 		if(this.#mDownViewer[0] != 0) {
 			this.#mDownViewer[0] = 0
-			const evt = new MouseEvent("click",
+			const evt = new MouseEvent("down",
 				{
 					target:this,
 					altKey:this.#mDownViewer[7],
@@ -138,7 +142,7 @@ export class Window {
 		}
 		if(this.#mUpViewer[0] != 0) {
 			this.#mUpViewer[0] = 0
-			const evt = new MouseEvent("click",
+			const evt = new MouseEvent("up",
 				{
 					target:this,
 					altKey:this.#mUpViewer[7],
@@ -181,14 +185,15 @@ export class Window {
 				}
 			)
 			if (this.onclick) this.onclick(evt)
-				this.#mClickEvts.forEach((item,key)=>{
+			
+			this.#mClickEvts.forEach((item,key)=>{
 				item.cb(evt);
 			})
 		}
 
 		if(this.#mWheelViewer[0] != 0) {
 			this.#mWheelViewer[0] = 0
-			const evt = new WheelEvent("click",
+			const evt = new WheelEvent("wheel",
 				{
 					target:this,
 					altKey:this.#mMoveViewer[7],
@@ -217,7 +222,16 @@ export class Window {
 			this.#kDownViewer[0] = 0;
 			const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
 			if (this.onkeydown) this.onkeydown(evt)
-				this.#keyDownEvts.forEach((item,key)=>{
+
+			this.#keyDownEvts.forEach((item,key)=>{
+				item.cb(evt);
+			})
+		}
+		if(this.#kUpViewer[0] != 0) {
+			this.#kUpViewer[0] = 0;
+			const evt = new KeyboardEvent("up",null,this.#kUpViewer[2],this,this.#kUpViewer[1],this.#kUpViewer[3],this.#kUpViewer[4],this.#kUpViewer[5],this.#kUpViewer[6],)
+			if (this.onkeyup) this.onkeyup(evt)
+			this.#keyUpEvts.forEach((item,key)=>{
 				item.cb(evt);
 			})
 		}
@@ -245,6 +259,7 @@ export class Window {
 	onmouseup : ((evt: MouseEvent) => any) | null = null;
 	onclick : ((evt: MouseEvent) => any) | null = null;
 	onkeydown : ((evt: KeyboardEvent) => any) | null = null;
+	onkeyup : ((evt: KeyboardEvent) => any) | null = null;
 	
 	onwheel : ((evt: MouseEvent) => any) | null = null;
 
@@ -350,7 +365,7 @@ export class Window {
 			const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
 			let lastFrameTime = performance.now();
 
-			const loop = () => {
+			const loop = () =>{
 				if (this.#wPropertiesViewer[3] == 1) {
 					lib.symbols.destroy_window();
 					process.exit(0);
@@ -408,6 +423,9 @@ export class Window {
 		}else if (name == "keydown") {
 			this.#keyDownEvts.set(usedIndex, {name: name, cb: fn})
 			this.#evtDetails.set(fn,usedIndex)
+		}else if (name == "keyup") {
+			this.#keyUpEvts.set(usedIndex, {name: name, cb: fn})
+			this.#evtDetails.set(fn,usedIndex)
 		}
 	}
 	removeEventListener(name : string,fn : ((event:any)=>void)){
@@ -422,6 +440,21 @@ export class Window {
 				this.#mMoveEvts.delete(det)
 				this.#evtDetails.delete(fn)
 			}
+		}else if (name == "mousedown") {
+			if (det != undefined) {
+				this.#mDownEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
+		}else if (name == "mouseup") {
+			if (det != undefined) {
+				this.#mMUpEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
+		}else if (name == "wheel") {
+			if (det != undefined) {
+				this.#mWheelEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
 		}else if (name == "click") {
 			if (det != undefined) {
 				this.#mClickEvts.delete(det)
@@ -430,6 +463,11 @@ export class Window {
 		}else if (name == "keydown") {
 			if (det != undefined) {
 				this.#keyDownEvts.delete(det)
+				this.#evtDetails.delete(fn)
+			}
+		}else if (name == "keyup") {
+			if (det != undefined) {
+				this.#keyUpEvts.delete(det)
 				this.#evtDetails.delete(fn)
 			}
 		}

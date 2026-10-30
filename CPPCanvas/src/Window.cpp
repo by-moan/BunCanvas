@@ -428,7 +428,7 @@ extern "C" {
     WINDOWS_EXPORT void update_window(){}
     #else
     WINDOWS_EXPORT void update_window(){
-        wPropertiesViewer[2] = glfwWindowShouldClose(window)
+        wPropertiesViewer[3] = glfwWindowShouldClose(window);
         if (glfwWindowShouldClose(window)) return;
         glfwGetFramebufferSize(window, &width, &height);
         
@@ -449,9 +449,9 @@ extern "C" {
             );
             canvas = sWrapper->surface->getCanvas();
             // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-            wResizeViewer[0] = true;
-            wResizeViewer[1] = pendingW;
-            wResizeViewer[2] = pendingH;
+            wPropertiesViewer[0] = true;
+            wPropertiesViewer[1] = pendingW;
+            wPropertiesViewer[2] = pendingH;
         }
         
         // processResizes();

@@ -27,12 +27,10 @@ enum GradientType {
 
 class CanvasGradient {
 	type : GradientType;
-	stops = {
-		offsets: [] as number[],
-		color: [] as string[],
-	}
+	points = new Float32Array(6);
+	offsets: number[] = [];
+    colors: Uint8Array[] = [];
 
-	points = new Float64Array(6);
 
 	/*Linear
 		points[0] p0.x
@@ -85,34 +83,18 @@ class CanvasGradient {
 				break;
 			}
 		}
-		// switch (args.length) {
-		// 	case 3: {
-		// 		let ptr = lib.symbols.canvas_create_conic_gradient(args[0],args[1],args[2])
-		// 		ptrs.set(this,ptr)
-		// 		cGradientFinalizationRegistry.register(this,ptr)
-		// 		break;
-		// 	}
-		// 	case 4: {
-		// 		let ptr = lib.symbols.canvas_create_linear_gradient(args[0],args[1],args[2],args[3])
-		// 		ptrs.set(this,ptr)
-		// 		cGradientFinalizationRegistry.register(this,ptr)
-		// 		break;
-		// 	}
-		// 	case 6: {
-		// 		let ptr = lib.symbols.canvas_create_radial_gradient(args[0],args[1],args[2],args[3],args[4],args[5])
-		// 		ptrs.set(this,ptr)
-		// 		cGradientFinalizationRegistry.register(this,ptr)
-		// 		break;
-		// 	}
-		// }
 	}
 
 	addColorStop(offset : number, color : string) {
 		if (offset < 0 || offset > 1) throw new RangeError(`Failed to execute 'addColorStop' on 'CanvasGradient': The provided value (${offset}) is outside the range (0.0, 1.0).`)
-		// let res = lib.symbols.canvas_gradient_add_color_stop(ptrs.get(this),offset,encoder.encode(`${color}\0`))
 		if (!isValidColor(color)) throw new SyntaxError(`Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('${color}') could not be parsed as a color.`)
-		this.stops.offsets.push(offset)
-		this.stops.color.push(color)
+		
+		// Maintain sorted order on insertion
+        const idx = this.offsets.findIndex(o => o > offset);
+        const insertIdx = idx === -1 ? this.offsets.length : idx;
+
+        this.offsets.splice(insertIdx, 0, offset);
+        this.colors.splice(insertIdx, 0, encodeCString(color));
 	}
 };
 
@@ -176,15 +158,36 @@ class CanvasRenderingContext2D {
 	#savedState : Render2DState = new Render2DState();
 	#owner : Canvas;
 
-	get canvas() : Canvas {
-		return this.#owner
-	}
-
 	#reset(){
 		this.#currentState = new Render2DState();
 	}
 
-	
+	#setStyleGradient(style: CanvasGradient, isStroke: boolean): boolean {
+		const count = style.colors.length;
+		const ptrArray = new BigUint64Array(count);
+		
+		for (let i = 0; i < count; i++) {
+			ptrArray[i] = BigInt(ptr(style.colors[i]));
+		}
+
+		const offsetBuffer = new Float32Array(style.offsets);
+		const nativeFn = isStroke 
+			? lib.symbols.canvas_set_stroke_style_gradient 
+			: lib.symbols.canvas_set_fill_style_gradient;
+
+		return nativeFn(
+			ptrs.get(this),
+			style.type,
+			ptr(style.points),
+			count,
+			ptr(ptrArray),
+			ptr(offsetBuffer)
+		);
+	}
+
+	get canvas() : Canvas {
+		return this.#owner
+	}
 	
 	set font(css: string) {
 		this.#currentState.fontCss = css.trim().toLowerCase();
@@ -192,7 +195,6 @@ class CanvasRenderingContext2D {
 		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`));
 	}
 	get font(): string { 
-
 		return this.#currentState.fontCss;
 	}
 	
@@ -201,15 +203,8 @@ class CanvasRenderingContext2D {
 		let res = false;
 		if (typeof style === "string") {
 			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
-		}
-		if (style instanceof CanvasGradient ){
-			const encodedBuffers = style.stops.color.map(str=>encodeCString(str))
-			const ptrArray = new BigUint64Array(encodedBuffers.length)
-			for (let i = 0; i < encodedBuffers.length; i++) {
-				// Convert the Uint8Array buffer reference to its native memory address
-				ptrArray[i] = BigInt(ptr(encodedBuffers[i]));
-			}
-			res = lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),style.type,ptr(new Float32Array(style.points)),ptrArray.length,ptr(ptrArray),new Float32Array(style.stops.offsets))
+		} else if (style instanceof CanvasGradient) {
+			res = this.#setStyleGradient(style, false);
 		}
 		if (res) this.#currentState.fillStyle = style;
 	}
@@ -222,16 +217,10 @@ class CanvasRenderingContext2D {
 		let res = false;
 		if (typeof style === "string") {
 			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+		} else if (style instanceof CanvasGradient) {
+			res = this.#setStyleGradient(style, true);
 		}
-		if (style instanceof CanvasGradient ){
-			const encodedBuffers = style.stops.color.map(str=>encodeCString(str))
-			const ptrArray = new BigUint64Array(encodedBuffers.length)
-			for (let i = 0; i < encodedBuffers.length; i++) {
-				// Convert the Uint8Array buffer reference to its native memory address
-				ptrArray[i] = BigInt(ptr(encodedBuffers[i]));
-			}
-			res = lib.symbols.canvas_set_stroke_style_gradient(ptrs.get(this),style.type,ptr(new Float32Array(style.points)),ptrArray.length,ptr(ptrArray),ptr(new Float32Array(style.stops.offsets)))
-		}
+
 		if (res) this.#currentState.strokeStyle = style;
 	}
 	get strokeStyle(){

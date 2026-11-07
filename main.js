@@ -6,9 +6,12 @@ const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
 const canvas = new Canvas(800,600)
 window.append(canvas);
 
+let wSizeStr = `${window.innerWidth}x${window.innerHeight}`
+
 window.onresize = (evt)=>{
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
+    wSizeStr = `${window.innerWidth}x${window.innerHeight}`
 }
 
 const ctx = canvas.getContext('2d', {desynchronized:true});
@@ -270,7 +273,7 @@ function drawCanvasHUD(ctx) {
     // Text
     ctx.fillStyle = '#6366f1';
     ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.fillText(`WINDOW: asd`, 28, 38);
+    ctx.fillText(`WINDOW: ${wSizeStr}`, 28, 38);
     
     ctx.fillStyle = '#10b981';
     ctx.font = '12px monospace';
@@ -320,11 +323,9 @@ function step(now) {
         resolveCollisions();
     }
     
-    // Canvas Background clear with subtle trail fade
-    const grad = ctx.createLinearGradient(0,0,window.innerWidth, window.innerHeight);
-    grad.addColorStop(0, "#ff0000")
-    grad.addColorStop(0.5, "#00FF00")
-    grad.addColorStop(1, "#0000FF")
+    const grad = ctx.createLinearGradient(0,0,0,window.innerHeight);
+    grad.addColorStop(1, "#0d1125")
+    grad.addColorStop(0, "#162157")
 
 
     ctx.fillStyle = grad;

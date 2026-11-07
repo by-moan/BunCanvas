@@ -299,6 +299,7 @@ function drawCanvasHUD(ctx) {
 // Main Loop
 let lastFrameTime = performance.now();
 
+
 function step(now) {
     const dt = Math.min((now - lastFrameTime) / 16.667, 2.0);
     lastFrameTime = now;
@@ -320,7 +321,13 @@ function step(now) {
     }
     
     // Canvas Background clear with subtle trail fade
-    ctx.fillStyle = 'rgba(9, 13, 22, 0.35)';
+    const grad = ctx.createLinearGradient(0,0,window.innerWidth, window.innerHeight);
+    grad.addColorStop(0, "#ff0000")
+    grad.addColorStop(0.5, "#00FF00")
+    grad.addColorStop(1, "#0000FF")
+
+
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     
     // Render all ball objects

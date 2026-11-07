@@ -1,8 +1,5 @@
 bool pollingEvents = false;
 
-
-
-bool shouldClose = false;
 bool pendingResize = false;
 int pendingW = 1;
 int pendingH = 1;
@@ -147,7 +144,6 @@ void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) 
 }
 
 typedef int (*JSCallback_WRefresh)(int);
-typedef int (*JSCallback_WClose)();
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title){
@@ -318,7 +314,6 @@ extern "C" {
             // loop_mutex.unlock();
         }
         ready = false;
-        shouldClose = true;
         glfwDestroyWindow(window);
         glfwTerminate();
         delete renderThreadInterface;

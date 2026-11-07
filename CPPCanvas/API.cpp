@@ -250,7 +250,6 @@ GLFWwindow* window = nullptr;
 BackedSurface* sWrapper = nullptr;
 sk_sp<SkFontMgr> fontMgr = CreateFontManager();
 bool ready = false;
-bool mainThreadReady = false;
 std::vector<int> vsyncQueue;
 
 #ifndef __APPLE__
@@ -260,7 +259,6 @@ InterfaceWrapper* mainThreadIface = nullptr;
 bool gpuContextReady = false;
 #endif
 
-std::recursive_mutex loop_mutex;
 
 static int32_t wPropertiesViewer[3]{};
 static _Float64_t mMoveViewer[9]{};

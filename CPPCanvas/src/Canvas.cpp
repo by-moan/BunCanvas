@@ -552,18 +552,52 @@ std::vector<BunCanvas*> canvases;
 
 void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, int argc){
     if (argc == 4) {
-        (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(0[d],1[d],2[d],3[d]),ctx->currentState.sampling,&(ctx->currentState.imageColor));
+        (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(d[0], d[1], d[2], d[3]),ctx->currentState.sampling,&(ctx->currentState.imageColor));
     }
     if (argc == 8) {
         (*ctx)()->drawImageRect(
             img.get(),
-            SkRect::MakeXYWH(0[d],1[d],2[d],3[d]),
-            SkRect::MakeXYWH(4[d],5[d],6[d],7[d]),
+            SkRect::MakeXYWH(d[0],d[1],d[2],d[3]),
+            SkRect::MakeXYWH(d[4],d[5],d[6],d[7]),
             ctx->currentState.sampling,
             &(ctx->currentState.imageColor),
             {}
         );
     }
+}
+
+sk_sp<SkShader> createSkiaShader(const BunCanvasGradient& grad) {
+    // if (!grad) return nullptr;
+
+    std::vector<SkColor4f> colors;
+    std::vector<float> positions;
+    colors.reserve(grad.stops.size());
+    positions.reserve(grad.stops.size());
+
+    for (const auto& stop : grad.stops) {
+        colors.push_back(stop.color);
+        positions.push_back(stop.offset);
+    }
+
+    SkGradient gradient(SkGradient::Colors(colors, positions, SkTileMode::kClamp), {});
+
+    switch (grad.type) {
+        case GradientType::Linear: {
+            SkPoint pts[] = { grad.p0, grad.p1 };
+            return SkShaders::LinearGradient(pts, gradient);
+        }
+        case GradientType::Radial: {
+            if (grad.c0 == grad.c1 && grad.r0 == 0.0f) {
+                return SkShaders::RadialGradient(grad.c1, grad.r1, gradient);
+            }
+            return SkShaders::TwoPointConicalGradient(grad.c0, grad.r0, grad.c1, grad.r1, gradient);
+        }
+        case GradientType::Conic: {
+            float startDeg = SkRadiansToDegrees(grad.angle);
+            return SkShaders::SweepGradient(grad.center, startDeg, startDeg + 360.0f, gradient, nullptr);
+        }
+    }
+    return nullptr;
 }
 
 extern "C" {
@@ -612,111 +646,86 @@ extern "C" {
         return false;
     }
     
-    WINDOWS_EXPORT bool canvas_set_fill_style_gradient(void* canvasObj, void* cGradient){
+    WINDOWS_EXPORT bool canvas_set_fill_style_gradient(void* canvasObj, GradientType gradType,
+        float* gradient_args,
+        int stops_length, const char** stops_color, float* stops_offset){
         
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
-        if (!obj||!grad) return false;
+        if (!obj||!stops_color||!stops_offset) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        
-        switch (grad->type){
+
+        sk_sp<SkShader> createdShader = nullptr;
+
+        switch(gradType) {
             case GradientType::Linear : {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-                
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-                
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
-                }
-                
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-                SkPoint pts[] = { grad->p0, grad->p1 };
-                obj->currentState.fillColor.setShader(SkShaders::LinearGradient(pts, gradient));
-                return true;
-            }
-            case GradientType::Radial: {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
-                }
-            
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-            
-                sk_sp<SkShader> shader;
-            
-                // Simple radial gradient
-                if (grad->c0 == grad->c1 && grad->r0 == 0.0f) {
-                    shader = SkShaders::RadialGradient(
-                        grad->c1,
-                        grad->r1,
-                        gradient
+                BunCanvasGradient gradient{GradientType::Linear,gradient_args[0],gradient_args[1],gradient_args[2],gradient_args[3]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
                     );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                    }
                 }
-                // General Canvas radial gradient
-                else {
-                    shader = SkShaders::TwoPointConicalGradient(
-                        grad->c0,
-                        grad->r0,
-                        grad->c1,
-                        grad->r1,
-                        gradient
-                    );
-                }
-            
-                obj->currentState.fillColor.setShader(std::move(shader));
-                return true;
+                createdShader = createSkiaShader(gradient);
+                break;
             }
-
-            case GradientType::Conic: {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-            
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-            
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
+            case GradientType::Radial : {
+                BunCanvasGradient gradient{GradientType::Radial,gradient_args[0],gradient_args[1],gradient_args[2],gradient_args[3],gradient_args[4],gradient_args[5]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
+                    );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                    }
                 }
-            
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-            
-                float startDeg = SkRadiansToDegrees(grad->angle);
-            
-                obj->currentState.fillColor.setShader(
-                    SkShaders::SweepGradient(
-                        grad->center,
-                        startDeg,
-                        startDeg + 360.0f,
-                        gradient,
-                        nullptr
-                    )
-                );
-            
-                return true;
+                createdShader = createSkiaShader(gradient);
+                break;
+            }
+            case GradientType::Conic : {
+                BunCanvasGradient gradient{GradientType::Conic,gradient_args[0],gradient_args[1],gradient_args[2]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
+                    );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                        // return true;
+                    }
+                }
+                createdShader = createSkiaShader(gradient);
+                break;
             }
         }
+
+        if(createdShader) {
+            obj->currentState.fillColor.setShader(
+                std::move(createdShader)
+            );
+        }
+        
         return false;
     }
     
@@ -737,110 +746,86 @@ extern "C" {
         return false;
     }
     
-    WINDOWS_EXPORT bool canvas_set_stroke_style_gradient(void* canvasObj, void* cGradient){
+    WINDOWS_EXPORT bool canvas_set_stroke_style_gradient(void* canvasObj, GradientType gradType,
+        float* gradient_args,
+        int stops_length, const char** stops_color, float* stops_offset){
+        
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        BunCanvasGradient* grad = validated<BunCanvasGradient>(cGradient);
-        if (!obj||!grad) return false;
+        if (!obj||!stops_color||!stops_offset) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        
-        switch (grad->type){
+
+        sk_sp<SkShader> createdShader = nullptr;
+
+        switch(gradType) {
             case GradientType::Linear : {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-                
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-                
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
-                }
-                
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-                SkPoint pts[] = { grad->p0, grad->p1 };
-                obj->currentState.strokeColor.setShader(SkShaders::LinearGradient(pts, gradient));
-                return true;
-            }
-            case GradientType::Radial: {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
-                }
-            
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-            
-                sk_sp<SkShader> shader;
-            
-                // Simple radial gradient
-                if (grad->c0 == grad->c1 && grad->r0 == 0.0f) {
-                    shader = SkShaders::RadialGradient(
-                        grad->c1,
-                        grad->r1,
-                        gradient
+                BunCanvasGradient gradient{GradientType::Linear,gradient_args[0],gradient_args[1],gradient_args[2],gradient_args[3]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
                     );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                    }
                 }
-                // General Canvas radial gradient
-                else {
-                    shader = SkShaders::TwoPointConicalGradient(
-                        grad->c0,
-                        grad->r0,
-                        grad->c1,
-                        grad->r1,
-                        gradient
-                    );
-                }
-            
-                obj->currentState.strokeColor.setShader(std::move(shader));
-                return true;
+                createdShader = createSkiaShader(gradient);
+                break;
             }
-
-            case GradientType::Conic: {
-                std::vector<SkColor4f> colors;
-                std::vector<float> positions;
-            
-                colors.reserve(grad->stops.size());
-                positions.reserve(grad->stops.size());
-            
-                for (const auto& stop : grad->stops) {
-                    colors.push_back(stop.color);
-                    positions.push_back(stop.offset);
+            case GradientType::Radial : {
+                BunCanvasGradient gradient{GradientType::Radial,gradient_args[0],gradient_args[1],gradient_args[2],gradient_args[3],gradient_args[4],gradient_args[5]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
+                    );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                    }
                 }
-            
-                SkGradient gradient(
-                    SkGradient::Colors(colors, positions, SkTileMode::kClamp),
-                    {}
-                );
-            
-                float startDeg = SkRadiansToDegrees(grad->angle);
-            
-                obj->currentState.strokeColor.setShader(
-                    SkShaders::SweepGradient(
-                        grad->center,
-                        startDeg,
-                        startDeg + 360.0f,
-                        gradient,
-                        nullptr
-                    )
-                );
-            
-                return true;
+                createdShader = createSkiaShader(gradient);
+                break;
+            }
+            case GradientType::Conic : {
+                BunCanvasGradient gradient{GradientType::Conic,gradient_args[0],gradient_args[1],gradient_args[2]};
+                for (size_t itr = 0 ; itr < stops_length ; itr++) {
+                    auto it = std::lower_bound(
+                        gradient.stops.begin(),
+                        gradient.stops.end(),
+                        stops_offset[itr],
+                        [](const ColorStop& s, float o) {
+                            return s.offset < o;
+                        }
+                    );
+                    auto col = parseCssColor(stops_color[itr]);
+                    if (col) {
+                        gradient.stops.insert(it, {stops_offset[itr], *col});
+                        // return true;
+                    }
+                }
+                createdShader = createSkiaShader(gradient);
+                break;
             }
         }
+
+        if(createdShader) {
+            obj->currentState.strokeColor.setShader(
+                std::move(createdShader)
+            );
+        }
+        
         return false;
     }
     WINDOWS_EXPORT bool canvas_set_shadow_color(void* renderingContext, const char* c){
@@ -1789,52 +1774,49 @@ extern "C" {
         return false;
     }
     
-    WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
-        return new BunCanvasGradient(GradientType::Linear, x1, y1, x2, y2);
-    }
-    WINDOWS_EXPORT void* canvas_create_radial_gradient(float x1, float y1, float x2, float y2, float r0, float r1){
-        return new BunCanvasGradient(GradientType::Radial, x1, y1, x2, y2, r0, r1);
-    }
-    WINDOWS_EXPORT void* canvas_create_conic_gradient(float a,float x1, float y1){
-        return new BunCanvasGradient(GradientType::Conic, x1, y1, a);
-    }
-    WINDOWS_EXPORT bool canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
-        // Validate offset (0 <= offset <= 1)
-        // Throw IndexSizeError if invalid
-        auto* grad = validated<BunCanvasGradient>(gPtr);
-        if (!grad) return false;
-        
-        auto it = std::lower_bound(
-            grad->stops.begin(),
-            grad->stops.end(),
-            offset,
-            [](const ColorStop& s, float o) {
-                return s.offset < o;
-            }
-        );
-            
-        auto col = parseCssColor(c);
-        
-        if (col) {
-            grad->stops.insert(it, {offset, *col});
-            return true;
-        }
-        return false;
-    }
-    WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
-        // Validate offset (0 <= offset <= 1)
-        // Throw IndexSizeError if invalid
-        auto* grad = validated<BunCanvasGradient>(gPtr);
-        if (!grad) return;
-        delete grad;
-    }
+    // WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
+    //     return new BunCanvasGradient(GradientType::Linear, x1, y1, x2, y2);
+    // }
+
+    // WINDOWS_EXPORT void* canvas_create_radial_gradient(float x1, float y1, float x2, float y2, float r0, float r1){
+    //     return new BunCanvasGradient(GradientType::Radial, x1, y1, x2, y2, r0, r1);
+    // }
+
+    // WINDOWS_EXPORT void* canvas_create_conic_gradient(float a,float x1, float y1){
+    //     return new BunCanvasGradient(GradientType::Conic, x1, y1, a);
+    // }
+    // WINDOWS_EXPORT bool canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
+    //     // Validate offset (0 <= offset <= 1)
+    //     // Throw IndexSizeError if invalid
+    //     auto* grad = validated<BunCanvasGradient>(gPtr);
+    //     if (!grad) return false;
+    //     auto it = std::lower_bound(
+    //         grad->stops.begin(),
+    //         grad->stops.end(),
+    //         offset,
+    //         [](const ColorStop& s, float o) {
+    //             return s.offset < o;
+    //         }
+    //     );
+    //     auto col = parseCssColor(c);
+    //     if (col) {
+    //         grad->stops.insert(it, {offset, *col});
+    //         return true;
+    //     }
+    //     return false;
+    // }
+    // WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
+    //     // Validate offset (0 <= offset <= 1)
+    //     // Throw IndexSizeError if invalid
+    //     auto* grad = validated<BunCanvasGradient>(gPtr);
+    //     if (!grad) return;
+    //     delete grad;
+    // }
     
     WINDOWS_EXPORT void canvas_destroy(void* ptr) {
         auto* cnv = validated<BunCanvas>(ptr);
         if (!cnv) return;
-        
         auto it = std::find(canvases.begin(), canvases.end(), ptr);
-        
         if (it != canvases.end()) {
             canvases.erase(it);
         }

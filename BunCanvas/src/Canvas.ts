@@ -6,6 +6,7 @@ import { ImageData } from "./ImageData.js";
 import { DOMMatrix, multipliedMatrices } from "../dom/DOMMatrix.js";
 import { TextMetrics } from "./TextMetrics.js";
 import { Path2D } from "./Path2D.js";
+import { isValidColor } from "../internal/colorCheck.js";
 
 const ptrs = new WeakMap();
 
@@ -13,41 +14,105 @@ const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
 	console.log("destroyed Canvas!")
 });
-const cGradientFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
-    lib.symbols.canvas_gradient_destroy(ptr);
-});
+// const cGradientFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
+//     lib.symbols.canvas_gradient_destroy(ptr);
+// });
+
+enum GradientType {
+    Linear,
+    Radial,
+    Conic
+};
+
 
 class CanvasGradient {
-	constructor(a : number, x1 : number, y1 : number);
-	constructor(x1 : number, y1 : number, x2 : number, y2 : number);
-	constructor(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
+	type : GradientType;
+	stops = {
+		offsets: [] as number[],
+		color: [] as string[],
+	}
+
+	points = new Float64Array(6);
+
+	/*Linear
+		points[0] p0.x
+		points[1] p0.y
+		points[2] p1.x
+		points[3] p1.y
+	*/
+    
+    /*Radial
+		points[0] c0.x
+		points[1] c0.y
+		points[2] c1.x
+		points[3] c1.y
+		points[4] r0
+		points[5] r1
+	*/
+    
+    /*Conic
+		points[0] center.x
+		points[1] center.y
+		points[2] angle
+	*/
+	
+	constructor(type : GradientType, a : number, x1 : number, y1 : number);
+	constructor(type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number);
+	constructor(type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
 	constructor(...args : any[]){
-		switch (args.length) {
-			case 3: {
-				let ptr = lib.symbols.canvas_create_conic_gradient(args[0],args[1],args[2])
-				ptrs.set(this,ptr)
-				cGradientFinalizationRegistry.register(this,ptr)
+		this.type = args[0]
+		switch (this.type) {
+			case GradientType.Linear: {
+				this.points[0] = args[1]
+				this.points[1] = args[2]
+				this.points[2] = args[3]
+				this.points[3] = args[4]
 				break;
 			}
-			case 4: {
-				let ptr = lib.symbols.canvas_create_linear_gradient(args[0],args[1],args[2],args[3])
-				ptrs.set(this,ptr)
-				cGradientFinalizationRegistry.register(this,ptr)
+			case GradientType.Radial: {
+				this.points[0] = args[1]
+				this.points[1] = args[2]
+				this.points[2] = args[3]
+				this.points[3] = args[4]
+				this.points[4] = args[5]
+				this.points[5] = args[6]
 				break;
 			}
-			case 6: {
-				let ptr = lib.symbols.canvas_create_radial_gradient(args[0],args[1],args[2],args[3],args[4],args[5])
-				ptrs.set(this,ptr)
-				cGradientFinalizationRegistry.register(this,ptr)
+			case GradientType.Conic: {
+				this.points[0] = args[1]
+				this.points[1] = args[2]
+				this.points[2] = args[3]
 				break;
 			}
 		}
+		// switch (args.length) {
+		// 	case 3: {
+		// 		let ptr = lib.symbols.canvas_create_conic_gradient(args[0],args[1],args[2])
+		// 		ptrs.set(this,ptr)
+		// 		cGradientFinalizationRegistry.register(this,ptr)
+		// 		break;
+		// 	}
+		// 	case 4: {
+		// 		let ptr = lib.symbols.canvas_create_linear_gradient(args[0],args[1],args[2],args[3])
+		// 		ptrs.set(this,ptr)
+		// 		cGradientFinalizationRegistry.register(this,ptr)
+		// 		break;
+		// 	}
+		// 	case 6: {
+		// 		let ptr = lib.symbols.canvas_create_radial_gradient(args[0],args[1],args[2],args[3],args[4],args[5])
+		// 		ptrs.set(this,ptr)
+		// 		cGradientFinalizationRegistry.register(this,ptr)
+		// 		break;
+		// 	}
+		// }
 	}
 
 	addColorStop(offset : number, color : string) {
 		if (offset < 0 || offset > 1) throw new RangeError(`Failed to execute 'addColorStop' on 'CanvasGradient': The provided value (${offset}) is outside the range (0.0, 1.0).`)
-		let res = lib.symbols.canvas_gradient_add_color_stop(ptrs.get(this),offset,encoder.encode(`${color}\0`))
-		if (!res) throw new SyntaxError(`Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('${color}') could not be parsed as a color.`)
+		// let res = lib.symbols.canvas_gradient_add_color_stop(ptrs.get(this),offset,encoder.encode(`${color}\0`))
+		if (!isValidColor(color)) throw new SyntaxError(`Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('${color}') could not be parsed as a color.`)
+		this.stops.offsets.push(offset)
+		this.stops.color.push(color)
 	}
 };
 
@@ -138,7 +203,13 @@ class CanvasRenderingContext2D {
 			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
 		}
 		if (style instanceof CanvasGradient ){
-			res = lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),ptrs.get(style))
+			const encodedBuffers = style.stops.color.map(str=>encodeCString(str))
+			const ptrArray = new BigUint64Array(encodedBuffers.length)
+			for (let i = 0; i < encodedBuffers.length; i++) {
+				// Convert the Uint8Array buffer reference to its native memory address
+				ptrArray[i] = BigInt(ptr(encodedBuffers[i]));
+			}
+			res = lib.symbols.canvas_set_fill_style_gradient(ptrs.get(this),style.type,ptr(new Float32Array(style.points)),ptrArray.length,ptr(ptrArray),new Float32Array(style.stops.offsets))
 		}
 		if (res) this.#currentState.fillStyle = style;
 	}
@@ -153,7 +224,13 @@ class CanvasRenderingContext2D {
 			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
 		}
 		if (style instanceof CanvasGradient ){
-			res = lib.symbols.canvas_set_stroke_style_gradient(ptrs.get(this),ptrs.get(style))
+			const encodedBuffers = style.stops.color.map(str=>encodeCString(str))
+			const ptrArray = new BigUint64Array(encodedBuffers.length)
+			for (let i = 0; i < encodedBuffers.length; i++) {
+				// Convert the Uint8Array buffer reference to its native memory address
+				ptrArray[i] = BigInt(ptr(encodedBuffers[i]));
+			}
+			res = lib.symbols.canvas_set_stroke_style_gradient(ptrs.get(this),style.type,ptr(new Float32Array(style.points)),ptrArray.length,ptr(ptrArray),ptr(new Float32Array(style.stops.offsets)))
 		}
 		if (res) this.#currentState.strokeStyle = style;
 	}
@@ -398,17 +475,17 @@ class CanvasRenderingContext2D {
 	createConicGradient(a : number, x1 : number, y1 : number) : CanvasGradient;
 	createConicGradient(...args : [number,number,number]) : CanvasGradient {
 		if (args.length < 3) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 3 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(...args);
+		return new CanvasGradient(GradientType.Conic, ...args);
 	}
 	createLinearGradient(x1 : number, y1 : number, x2 : number, y2 : number) : CanvasGradient;
 	createLinearGradient(...args : [number,number,number,number]) : CanvasGradient {
 		if (args.length < 4) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(...args);
+		return new CanvasGradient(GradientType.Linear, ...args);
 	}
 	createRadialGradient(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number) : CanvasGradient;
 	createRadialGradient(...args : [number,number,number,number,number,number]) : CanvasGradient {
 		if (args.length < 6) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 6 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(...args);
+		return new CanvasGradient(GradientType.Radial, ...args);
 	}
 	getTransform() : DOMMatrix {
 		let arr = new Float32Array(16)
@@ -421,10 +498,6 @@ class CanvasRenderingContext2D {
 		if (args[0] instanceof DOMMatrix) lib.symbols.canvas_set_transform(ptrs.get(this),args[0].ptr)
 		if (args.length == 6) {
 			const mtx = new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5]]);
-			// console.log(mtx.m11,mtx.m21,mtx.m31,mtx.m41)
-			// console.log(mtx.m12,mtx.m22,mtx.m32,mtx.m42)
-			// console.log(mtx.m13,mtx.m23,mtx.m33,mtx.m43)
-			// console.log(mtx.m14,mtx.m24,mtx.m34,mtx.m44)
 			lib.symbols.canvas_set_transform(ptrs.get(this),mtx.ptr)
 		}
 		if (args.length == 16) lib.symbols.canvas_set_transform(ptrs.get(this),new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5],args[5],args[6],args[7],args[8],args[9],args[10],args[11],args[12],args[13],args[14],args[15]]).ptr)

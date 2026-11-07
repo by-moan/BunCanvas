@@ -124,7 +124,7 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	canvas_set_fill_style_gradient: {
-		args: ["ptr","ptr"],
+		args: ["ptr","int","ptr","int","ptr","ptr"],
 		returns: "bool",
 	},
 	canvas_set_stroke_style: {
@@ -132,7 +132,7 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	canvas_set_stroke_style_gradient: {
-		args: ["ptr","ptr"],
+		args: ["ptr","int","ptr","int","ptr","ptr"],
 		returns: "bool",
 	},
 	canvas_set_stroke_width: {
@@ -283,26 +283,26 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","bool"],
 		returns: "bool",
 	},
-	canvas_create_conic_gradient: {
-		args: ["float","float","float"],
-		returns: "ptr",
-	},
-	canvas_create_linear_gradient: {
-		args: ["float","float","float","float"],
-		returns: "ptr",
-	},
-	canvas_create_radial_gradient: {
-		args: ["float","float","float","float","float","float"],
-		returns: "ptr",
-	},
-	canvas_gradient_add_color_stop: {
-		args: ["ptr", "float", "cstring"],
-		returns: "bool",
-	},
-	canvas_gradient_destroy: {
-		args: ["ptr"],
-		returns: "void",
-	},
+	// canvas_create_conic_gradient: {
+	// 	args: ["float","float","float"],
+	// 	returns: "ptr",
+	// },
+	// canvas_create_linear_gradient: {
+	// 	args: ["float","float","float","float"],
+	// 	returns: "ptr",
+	// },
+	// canvas_create_radial_gradient: {
+	// 	args: ["float","float","float","float","float","float"],
+	// 	returns: "ptr",
+	// },
+	// canvas_gradient_add_color_stop: {
+	// 	args: ["ptr", "float", "cstring"],
+	// 	returns: "bool",
+	// },
+	// canvas_gradient_destroy: {
+	// 	args: ["ptr"],
+	// 	returns: "void",
+	// },
 	canvas_get_transform: {
 		args: ["ptr", "ptr"],
 		returns: "void",

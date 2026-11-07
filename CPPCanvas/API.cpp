@@ -304,20 +304,15 @@ targetPtr* validated(void* ptr){
         
     if (obj->magic != targetPtr::MAGIC)
     return nullptr;
-        
-        
     return obj;
 }
 
-// #include "src/FontFace/FontCache.cpp"
-// #include "src/FontFace/FontFaceSet.cpp"
 #include "src/Audio.cpp"
 
 
 #include "src/KeywordColors.h"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"
-// #include "src/CssFontParser.cpp"
 #include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Path2D.cpp"

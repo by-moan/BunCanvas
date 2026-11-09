@@ -1,4 +1,4 @@
-import {Canvas} from "BunCanvas";
+import {Canvas} from "@buncanvas/core";
 
 
 

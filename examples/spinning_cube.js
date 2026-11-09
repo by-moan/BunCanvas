@@ -1,4 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio } from "BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio } from "@buncanvas/core";
 
 
 const window = new Window(800,600, "spiiin", {vsync:true});

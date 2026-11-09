@@ -1,5 +1,6 @@
 *.DS_Store*
 *.ignore*
+publish
 /build/*
 /dist/*
 /nvg_demo

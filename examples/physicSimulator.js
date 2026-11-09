@@ -1,4 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "@buncanvas/core";
 
 
 const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});

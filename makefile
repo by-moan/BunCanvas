@@ -61,7 +61,7 @@ build: $(TARGET)
 
 # Build (if needed) and run
 run: $(COPIED_LIB)
-	cd $(OUTPUT_DIR) && bun ../main.js
+	cd $(OUTPUT_DIR) && bun ../main.js --XX:BunCanvas.IgnoreImport
 # 	cd $(OUTPUT_DIR) && gdb -ex "set pagination off" -ex "handle SIGPWR nostop noprint pass" --args bun ../main.js bun ../main.js
 
 # Run without building

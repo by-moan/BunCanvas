@@ -1,29 +1,28 @@
 import { dlopen, FFIType, suffix } from "bun:ffi";
 import { getNativePath } from "./loader";
+import { createRequire } from 'node:module';
 
-const candidates = [
-	`./node_modules/BunCanvas/bin/BunCanvas.${process.arch}.${suffix}`,
-	`./BunCanvas/bin/BunCanvas.${process.arch}.${suffix}`,
-	`BunCanvas.${process.arch}.${suffix}`,
-];
+let nativeLib;
 
-let selected;
-
-for (const item of candidates) {
-	let exists = await Bun.file(item).exists()
-	if (exists) {
-		selected = item
-		console.log(selected)
-		break
+try {
+	if (!process.argv.includes('--XX:BunCanvas.IgnoreImport')){
+		nativeLib = require(`@buncanvas/native-${process.platform}-${process.arch}`)
+	} else {
+		nativeLib = `BunCanvas.${process.arch}.${suffix}`
 	}
+}catch(ex){
+	const req = createRequire(import.meta.url);
+	nativeLib = req.resolve(`@buncanvas/native-${process.platform}-${process.arch}`)
 }
 
-if(!selected) {
+console.log(nativeLib)
+
+if(!nativeLib) {
 	console.error(`BunCanvas.${process.arch}.${suffix} binary was not found in the working directory!`)
 	process.exit(-1)
 }
 
-export const dlPath = selected
+export const dlPath = nativeLib
 
 export const encoder = new TextEncoder();
 

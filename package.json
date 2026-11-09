@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@types/bun": "^1.4.4"
+  },
+  "dependencies": {
+    "@buncanvas/native-linux-x64": "^0.1.1"
   }
 }

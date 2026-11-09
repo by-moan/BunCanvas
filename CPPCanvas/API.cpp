@@ -223,8 +223,8 @@ BackedSurface* createSurface(
     fbInfo.fFBOID = 0;
     fbInfo.fFormat = GL_RGBA8;
     auto backendRT = GrBackendRenderTargets::MakeGL(
-        w,
-        h,
+        w<1?1:w,
+        h<1?1:h,
         0,
         8,
         fbInfo

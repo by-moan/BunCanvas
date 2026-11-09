@@ -280,8 +280,6 @@ export class Window {
 		const { vsync = true, maxFramerate = 0 } = args ?? {};
 		this.#vsync = vsync;
 		this.maxFramerate = maxFramerate;
-		let lastFrame = performance.now();
-
 		
 		if (process.platform !== "darwin") {
 			render_thread.onerror = (msg) => {
@@ -306,7 +304,7 @@ export class Window {
 			render_thread.onmessage = (msg) => {
 				const frameSignal = msg.data;
 
-				if (frameSignal === 2) {
+				if (frameSignal == 2) {
 					lib.symbols.destroy_window();
 					lib.symbols.images_cleanup();
 					process.exit(0);

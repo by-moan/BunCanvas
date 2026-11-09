@@ -316,7 +316,6 @@ extern "C" {
         ready = false;
         glfwDestroyWindow(window);
         glfwTerminate();
-        delete renderThreadInterface;
     }
     
     WINDOWS_EXPORT bool canvas_init_gpu_context() {
@@ -459,6 +458,7 @@ extern "C" {
     
     #ifndef __APPLE__
     WINDOWS_EXPORT void destroy_window() {
+        delete renderThreadInterface;
         // delete ptr;
     }
     #else

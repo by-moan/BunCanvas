@@ -12,6 +12,25 @@ This proyect is now at an advanced stage, main functionality and overloads can b
 
 <br>
 <br>
+
+# BunCanvas is now on NPM
+## How to install:
+
+NOTE: This project only uses bun, it has no support for node or other javascript runtimes.
+```bash
+bun add @buncanvas/core@latest
+```
+Installing buncanvas will install the library alongside the native bindings.
+As of today, it has official support for the following platforms:
+<ul>
+  <li>Linux (x86_64)</li>
+  <li>MacOS (x86_64)</li>
+  <li>Windows (x86_64)</li>
+</ul>
+Support for the arm architecture is planned.
+
+<br>
+<br>
 <br>
 
 ## How to build and run (Linux x64 and aarch64)

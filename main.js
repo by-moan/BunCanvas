@@ -1,5 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "./BunCanvas";
-
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasGradient, TextMetrics, CanvasRenderingContext2D } from "./BunCanvas";
 
 const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
 // Create and append canvas
@@ -12,6 +11,7 @@ window.onresize = (evt)=>{
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
     wSizeStr = `${window.innerWidth}x${window.innerHeight}`
+    ctx.font = "20px arial"
 }
 
 const ctx = canvas.getContext('2d', {desynchronized:true});
@@ -85,7 +85,8 @@ const PHYSICS = {
 // Ball Class
 class Ball {
     static radius = 10
-    constructor(x, y, radius = 10, vx = 0, vy = 0) {
+    static string = "abcdefghijklmnopqrstuvwxyz"
+    constructor(x, y, radius = 10, vx = 0, vy = 0, letter = null) {
         this.x = x;
         this.y = y;
         this.radius = radius;
@@ -96,6 +97,8 @@ class Ball {
         this.g = (Math.random() * 360) | 0;
         this.b = (Math.random() * 360) | 0;
         this.color = `rgb(${this.r},${this.g},${this.b})`;
+        this.letter = letter??Ball.string[parseInt(Math.random()*Ball.string.length)]
+        console.log(this.letter)
     }
     
     update(dt) {
@@ -112,18 +115,17 @@ class Ball {
     static BallPath = new Path2D()
     static BallShinePath = new Path2D()
     
+    /**
+     * 
+     * @param {CanvasRenderingContext2D} ctx 
+     */
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
         
         // Glow & Color
         ctx.fillStyle = this.color;
-        ctx.fill(Ball.BallPath);
-        
-        // Highlight arc for depth
-        ctx.beginPath();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fill(Ball.BallShinePath);
+        ctx.fillText(this.letter,0,0);
         
         ctx.restore();
     }
@@ -324,8 +326,8 @@ function step(now) {
     }
     
     const grad = ctx.createLinearGradient(0,0,0,window.innerHeight);
-    grad.addColorStop(1, "#0d1125")
-    grad.addColorStop(0, "#162157")
+    grad.addColorStop(0, "#0d1125")
+    grad.addColorStop(1, "#162157")
 
 
     ctx.fillStyle = grad;
@@ -349,11 +351,24 @@ function step(now) {
     requestAnimationFrame(step);
 }
 
-// Seed initial balls
-for (let i = 0; i < 20; i++) {
+// // Seed initial balls
+// for (let i = 0; i < 20; i++) {
+//     const rx = 100 + Math.random() * (window.innerWidth - 200);
+//     const ry = 50 + Math.random() * (window.innerHeight / 2);
+//     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));
+// }
+
+const kb_clicks = [
+    new Audio("./kb_click.mp3"),
+    new Audio("./kb_click_2.mp3"),
+]
+
+window.onkeydown = (evt)=>{
     const rx = 100 + Math.random() * (window.innerWidth - 200);
     const ry = 50 + Math.random() * (window.innerHeight / 2);
-    balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));
+    balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4,evt.key));
+    console.log(evt.location)
+    kb_clicks[parseInt(Math.random()*kb_clicks.length)].play()
 }
 
 // Start Animation Frame Loop

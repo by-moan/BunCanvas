@@ -7,16 +7,13 @@ import { DOMMatrix, multipliedMatrices } from "../dom/DOMMatrix.js";
 import { TextMetrics } from "./TextMetrics.js";
 import { Path2D } from "./Path2D.js";
 import { isValidColor } from "../internal/colorCheck.js";
+import { INTERNAL_TOKEN, throwIllegalConstructor } from "../internal/ConstructEnforcer.js";
 
 const ptrs = new WeakMap();
 
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
-	console.log("destroyed Canvas!")
 });
-// const cGradientFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
-//     lib.symbols.canvas_gradient_destroy(ptr);
-// });
 
 enum GradientType {
     Linear,
@@ -25,7 +22,7 @@ enum GradientType {
 };
 
 
-class CanvasGradient {
+export class CanvasGradient {
 	type : GradientType;
 	points = new Float32Array(6);
 	offsets: number[] = [];
@@ -54,35 +51,36 @@ class CanvasGradient {
 		points[2] angle
 	*/
 	
-	constructor(type : GradientType, a : number, x1 : number, y1 : number);
-	constructor(type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number);
-	constructor(type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
+	constructor(token: {}, type : GradientType, a : number, x1 : number, y1 : number);
+	constructor(token: {}, type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number);
+	constructor(token: {}, type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
 	constructor(...args : any[]){
-		this.type = args[0]
+		if (args[0] !== INTERNAL_TOKEN) throwIllegalConstructor(this)
+		this.type = args[1]
 		switch (this.type) {
 			case GradientType.Linear: {
-				this.points[0] = args[1]
-				this.points[1] = args[2]
-				this.points[2] = args[3]
-				this.points[3] = args[4]
+				this.points[0] = args[2]
+				this.points[1] = args[3]
+				this.points[2] = args[4]
+				this.points[3] = args[5]
 				break;
 			}
 			case GradientType.Radial: {
-				this.points[0] = args[1]
-				this.points[1] = args[2]
-				this.points[2] = args[3]
-				this.points[3] = args[4]
-				this.points[4] = args[5]
-				this.points[5] = args[6]
+				this.points[0] = args[2]
+				this.points[1] = args[3]
+				this.points[2] = args[4]
+				this.points[3] = args[5]
+				this.points[4] = args[6]
+				this.points[5] = args[7]
 				break;
 			}
 			case GradientType.Conic: {
-				this.points[0] = args[1]
-				this.points[1] = args[2]
-				this.points[2] = args[3]
+				this.points[0] = args[2]
+				this.points[1] = args[3]
+				this.points[2] = args[4]
 				break;
 			}
-		}
+		}   
 	}
 
 	addColorStop(offset : number, color : string) {
@@ -97,6 +95,23 @@ class CanvasGradient {
         this.colors.splice(insertIdx, 0, encodeCString(color));
 	}
 };
+
+{
+	const proto = CanvasGradient.prototype;
+	
+	for (const key of Object.getOwnPropertyNames(proto)) {
+		const desc = Object.getOwnPropertyDescriptor(proto, key);
+		if (key == "constructor"){
+			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
+			continue
+		}
+		if (typeof desc?.value === "function") {
+			desc.value.toString = () =>
+				`function ${key}() { [native code] }`;
+		}
+	}
+}
+
 
 class Render2DState {
 	lineWidth = 0;
@@ -153,7 +168,7 @@ class Render2DState {
 	}
 }
 
-class CanvasRenderingContext2D {
+export class CanvasRenderingContext2D {
 	#currentState : Render2DState = new Render2DState();
 	#savedState : Render2DState = new Render2DState();
 	#owner : Canvas;
@@ -412,10 +427,10 @@ class CanvasRenderingContext2D {
 		
 		throw new TypeError("Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(Image or Canvas)'.")
 	}
-	getImageData(x : number, y : number, w : number,h : number) {
-		const arr = new Uint8Array(w*h*4);
-		lib.symbols.canvas_get_image_data(ptrs.get(this),x,y,w,h, ptr(arr))
-		return new ImageData(w,h,arr);
+	getImageData(x: number, y: number, w: number, h: number): ImageData {
+		const arr = new Uint8ClampedArray(w * h * 4);
+		lib.symbols.canvas_get_image_data(ptrs.get(this), x, y, w, h, ptr(arr));
+		return new ImageData(arr, w, h);
 	}
 	putImageData(
 		data: ImageData,
@@ -464,17 +479,17 @@ class CanvasRenderingContext2D {
 	createConicGradient(a : number, x1 : number, y1 : number) : CanvasGradient;
 	createConicGradient(...args : [number,number,number]) : CanvasGradient {
 		if (args.length < 3) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 3 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(GradientType.Conic, ...args);
+		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Conic, ...args);
 	}
 	createLinearGradient(x1 : number, y1 : number, x2 : number, y2 : number) : CanvasGradient;
 	createLinearGradient(...args : [number,number,number,number]) : CanvasGradient {
 		if (args.length < 4) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(GradientType.Linear, ...args);
+		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Linear, ...args);
 	}
 	createRadialGradient(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number) : CanvasGradient;
 	createRadialGradient(...args : [number,number,number,number,number,number]) : CanvasGradient {
 		if (args.length < 6) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 6 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(GradientType.Radial, ...args);
+		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Radial, ...args);
 	}
 	getTransform() : DOMMatrix {
 		let arr = new Float32Array(16)
@@ -594,6 +609,7 @@ class CanvasRenderingContext2D {
 		const pArr = new Float32Array(12)
 		lib.symbols.canvas_measure_text(ptrs.get(this),encoder.encode(`${text}\0`),ptr(pArr))
 		return new TextMetrics(
+			INTERNAL_TOKEN,
 			pArr[0], 
 			pArr[1], 
 			pArr[2], 
@@ -611,7 +627,8 @@ class CanvasRenderingContext2D {
 	// clearRect(x,y,w,h){
 	//     lib.symbols.canvas_clear_rect(x,y,w,h)
 	// }
-	constructor(iptr : Pointer | null, cnv : Canvas, args: any) {
+	constructor(iptr : Pointer | null, cnv : Canvas, args: any, token: {}) {
+		if (token !== INTERNAL_TOKEN) throwIllegalConstructor(this)
 		const { desynchronized = false, alpha = true } = args ?? {};
 		const cb = new JSCallback(this.#reset.bind(this),{
 			args: [],
@@ -681,7 +698,7 @@ export class Canvas {
 	
 	getContext(contextType : string, args : any) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this),this, args)
+			return new CanvasRenderingContext2D(ptrs.get(this),this, args, INTERNAL_TOKEN)
 		}
 	}
 

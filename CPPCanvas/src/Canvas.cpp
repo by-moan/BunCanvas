@@ -1850,7 +1850,10 @@ extern "C" {
 
     WINDOWS_EXPORT void canvas_measure_text(void* ctxPtr, const char* txt, float* fMetrics){
         BunCanvasRenderingContext2D* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx || !txt || !fMetrics) return;
+        if (!ctx || !txt || !fMetrics) {
+            std::cout << "measure_text returned early!\n";
+            return;
+        };
         SkRect bounds;
         float width = ctx->currentState.font_current.measureText(
             txt,

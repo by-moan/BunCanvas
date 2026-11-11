@@ -169,7 +169,6 @@ public:
             std::cerr << "Failed to load file: " << path << std::endl;
             return;
         }
-        std::cout << "playing!\n";
 
         backend.addVoice(std::move(voice));
     }

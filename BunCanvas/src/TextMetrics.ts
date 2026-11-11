@@ -1,3 +1,5 @@
+import { INTERNAL_TOKEN, throwIllegalConstructor } from "../internal/ConstructEnforcer";
+
 export class TextMetrics {
         readonly width : number;
         readonly actualBoundingBoxLeft : number;
@@ -13,6 +15,7 @@ export class TextMetrics {
         readonly ideographicBaseline : number;
 
         constructor(
+            token: {},
             width : number,
             actualBoundingBoxLeft : number,
             actualBoundingBoxRight : number,
@@ -26,6 +29,7 @@ export class TextMetrics {
             hangingBaseline : number,
             ideographicBaseline : number
         ){
+            if (token !== INTERNAL_TOKEN) throwIllegalConstructor(this)
             this.width = width
             this.actualBoundingBoxLeft = actualBoundingBoxLeft
             this.actualBoundingBoxRight = actualBoundingBoxRight

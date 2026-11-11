@@ -415,11 +415,9 @@ extern "C" {
     WINDOWS_EXPORT bool canvas_init_gpu_context() {}
     WINDOWS_EXPORT void canvas_flush_gpu() {}
     #endif
-    
-    #ifndef __APPLE__
-    WINDOWS_EXPORT void update_window(){}
-    #else
+
     WINDOWS_EXPORT void update_window(){
+    #ifdef __APPLE__
         wPropertiesViewer[3] = glfwWindowShouldClose(window);
         if (glfwWindowShouldClose(window)) return;
         glfwGetFramebufferSize(window, &width, &height);
@@ -453,21 +451,19 @@ extern "C" {
         }
         renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
         glfwSwapBuffers(window);
-    }
     #endif
+    }
     
-    #ifndef __APPLE__
     WINDOWS_EXPORT void destroy_window() {
+    #ifndef __APPLE__
         delete renderThreadInterface;
         // delete ptr;
-    }
     #else
-    WINDOWS_EXPORT void destroy_window() {
         ready = false;
         glfwDestroyWindow(window);
         glfwTerminate();
         delete renderThreadInterface;
+    #endif
     }
     
-    #endif
 }

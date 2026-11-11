@@ -615,7 +615,7 @@ static sk_sp<SkShader> buildSkiaShader(
 }
 
 // Internal dispatcher to handle locking and state assignment
-static bool set_canvas_gradient_internal(
+static bool setCanvasGradientInternal(
     void* canvasObj, 
     GradientType gradType,
     const float* gradient_args,
@@ -644,8 +644,38 @@ static bool set_canvas_gradient_internal(
     return true;
 }
 
+void updateCanvasFilters(Rendering2DState& state) {
+    // 1. Rebuild shadow filter from current parameters
+    if (state.shadowBlurAmount > 0.2f) {
+        state.shadowBlurFilter = SkImageFilters::DropShadow(
+            state.shadowBlurOffsetX,
+            state.shadowBlurOffsetY,
+            state.shadowBlurAmount * 0.5f,
+            state.shadowBlurAmount * 0.5f,
+            state.shadowBlurColor.getColor4f(),
+            nullptr,
+            nullptr
+        );
+    } else {
+        state.shadowBlurFilter = nullptr;
+    }
+
+    // 2. Resolve filter pipeline
+    if (state.shadowBlurFilter && state.filters) {
+        state.resolvedFilters = SkImageFilters::Compose(state.shadowBlurFilter, state.filters);
+    } else if (state.shadowBlurFilter) {
+        state.resolvedFilters = state.shadowBlurFilter;
+    } else {
+        state.resolvedFilters = state.filters;
+    }
+
+    // 3. Bind resolved filter to all paint states
+    state.fillColor.setImageFilter(state.resolvedFilters);
+    state.imageColor.setImageFilter(state.resolvedFilters);
+    state.strokeColor.setImageFilter(state.resolvedFilters);
+}
+
 extern "C" {
-    
     WINDOWS_EXPORT void* canvas_create(int w, int h, bool useGPU) {
         return new BunCanvas(w,h,useGPU);
     }
@@ -694,7 +724,7 @@ extern "C" {
         void* canvasObj, GradientType gradType, float* gradient_args,
         int stops_length, const char** stops_color, float* stops_offset
     ) {
-        return set_canvas_gradient_internal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, true);
+        return setCanvasGradientInternal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, true);
     }
     WINDOWS_EXPORT bool canvas_set_stroke_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
@@ -717,22 +747,8 @@ extern "C" {
         void* canvasObj, GradientType gradType, float* gradient_args,
         int stops_length, const char** stops_color, float* stops_offset
     ) {
-        return set_canvas_gradient_internal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, false);
+        return setCanvasGradientInternal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, false);
     }
-
-    WINDOWS_EXPORT bool canvas_set_shadow_color(void* renderingContext, const char* c){
-        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
-        if (obj == nullptr) return false;
-        
-        auto col = parseCssColor(c);
-        if (col){
-            obj->currentState.shadowBlurColor.setColor4f(*col);
-            return true;
-        }
-        return false;
-    }
-    
-    
     
     
     WINDOWS_EXPORT void canvas_set_stroke_width(void* canvasObj, float w) {
@@ -1505,12 +1521,12 @@ extern "C" {
             (*ctx)()->save();
             (*ctx)()->translate(x, y);
             (*ctx)()->scale(scale, 1.0f);
-            if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
-                SkPaint shColor = ctx->currentState.shadowBlurColor;
-                auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
-                shColor.setAlphaf(_af);
-                (*ctx)()->drawString(txt, finalX+ctx->currentState.shadowBlurOffsetX, finalY+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
-            }
+            // if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
+            //     SkPaint shColor = ctx->currentState.shadowBlurColor;
+            //     auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
+            //     shColor.setAlphaf(_af);
+            //     (*ctx)()->drawString(txt, finalX+ctx->currentState.shadowBlurOffsetX, finalY+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
+            // }
             (*ctx)()->drawString(txt, finalX, finalY, ctx->currentState.font_current, fColor);
             (*ctx)()->restore();
         } else {
@@ -1552,58 +1568,100 @@ extern "C" {
         }
     }
     
-    WINDOWS_EXPORT void canvas_set_shadow_blur(void* ctxPtr, float b){
+    WINDOWS_EXPORT bool canvas_set_filter(void* ctxPtr, const char* fltr) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return;
+        if (!ctx) return false;
+
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
-        ctx->currentState.shadowBlurAmount = std::max(b,0.f);
-        
-        if (ctx->currentState.shadowBlurAmount > 0.2f){
-            ctx->currentState.shadowBlurFilter = SkImageFilters::DropShadowOnly(
-                ctx->currentState.shadowBlurOffsetX,           // dx
-                ctx->currentState.shadowBlurOffsetY,           // dy
-                ctx->currentState.shadowBlurAmount * 0.5f, // sigmaX
-                ctx->currentState.shadowBlurAmount * 0.5f, // sigmaY
-                ctx->currentState.shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-                nullptr,                      // input (no input filter)
-                nullptr                       // cropRect (optional, can omit)
-            );
-        }else {
-            ctx->currentState.shadowBlurFilter = nullptr;
+
+        if (std::strcmp(fltr, "none") == 0) {
+            ctx->currentState.filters = nullptr;
+            updateCanvasFilters(ctx->currentState);
+            return true;
         }
-        if (ctx->currentState.filters){
-            ctx->currentState.resolvedFilters = SkImageFilters::Compose(ctx->currentState.shadowBlurFilter, ctx->currentState.filters);
-        }else{
-            ctx->currentState.resolvedFilters = ctx->currentState.shadowBlurFilter;
-        }
-        // ctx->currentState.fillColor.setImageFilter(ctx->currentState.resolvedFilters);
-        ctx->currentState.imageColor.setImageFilter(ctx->currentState.resolvedFilters);
-        ctx->currentState.strokeColor.setImageFilter(ctx->currentState.resolvedFilters);
-        ctx->currentState.shadowBlurColor.setMaskFilter(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, ctx->currentState.shadowBlurAmount * 0.5f));
+
+        auto filter = css::buildSkiaFilter(fltr);
+        if (!filter) return false;
+
+        ctx->currentState.filters = std::move(filter);
+        updateCanvasFilters(ctx->currentState);
+        return true;
     }
-    WINDOWS_EXPORT void canvas_set_shadow_offsetX(void* ctxPtr, float oX){
+
+    WINDOWS_EXPORT void canvas_set_shadow_blur(void* ctxPtr, float b) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
+
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
+
+        ctx->currentState.shadowBlurAmount = std::max(b, 0.0f);
         
+
+        updateCanvasFilters(ctx->currentState);
+    }
+
+    WINDOWS_EXPORT void canvas_set_shadow_offsetX(void* ctxPtr, float oX) {
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+
+        if (ctx->currentState.shadowBlurOffsetX == oX) return;
         ctx->currentState.shadowBlurOffsetX = oX;
+        
+        // Rebuild filters only if a active shadow exists
+        if (ctx->currentState.shadowBlurAmount > 0.2f) {
+            updateCanvasFilters(ctx->currentState);
+        }
     }
-    
-    WINDOWS_EXPORT void canvas_set_shadow_offsetY(void* ctxPtr, float oY){
+
+    WINDOWS_EXPORT void canvas_set_shadow_offsetY(void* ctxPtr, float oY) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
+
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
-        
+
+        if (ctx->currentState.shadowBlurOffsetY == oY) return;
         ctx->currentState.shadowBlurOffsetY = oY;
+
+        // Rebuild filters only if a active shadow exists
+        if (ctx->currentState.shadowBlurAmount > 0.2f) {
+            updateCanvasFilters(ctx->currentState);
+        }
+    }
+
+    WINDOWS_EXPORT bool canvas_set_shadow_color(void* renderingContext, const char* c) {
+        auto* ctx = validated<BunCanvasRenderingContext2D>(renderingContext);
+        if (!ctx) return false;
+
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+        );
+
+        auto col = parseCssColor(c);
+        if (!col) return false;
+
+        ctx->currentState.shadowBlurColor.setColor4f(*col);
+
+        // Rebuild drop shadow filter with updated color if a shadow is active
+        if (ctx->currentState.shadowBlurAmount > 0.2f) {
+            updateCanvasFilters(ctx->currentState);
+        }
+
+        return true;
     }
 
     WINDOWS_EXPORT bool canvas_set_image_smoothing_enabled(void* ctxPtr, bool v){
@@ -1752,41 +1810,6 @@ extern "C" {
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
         (*ctx)()->resetMatrix();
-    }
-    WINDOWS_EXPORT bool canvas_set_filter(void* ctxPtr, const char* fltr){
-        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return false;
-        nonapple(
-            std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
-        );
-        auto filter = css::buildSkiaFilter(fltr);
-        if (std::strcmp(fltr, "none") == 0){
-            ctx->currentState.filters = nullptr;
-            if (ctx->currentState.shadowBlurFilter){
-                ctx->currentState.resolvedFilters = ctx->currentState.shadowBlurFilter;
-            }else{
-                ctx->currentState.resolvedFilters = nullptr;
-            }
-            ctx->currentState.fillColor.setImageFilter(ctx->currentState.resolvedFilters);
-            ctx->currentState.imageColor.setImageFilter(ctx->currentState.resolvedFilters);
-            ctx->currentState.strokeColor.setImageFilter(ctx->currentState.resolvedFilters);
-            return true;
-        }
-        if (filter) {
-            // SkPaint paint;
-            ctx->currentState.filters = filter;
-            if (ctx->currentState.shadowBlurFilter){
-                ctx->currentState.resolvedFilters = SkImageFilters::Compose(ctx->currentState.shadowBlurFilter, ctx->currentState.filters);
-            }else{
-                ctx->currentState.resolvedFilters = filter;
-            }
-            ctx->currentState.fillColor.setImageFilter(ctx->currentState.resolvedFilters);
-            ctx->currentState.imageColor.setImageFilter(ctx->currentState.resolvedFilters);
-            ctx->currentState.strokeColor.setImageFilter(ctx->currentState.resolvedFilters);
-            return true;
-        }
-        return false;
     }
 
     WINDOWS_EXPORT void canvas_set_line_dash(void* ctxPtr, float* pts, int len, float offset){

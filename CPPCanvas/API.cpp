@@ -53,7 +53,7 @@
 #elif __has_include(<miniaudio.h>)
     #include <miniaudio.h>
 #else
-    #error "No se pudo encontrar miniaudio.h en el sistema"
+    #error "miniaudio.h was not found in the system or was not bundled properly"
 #endif
 
 #include "include/core/SkFontScanner.h"

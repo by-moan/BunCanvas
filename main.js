@@ -125,6 +125,8 @@ class Ball {
         
         // Glow & Color
         ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 8;
         ctx.fillText(this.letter,0,0);
         
         ctx.restore();

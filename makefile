@@ -88,17 +88,16 @@ ifeq ($(IS_WINDOWS),1)
     
     $(TARGET): $(ALL_SOURCES)
 		@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
-		clang-cl /LD /std:c++20 /Ox /EHsc $(API_CPP) \
+		clang-cl /LD /std:c++20 /Ox /EHsc $(API_CPP) /Fe:$@ \
+			/I"$(VULKAN_SDK)\Include" \
 			/I$(CANVAS_DIR)/Thirdparty/skia_build/skia \
 			/I$(CANVAS_DIR)/Thirdparty/glfw-3.4.bin.WIN64\include \
 			/I$(CANVAS_DIR)/Thirdparty/miniaudio \
 			"$(SKIA_LIB)" \
-			opengl32.lib user32.lib gdi32.lib shell32.lib dwrite.lib \
-			$(CANVAS_DIR)/Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib \
-			/Fe:$@
-
-
-
+			/link /libpath:"$(VULKAN_SDK)\Lib" \
+			vulkan-1.lib user32.lib gdi32.lib shell32.lib dwrite.lib \
+			$(CANVAS_DIR)/Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib
+			
 # Linux build
 else ifeq ($(PLATFORM),linux)
     SKIA_OUT := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/$(UNAME_O)_$(UNAME_M)

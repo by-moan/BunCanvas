@@ -116,8 +116,7 @@ else ifeq ($(PLATFORM),linux)
 			-L/usr/lib/clang/22/lib/linux \
 			\
 			-Wl,-Bdynamic \
-				-lGL \
-				-lEGL \
+				-lvulkan \
 				-lfontconfig \
 				-ldl \
 				-lpthread \

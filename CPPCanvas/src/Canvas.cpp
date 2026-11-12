@@ -424,10 +424,9 @@ class BunCanvas {
             mainThreadCtx->context->deleteBackendTexture(backendTex);
         }
         // Clean up any retired textures immediately
-        for (auto& r : retiredTextures) {
-            GrGLTextureInfo info;
-            if (GrBackendTextures::GetGLTextureInfo(r.tex, &info)) {
-                glDeleteTextures(1, &info.fID);
+        if (mainThreadCtx && mainThreadCtx->context) {
+            for (auto& r : retiredTextures) {
+                mainThreadCtx->context->deleteBackendTexture(r.tex);
             }
         }
         retiredTextures.clear();
@@ -469,25 +468,18 @@ class BunCanvas {
         #else
         if (gpuContextReady && useGPU) {
 
-            if (!retiredTextures.empty()) {
-                // Clean up retired textures after the frame delay
-                // ensures the render thread has finished using them
+            if (!retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
                 auto& retired = retiredTextures;
                 for (auto it = retired.begin(); it != retired.end(); ) {
                     it->framesLeft--;
                     if (it->framesLeft <= 0) {
-                        GrGLTextureInfo info;
-                        if (GrBackendTextures::GetGLTextureInfo(it->tex, &info)) {
-                            glDeleteTextures(1, &info.fID);
-                        }
+                        mainThreadCtx->context->deleteBackendTexture(it->tex);
                         it = retired.erase(it);
                     } else {
                         ++it;
                     }
                 }
             }
-                
-
             auto borrow = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
                 backendTex,
@@ -502,7 +494,7 @@ class BunCanvas {
                 // Retire the texture instead of deleting it immediately.
                 // The render thread might still have pending draw commands
                 // that reference this texture from the previous frame.
-                retiredTextures.push_back({backendTex, 0});
+                retiredTextures.push_back({backendTex, 3});
                 hasBackendTex = false;
             }
             backendTex = mainThreadCtx->context->createBackendTexture(

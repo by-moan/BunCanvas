@@ -38,14 +38,10 @@
 
 #ifndef __APPLE__
 #define nonapple(code) code
-// #include <GL/glew.h>
-#include <GL/gl.h>
 #else
 #define _Float64_t double
 #define nonapple(code)
 #endif
-
-#include <GLFW/glfw3.h>
 
 #define MINIAUDIO_IMPLEMENTATION
 #if __has_include(<miniaudio/miniaudio.h>)
@@ -86,14 +82,21 @@
 #include "include/core/SkStream.h"
 #include "include/core/SkScalar.h"
 
-#include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/gpu/ganesh/SkImageGanesh.h"
 #include "include/gpu/ganesh/GrDirectContext.h"
 #include "include/gpu/ganesh/GrBackendSurface.h"
+#include "include/gpu/ganesh/GrBackendSemaphore.h"
 #include "include/gpu/ganesh/SkSurfaceGanesh.h"
 
-#include "include/gpu/ganesh/gl/GrGLBackendSurface.h"
-#include "include/gpu/ganesh/gl/GrGLDirectContext.h"
+#include "include/gpu/ganesh/vk/GrVkDirectContext.h"
+#include "include/gpu/ganesh/vk/GrVkBackendSurface.h"
+#include "include/gpu/ganesh/vk/GrVkBackendSemaphore.h"
+#include "include/gpu/ganesh/vk/GrVkTypes.h"
+
+#include "include/gpu/vk/VulkanBackendContext.h"
+#include "include/gpu/vk/VulkanExtensions.h"
+#include "include/gpu/vk/VulkanMutableTextureState.h"
+#include "include/gpu/MutableTextureState.h"
 
 #ifdef __linux__
 #include "include/ports/SkFontMgr_fontconfig.h"   // Linux
@@ -118,6 +121,11 @@
 #else
 #error "Platform is not supported by BunCanvas"
 #endif
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#include "src/VkConfig.cpp"
 
 sk_sp<SkFontMgr> CreateFontManager() {
 #ifdef __linux__
@@ -157,33 +165,6 @@ sk_sp<SkFontMgr> CreateFontManager() {
 #endif
 }
 
-// sk_sp<SkSurface> createSurface(
-//     GrDirectContext* context,
-//     int width,
-//     int height
-// ) {
-//     GrGLFramebufferInfo fbInfo;
-//     fbInfo.fFBOID = 0;
-//     fbInfo.fFormat = GL_RGBA8;
-    
-    // auto backendRT = GrBackendRenderTargets::MakeGL(
-//         width,
-//         height,
-//         0,
-//         8,
-//         fbInfo
-//     );
-//     return SkSurfaces::WrapBackendRenderTarget(
-//         context,
-//         backendRT,
-//         kBottomLeft_GrSurfaceOrigin,
-//         kRGBA_8888_SkColorType,
-//         nullptr,
-//         nullptr
-//     );
-// }
-
-
 class BackedSurface{
     public:
     GrBackendRenderTarget backendRT;
@@ -205,42 +186,7 @@ class SurfaceWrapper {
 	SurfaceWrapper(BackedSurface* sfc) : surface(sfc->surface){}
 };
 
-class InterfaceWrapper {
-    public:
-    sk_sp<const GrGLInterface> interface;
-
-    InterfaceWrapper(sk_sp<const GrGLInterface> iface) : interface(iface){}
-};
-
-InterfaceWrapper* renderThreadInterface = nullptr;
 ContextWrapper* renderThreadContext = nullptr;
-
-BackedSurface* createSurface(
-    int w,
-    int h
-) {
-    GrGLFramebufferInfo fbInfo;
-    fbInfo.fFBOID = 0;
-    fbInfo.fFormat = GL_RGBA8;
-    auto backendRT = GrBackendRenderTargets::MakeGL(
-        w<1?1:w,
-        h<1?1:h,
-        0,
-        8,
-        fbInfo
-    );
-    return new BackedSurface{
-        backendRT,
-        SkSurfaces::WrapBackendRenderTarget(
-            renderThreadContext->context.get(),
-            backendRT,
-            kBottomLeft_GrSurfaceOrigin,
-            kRGBA_8888_SkColorType,
-            nullptr,
-            nullptr
-        )
-    };
-}
 
 int currentWidth = 0;
 int currentHeight = 0;
@@ -252,11 +198,44 @@ sk_sp<SkFontMgr> fontMgr = CreateFontManager();
 bool ready = false;
 std::vector<int> vsyncQueue;
 
+std::vector<BackedSurface*> swapchainSurfaces;
+
+BackedSurface* createSurface(uint32_t imageIndex) {
+    GrBackendRenderTarget backendRT = VK::getSwapchainRenderTarget(imageIndex);
+    sk_sp<SkSurface> sfc = SkSurfaces::WrapBackendRenderTarget(
+        renderThreadContext->context.get(),
+        backendRT,
+        kTopLeft_GrSurfaceOrigin,
+        VK::getSwapchainColorType(),
+        nullptr,
+        nullptr
+    );
+    return new BackedSurface{backendRT, sfc};
+}
+
+void clearSwapchainSurfaces() {
+    canvas = nullptr;
+    for (auto* s : swapchainSurfaces) {
+        delete s;
+    }
+    swapchainSurfaces.clear();
+}
+
+void rebuildSwapchainSurfaces() {
+    clearSwapchainSurfaces();
+
+    uint32_t count = VK::getSwapchainImageCount();
+    swapchainSurfaces.reserve(count);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        swapchainSurfaces.push_back(createSurface(i));
+    }
+}
 #ifndef __APPLE__
-GLFWwindow* sharedWindow = nullptr;
+
 ContextWrapper* mainThreadCtx = nullptr;
-InterfaceWrapper* mainThreadIface = nullptr;
 bool gpuContextReady = false;
+
 #endif
 
 

@@ -17,8 +17,8 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     mMoveViewer[0] = true;
     mMoveViewer[1] = xpos;
     mMoveViewer[2] = ypos;
-    mMoveViewer[3] = xpos-prevX;
-    mMoveViewer[4] = ypos-prevY;
+    mMoveViewer[3] = xpos - prevX;
+    mMoveViewer[4] = ypos - prevY;
     prevX = xpos;
     prevY = ypos;
 }
@@ -122,348 +122,316 @@ void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action
     }
 }
 
-void window_refresh_callback(GLFWwindow* window) {
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    canvas->clear(SK_ColorTRANSPARENT);
-    
-    for (auto element : canvases) {
-        {
-            // std::lock_guard<std::mutex> lock(element->mutex);
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
-        }
-    }
-    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-    glfwSwapBuffers(window);
-}
-
 void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     mWheelViewer[0] = true;
     mWheelViewer[1] = xoffset;
     mWheelViewer[2] = yoffset;
 }
 
+void render_composited_canvases(SkCanvas* targetCanvas) {
+    for (auto element : canvases) {
+        std::lock_guard<std::mutex> lock(element->mutex);
+        #ifndef __APPLE__
+        if (element->hasBackendTex) {
+            auto img = SkImages::BorrowTextureFrom(
+                renderThreadContext->context.get(),
+                element->backendTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
+            if (img) {
+                targetCanvas->drawImageRect(
+                    img,
+                    SkRect::MakeXYWH(0, 0, img->width(), img->height()),
+                    SkFilterMode::kNearest
+                );
+            }
+        } else {
+            targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        }
+        #else
+        targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        #endif
+    }
+}
+
+void window_refresh_callback(GLFWwindow* window) {
+    if (!ready || swapchainSurfaces.empty()) return;
+    uint32_t imageIndex = 0;
+    if (!VK::acquireNextImage(&imageIndex)) return;
+
+    SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+    frameCanvas->clear(SK_ColorTRANSPARENT);
+    render_composited_canvases(frameCanvas);
+
+    VK::presentImage(
+        renderThreadContext->context.get(),
+        swapchainSurfaces[imageIndex]->surface.get(),
+        imageIndex
+    );
+}
+
 typedef int (*JSCallback_WRefresh)(int);
+bool currentVsync = true;
 
 extern "C" {
-    WINDOWS_EXPORT void create_window(int w, int h, const char* title){
+    WINDOWS_EXPORT void create_window(int w, int h, const char* title) {
     }
 
-    WINDOWS_EXPORT void glfw_init(){
+    WINDOWS_EXPORT void glfw_init() {
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
-        };
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-        glfwWindowHint(GLFW_STENCIL_BITS, 8);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-        
+        }
+        if (!glfwVulkanSupported()) {
+            std::cerr << "Vulkan is not supported on this system...\n";
+            return;
+        }
+
+        // Tell GLFW not to create an OpenGL context
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
         g_clearColor.setColor(SK_ColorTRANSPARENT);
         g_clearColor.setStyle(SkPaint::kFill_Style);
         g_clearColor.setBlendMode(SkBlendMode::kClear);
         g_clearColor.setAntiAlias(1);
         g_noAlphaClearColor.setColor(SK_ColorBLACK);
         g_noAlphaClearColor.setStyle(SkPaint::kFill_Style);
-        // noAlphaClearColor.setBlendMode(SkBlendMode::kSrc);
         g_noAlphaClearColor.setAntiAlias(1);
         pImageDataColor.setBlendMode(SkBlendMode::kSrc);
-        
-        // globalAudioBackend.init();
-        // globalAudioBackend.start();
-    }
-    WINDOWS_EXPORT void set_vsync(bool v){
-        vsyncQueue.push_back(v);
 
+        std::cout << "[OK] glfw_init()\n";
     }
+
+    WINDOWS_EXPORT void set_vsync(bool v) {
+        vsyncQueue.push_back(v);
+    }
+
     #ifndef __APPLE__
     // Called in the bun worker thread.
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync) {
         width = w;
         height = h;
-        window = glfwCreateWindow(width, height, title, NULL, sharedWindow);
-        if (!window) {
-            std::cerr << "Couldn't initialize Window...\n";
-            const char* desc;
-            int code = glfwGetError(&desc);
-            std::cerr << "GLFW error " << code << ": "
-            << (desc ? desc : "unknown")
-            << "\n";
-            glfwTerminate();
-            return;
-        }
-        #pragma region Events Setup
-        
-        glfwSetWindowSizeCallback(window, window_resize_callback);
-        glfwSetCursorPosCallback(window, cursor_pos_callback);
-        glfwSetMouseButtonCallback(window, mouse_button_callback);
-        glfwSetKeyCallback(window,keyboard_key_callback);
-        glfwSetScrollCallback(window,window_scroll_callback);
-        // glfwSetWindowRefreshCallback(window, window_refresh_callback);
-        #pragma endregion
-        
-        glfwMakeContextCurrent(window);
-        renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
-        if (!renderThreadInterface->interface) {
-            std::cout << "Native interface failed\n";
-            return;
-        }
-        
-        std::cout << "Native interface OK\n";
-        
-        renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
-        if (!renderThreadContext->context) {
-            std::cout << "Context was not created!\n";
-            return;
-        };
-        
-        glfwGetFramebufferSize(window, &width, &height);
-        
-        currentWidth = width;
-        currentHeight = height;
-        
-        sWrapper = createSurface(
-            width,
-            height
-        );
-        
-        if (!sWrapper->surface) {
-            std::cout << "Surface was not created!\n";
-            return;
-        };
-        
-        canvas = sWrapper->surface->getCanvas();
-        
-        ready = true;
-        glfwSwapInterval(vsync);
-        while (!glfwWindowShouldClose(window)) {
-            // loop_mutex.lock();
-            glfwGetFramebufferSize(window, &width, &height);
-            
-            glfwPollEvents();
-                canvas->clear(SK_ColorTRANSPARENT);
+        currentVsync = vsync;
 
-            if (pendingResize == true){
-                pendingResize = false;
-                glViewport(0, 0, pendingW, pendingH);
-                width = pendingW;
-                height = pendingH;
-                renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-                auto tmp = sWrapper->surface->makeImageSnapshot();
-                sWrapper->surface.reset();
-                delete sWrapper;
-                renderThreadContext->context->freeGpuResources();
-                sWrapper = createSurface(
-                    pendingW,
-                    pendingH
-                );
-                canvas = sWrapper->surface->getCanvas();
-                auto tw = tmp->width();
-                auto th = tmp->height();
-                canvas->drawImageRect(tmp, SkRect::MakeXYWH(0,0,tw,th), SkFilterMode::kLinear);
-                tmp.reset();
-                wPropertiesViewer[0] = true;
-                wPropertiesViewer[1] = pendingW;
-                wPropertiesViewer[2] = pendingH;
-            }
-
-            for (auto element : canvases) {
-                std::lock_guard<std::mutex> lock(element->mutex);
-                #ifndef __APPLE__
-                if (element->hasBackendTex) {
-                    auto img = SkImages::BorrowTextureFrom(
-                        renderThreadContext->context.get(),
-                        element->backendTex,
-                        kTopLeft_GrSurfaceOrigin,
-                        kN32_SkColorType,
-                        kPremul_SkAlphaType,
-                        nullptr
-                    );
-                    if (img) {
-                        canvas->drawImageRect(img, SkRect::MakeXYWH(0,0,img->width(),img->height()), SkFilterMode::kNearest);
-                    }
-                } else {
-                    canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-                }
-                
-                
-                
-                
-                #else
-                canvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
-                #endif
-            }
-
-            for (int it : vsyncQueue){
-                    glfwSwapInterval(it);
-                }
-                vsyncQueue.clear();
-
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-            
-            onrefresh(0);
-            
-            glfwSwapBuffers(window);
-            // std::unique_lock<std::mutex> lock(frameMtx);
-            // frameCv.wait(lock, [] { return frameReady; });
-            frameReady = false;
-            // lock.unlock();
-            
-            // loop_mutex.unlock();
-        }
-        ready = false;
-        glfwDestroyWindow(window);
-        glfwTerminate();
-    }
-    
-    WINDOWS_EXPORT bool canvas_init_gpu_context() {
-        sharedWindow = glfwCreateWindow(1, 1, "shared", NULL, NULL);
-        if (sharedWindow) {
-            glfwHideWindow(sharedWindow);
-        }
-        glfwMakeContextCurrent(sharedWindow);
-        mainThreadIface = new InterfaceWrapper(GrGLMakeNativeInterface());
-        if (!mainThreadIface->interface) return false;
-        mainThreadCtx = new ContextWrapper(
-            GrDirectContexts::MakeGL(mainThreadIface->interface)
-        );
-        gpuContextReady = (mainThreadCtx && mainThreadCtx->context);
-        return gpuContextReady;
-    }
-    
-    WINDOWS_EXPORT void canvas_flush_gpu() {
-        if (!gpuContextReady) return;
-        // Block the JS thread until the GPU finishes drawing.
-        // This guarantees the render thread can read the textures safely.
-        mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-    }
-    #else
-    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync){
-        width = w;
-        height = h;
-        
         window = glfwCreateWindow(width, height, title, NULL, NULL);
         if (!window) {
             std::cerr << "Couldn't initialize Window...\n";
             const char* desc;
             int code = glfwGetError(&desc);
-            std::cerr << "GLFW error " << code << ": "
-            << (desc ? desc : "unknown")
-            << "\n";
+            std::cerr << "GLFW error " << code << ": " << (desc ? desc : "unknown") << "\n";
             glfwTerminate();
             return;
         }
-        
-        #pragma region Events Setup
-        
+
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
-        glfwSetKeyCallback(window,keyboard_key_callback);
-        glfwSetWindowRefreshCallback(window, window_refresh_callback);
-        #pragma endregion
-        
-        glfwMakeContextCurrent(window);
-        renderThreadInterface = new InterfaceWrapper(GrGLMakeNativeInterface());
-        if (!renderThreadInterface->interface) {
-            std::cout << "Native interface failed\n";
+        glfwSetKeyCallback(window, keyboard_key_callback);
+        glfwSetScrollCallback(window, window_scroll_callback);
+
+        if (!VK::initCore()) {
+            std::cerr << "Failed to initialize Vulkan core!\n";
             return;
         }
-        
-        std::cout << "Native interface OK\n";
-        
-        renderThreadContext = new ContextWrapper(GrDirectContexts::MakeGL(renderThreadInterface->interface));
+
+        renderThreadContext = new ContextWrapper(VK::createRenderThreadContext());
         if (!renderThreadContext->context) {
-            std::cout << "Context was not created!\n";
+            std::cerr << "Render thread Vulkan context was not created!\n";
             return;
-        };
-        
-        GrGLFramebufferInfo fbInfo;
-        fbInfo.fFBOID = 0;
-        fbInfo.fFormat = GL_RGBA8;
-        
-        
+        }
+
         glfwGetFramebufferSize(window, &width, &height);
-        
         currentWidth = width;
         currentHeight = height;
 
-        sWrapper = createSurface(
-            width,
-            height
-        );
-        
-        if (!sWrapper->surface) {
-            std::cout << "Surface was not created!\n";
+        if (!VK::initWindowSurface(window, width, height, currentVsync)) {
+            std::cerr << "Vulkan swapchain was not created!\n";
             return;
-        };
-        glfwSwapInterval(vsync);
-        
-        canvas = sWrapper->surface->getCanvas();
-        
-        // g_clearColor.setColor(SK_ColorTRANSPARENT);
-        // g_clearColor.setStyle(SkPaint::kFill_Style);
-        // g_clearColor.setBlendMode(SkBlendMode::kClear);
-        // g_clearColor.setAntiAlias(1);
-        // pImageDataColor.setBlendMode(SkBlendMode::kSrc);
-        
+        }
+
+        rebuildSwapchainSurfaces();
+        if (swapchainSurfaces.empty() || !swapchainSurfaces[0]->surface) {
+            std::cerr << "Swapchain surfaces were not created!\n";
+            return;
+        }
+
+        ready = true;
+
+        while (!glfwWindowShouldClose(window)) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwPollEvents();
+
+            // Skip rendering while window is minimized (0x0 framebuffer)
+            if (width == 0 || height == 0) {
+                continue;
+            }
+
+            if (pendingResize) {
+                pendingResize = false;
+                width = pendingW;
+                height = pendingH;
+                renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                clearSwapchainSurfaces();
+                renderThreadContext->context->freeGpuResources();
+                VK::recreateSwapchain(pendingW, pendingH, currentVsync);
+                rebuildSwapchainSurfaces();
+
+                wPropertiesViewer[0] = true;
+                wPropertiesViewer[1] = pendingW;
+                wPropertiesViewer[2] = pendingH;
+            }
+
+            if (!vsyncQueue.empty()) {
+                currentVsync = vsyncQueue.back();
+                vsyncQueue.clear();
+                renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+                clearSwapchainSurfaces();
+                VK::recreateSwapchain(width, height, currentVsync);
+                rebuildSwapchainSurfaces();
+            }
+
+            uint32_t imageIndex = 0;
+            if (!VK::acquireNextImage(&imageIndex)) {
+                // Swapchain became out-of-date; recreate and retry next frame
+                clearSwapchainSurfaces();
+                VK::recreateSwapchain(width, height, currentVsync);
+                rebuildSwapchainSurfaces();
+                continue;
+            }
+
+            canvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+            canvas->clear(SK_ColorTRANSPARENT);
+
+            render_composited_canvases(canvas);
+
+            onrefresh(0);
+
+            VK::presentImage(
+                renderThreadContext->context.get(),
+                swapchainSurfaces[imageIndex]->surface.get(),
+                imageIndex
+            );
+
+            frameReady = false;
+        }
+
+        ready = false;
+        VK::waitIdle();
+        clearSwapchainSurfaces();
+        delete renderThreadContext;
+        renderThreadContext = nullptr;
+        glfwDestroyWindow(window);
+        VK::shutdown();
+        glfwTerminate();
+    }
+
+    WINDOWS_EXPORT bool canvas_init_gpu_context() {
+        if (!VK::initCore()) return false;
+        mainThreadCtx = new ContextWrapper(VK::createMainThreadContext());
+        gpuContextReady = (mainThreadCtx && mainThreadCtx->context);
+
+        if (gpuContextReady) {
+            std::cout << "[OK] canvas_init_gpu_context()\n";
+        } else {
+            std::cerr << "[ERR] canvas_init_gpu_context() failed!\n";
+        }
+        return gpuContextReady;
+    }
+
+    WINDOWS_EXPORT void canvas_flush_gpu() {
+        if (!gpuContextReady) return;
+        VK::flushAndSyncMainContext(mainThreadCtx->context.get());
+    }
+    #else
+    WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync) {
+        width = w;
+        height = h;
+        currentVsync = vsync;
+
+        window = glfwCreateWindow(width, height, title, NULL, NULL);
+        if (!window) {
+            std::cerr << "Couldn't initialize Window...\n";
+            const char* desc;
+            int code = glfwGetError(&desc);
+            std::cerr << "GLFW error " << code << ": " << (desc ? desc : "unknown") << "\n";
+            glfwTerminate();
+            return;
+        }
+
+        glfwSetWindowSizeCallback(window, window_resize_callback);
+        glfwSetCursorPosCallback(window, cursor_pos_callback);
+        glfwSetMouseButtonCallback(window, mouse_button_callback);
+        glfwSetKeyCallback(window, keyboard_key_callback);
+        glfwSetWindowRefreshCallback(window, window_refresh_callback);
+
+        if (!VK::initCore()) return;
+        renderThreadContext = new ContextWrapper(VK::createRenderThreadContext());
+        if (!renderThreadContext->context) return;
+
+        glfwGetFramebufferSize(window, &width, &height);
+        currentWidth = width;
+        currentHeight = height;
+
+        if (!VK::initWindowSurface(window, width, height, currentVsync)) return;
+        rebuildSwapchainSurfaces();
+        if (swapchainSurfaces.empty()) return;
+
         ready = true;
     }
-    
-    WINDOWS_EXPORT bool canvas_init_gpu_context() {}
+
+    WINDOWS_EXPORT bool canvas_init_gpu_context() { return false; }
     WINDOWS_EXPORT void canvas_flush_gpu() {}
     #endif
 
-    WINDOWS_EXPORT void update_window(){
+    WINDOWS_EXPORT void update_window() {
     #ifdef __APPLE__
         wPropertiesViewer[3] = glfwWindowShouldClose(window);
         if (glfwWindowShouldClose(window)) return;
         glfwGetFramebufferSize(window, &width, &height);
-        
         glfwPollEvents();
-        canvas->clear(SK_ColorTRANSPARENT);
-        
-        if (pendingResize == true){
+        if (width == 0 || height == 0) return;
+
+        if (pendingResize) {
             pendingResize = false;
-            glViewport(0, 0, pendingW, pendingH);
             width = pendingW;
             height = pendingH;
-            sWrapper->surface.reset();
+            clearSwapchainSurfaces();
             renderThreadContext->context->freeGpuResources();
-            delete sWrapper;
-            sWrapper = createSurface(
-                pendingW,
-                pendingH
-            );
-            canvas = sWrapper->surface->getCanvas();
-            // renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+            VK::recreateSwapchain(pendingW, pendingH, currentVsync);
+            rebuildSwapchainSurfaces();
             wPropertiesViewer[0] = true;
             wPropertiesViewer[1] = pendingW;
             wPropertiesViewer[2] = pendingH;
         }
-        
-        // processResizes();
-        
-        for (auto element : canvases) {
-            canvas->drawImage(element->surface->makeTemporaryImage(),0,0);
-        }
-        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-        glfwSwapBuffers(window);
+
+        uint32_t imageIndex = 0;
+        if (!VK::acquireNextImage(&imageIndex)) return;
+
+        canvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+        canvas->clear(SK_ColorTRANSPARENT);
+        render_composited_canvases(canvas);
+
+        VK::presentImage(
+            renderThreadContext->context.get(),
+            swapchainSurfaces[imageIndex]->surface.get(),
+            imageIndex
+        );
     #endif
     }
-    
+
     WINDOWS_EXPORT void destroy_window() {
-    #ifndef __APPLE__
-        delete renderThreadInterface;
-        // delete ptr;
-    #else
+    #ifdef __APPLE__
         ready = false;
+        VK::waitIdle();
+        clearSwapchainSurfaces();
+        delete renderThreadContext;
+        renderThreadContext = nullptr;
         glfwDestroyWindow(window);
+        VK::shutdown();
         glfwTerminate();
-        delete renderThreadInterface;
     #endif
     }
-    
 }

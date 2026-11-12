@@ -114,6 +114,16 @@ namespace VK {
         instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instInfo.pApplicationInfo = &appInfo;
 #ifdef __APPLE__
+        uint32_t devExtCount = 0;
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, nullptr);
+        std::vector<VkExtensionProperties> availDevExts(devExtCount);
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, availDevExts.data());
+        for (const auto& ext : availDevExts) {
+            if (std::strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0) {
+                deviceExtensions.push_back("VK_KHR_portability_subset");
+                break;
+            }
+        }
         instInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
         instInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
@@ -219,12 +229,9 @@ namespace VK {
     }
 
     // Add a helper in namespace VK:
-    void flushAndSyncMainContext(GrDirectContext* mainCtx) {
-        if (!mainCtx) return;
-        std::unique_lock<std::mutex> lock(sharedQueueMtx, std::defer_lock);
-        if (mainQueue == renderQueue) lock.lock();
-        mainCtx->flushAndSubmit(GrSyncCpu::kYes);
-    }
+    //Forward declaration. Implementation is in Canvas.cpp
+    void flushAndSyncMainContext(GrDirectContext* mainCtx);
+
     // 2. Factories for your global GrDirectContext pointers
     sk_sp<GrDirectContext> createMainThreadContext() {
         getProcCallCount = 0;

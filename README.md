@@ -136,8 +136,8 @@ cd skia_build
 fetch skia
 cd skia
 python3 tools/git-sync-deps
-gn gen out/windows_%PROCESSOR_ARCHITECTURE% --args='is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=trueskia_use_egl=true'
-ninja -C out/Release
+gn gen out/windows_%PROCESSOR_ARCHITECTURE% --args="is_debug = false is_official_build = true target_cpu = \"x64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_harfbuzz = false"
+ninja -C out/windows_%PROCESSOR_ARCHITECTURE%
 ```
 
 ### For Windows on ARM (aarch64) **UNTESTED!!**
@@ -147,8 +147,8 @@ cd skia_build
 fetch skia
 cd skia
 python3 tools/git-sync-deps
-gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args='is_official_build=true target_cpu = \"arm64\" skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=trueskia_use_egl=true'
-ninja -C out/Release
+gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args="is_debug = false is_official_build = true target_cpu = \"arm64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_harfbuzz = false"
+ninja -C out/windows_%PROCESSOR_ARCHITEW6432%
 ```
 
 **NOTE: `make run` and `make build` expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\windows_[ARCHITECTURE_VARIABLE]\skia.lib`, by following the steps accordingly you will get the dev environment ready to go**

@@ -239,7 +239,7 @@ bool gpuContextReady = false;
 #endif
 
 
-static int32_t wPropertiesViewer[3]{};
+static int32_t wPropertiesViewer[4]{};
 static _Float64_t mMoveViewer[9]{};
 static _Float64_t mClickViewer[9]{};
 static _Float64_t mDownViewer[9]{};

@@ -90,31 +90,6 @@ export class Window {
 				item.cb(evt);
 			})
 		}
-		if(this.#mMoveViewer[0] != 0) {
-			this.#mMoveViewer[0] = 0				
-			const evt = new MouseEvent("move",
-				{
-					target:this,
-					altKey:false,
-					button:0,
-					buttons:this.#mMoveViewer[5],
-					clientX:this.#mMoveViewer[1],
-					clientY:this.#mMoveViewer[2],
-					movementX: this.#mMoveViewer[3],
-					movementY: this.#mMoveViewer[4],
-					ctrlKey:false,
-					metaKey:false,
-					screenX:0,
-					screenY:0,
-					shiftKey:false
-				}
-			)
-			if (this.onmousemove) this.onmousemove(evt)
-			
-			this.#mMoveEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
-		}
 		if(this.#mDownViewer[0] != 0) {
 			this.#mDownViewer[0] = 0
 			const evt = new MouseEvent("down",
@@ -298,6 +273,7 @@ export class Window {
 			});
 
 			let pendingFrame = false;
+			let shuttingDown = false;
 			let lastFrame = performance.now();
 
 			// Removed 'async' wrapper to prevent promise allocation overhead
@@ -305,6 +281,8 @@ export class Window {
 				const frameSignal = msg.data;
 
 				if (frameSignal == 2) {
+					if (shuttingDown) return;
+					shuttingDown = true;
 					lib.symbols.destroy_window();
 					lib.symbols.images_cleanup();
 					process.exit(0);
@@ -329,7 +307,6 @@ export class Window {
 
 					if (!pendingFrame) {
 						pendingFrame = true;
-						lib.symbols.canvas_flush_gpu();
 
 						setImmediate(() => {
 							const queueLen = requestedFrames.length;
@@ -341,6 +318,7 @@ export class Window {
 									framesToProcess[i](now);
 								}
 							}
+							lib.symbols.canvas_flush_gpu();
 							pendingFrame = false;
 						});
 					}

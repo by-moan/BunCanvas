@@ -231,6 +231,7 @@ extern "C" {
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window, keyboard_key_callback);
         glfwSetScrollCallback(window, window_scroll_callback);
+        glfwSetWindowRefreshCallback(window, window_refresh_callback);
 
         if (!VK::initCore()) {
             std::cerr << "Failed to initialize Vulkan core!\n";
@@ -260,7 +261,7 @@ extern "C" {
 
         ready = true;
 
-        while (!glfwWindowShouldClose(window)) {
+        while (!(wPropertiesViewer[3] = glfwWindowShouldClose(window))) {
             glfwGetFramebufferSize(window, &width, &height);
             glfwPollEvents();
 
@@ -275,7 +276,7 @@ extern "C" {
                 height = pendingH;
                 renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
                 clearSwapchainSurfaces();
-                renderThreadContext->context->freeGpuResources();
+                // renderThreadContext->context->freeGpuResources();
                 VK::recreateSwapchain(pendingW, pendingH, currentVsync);
                 rebuildSwapchainSurfaces();
 
@@ -317,15 +318,7 @@ extern "C" {
 
             frameReady = false;
         }
-
-        ready = false;
-        VK::waitIdle();
-        clearSwapchainSurfaces();
-        delete renderThreadContext;
-        renderThreadContext = nullptr;
-        glfwDestroyWindow(window);
-        VK::shutdown();
-        glfwTerminate();
+        onrefresh(2);
     }
 
     WINDOWS_EXPORT bool canvas_init_gpu_context() {
@@ -423,15 +416,23 @@ extern "C" {
     }
 
     WINDOWS_EXPORT void destroy_window() {
-    #ifdef __APPLE__
         ready = false;
         VK::waitIdle();
         clearSwapchainSurfaces();
-        delete renderThreadContext;
-        renderThreadContext = nullptr;
-        glfwDestroyWindow(window);
+        canvas_destroy_all();
+
+        if (renderThreadContext) {
+            delete renderThreadContext;
+            renderThreadContext = nullptr;
+        }
+        if (mainThreadCtx) {
+            delete mainThreadCtx;
+            mainThreadCtx = nullptr;
+            gpuContextReady = false;
+        }
+
         VK::shutdown();
+        glfwDestroyWindow(window);
         glfwTerminate();
-    #endif
     }
 }

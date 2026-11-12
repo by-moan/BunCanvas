@@ -1,377 +1,191 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasGradient, TextMetrics, CanvasRenderingContext2D } from "./BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio } from "./BunCanvas";
 
-const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
+
+const window = new Window(800,600, "spiiin", {vsync:true});
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);
 
-let wSizeStr = `${window.innerWidth}x${window.innerHeight}`
-
 window.onresize = (evt)=>{
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-    wSizeStr = `${window.innerWidth}x${window.innerHeight}`
-    ctx.font = "20px arial"
+	canvas.width = window.innerWidth
+	canvas.height = window.innerHeight
 }
 
-const ctx = canvas.getContext('2d', {desynchronized:true});
+const ctx = canvas.getContext('2d');
 
-// Forward native canvas events to canvas/window callback properties
-if (canvas) {
-    const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return {
-            x: (clientX - rect.left) * (canvas.width / rect.width),
-            y: (clientY - rect.top) * (canvas.height / rect.height)
-        };
-    };
-    
-    window.addEventListener('mousedown', (e) => {
-        const pos = getPos(e);
-        const evt = { x: pos.x, y: pos.y, button: e.button, type: 'mousedown' };
-        if (canvas.onmousedown) canvas.onmousedown(evt);
-    });
-    
-    window.addEventListener('mousemove', (e) => {
-        const pos = getPos(e);
-        const evt = { x: pos.x, y: pos.y, type: 'mousemove' };
-        if (canvas.onmousemove) canvas.onmousemove(evt);
-    });
-    
-    window.addEventListener('mouseup', (e) => {
-        const evt = { type: 'mouseup' };
-        if (canvas.onmouseup) canvas.onmouseup(evt);
-    });
-    if (typeof document !== 'undefined') {
-        document.addEventListener('mouseup', (e) => {
-            const evt = { type: 'mouseup' };
-            if (canvas.onmouseup) canvas.onmouseup(evt);
-        });
-    }
-    
-    window.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const pos = getPos(e);
-        const evt = { x: pos.x, y: pos.y, type: 'touchstart' };
-        if (canvas.ontouchstart) canvas.ontouchstart(evt);
-    }, { passive: false });
-    
-    window.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const pos = getPos(e);
-        const evt = { x: pos.x, y: pos.y, type: 'touchmove' };
-        if (canvas.ontouchmove) canvas.ontouchmove(evt);
-    }, { passive: false });
-    
-    window.addEventListener('touchend', (e) => {
-        const evt = { type: 'touchend' };
-        if (canvas.ontouchend) canvas.ontouchend(evt);
-    });
+// Cube vertices
+const vertices = [
+  [-100, -100, -100], [100, -100, -100], [100, 100, -100], [-100, 100, -100],
+  [-100, -100, 100], [100, -100, 100], [100, 100, 100], [-100, 100, 100]
+];
+
+// Faces defined by 4 vertex indices
+const faces = [
+  { verts: [0, 1, 2, 3], color: '#ff6b6b', name: 'back' },
+  { verts: [4, 7, 6, 5], color: '#4ecdc4', name: 'front' },
+  { verts: [0, 4, 5, 1], color: '#45b7d1', name: 'bottom' },
+  { verts: [2, 6, 7, 3], color: '#96ceb4', name: 'top' },
+  { verts: [0, 3, 7, 4], color: '#ffeaa7', name: 'left' },
+  { verts: [1, 5, 6, 2], color: '#dfe6e9', name: 'right' }
+];
+
+// Create offscreen canvases with patterns for each face
+const faceCanvases = {};
+faces.forEach((face, i) => {
+  const fc = new Canvas(200,200);
+  const fctx = fc.getContext('2d');
+  
+  // Fill background
+  fctx.fillStyle = face.color;
+  fctx.fillRect(0, 0, 200, 200);
+  
+  // Draw a pattern
+  fctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  fctx.lineWidth = 3;
+  for (let j = 0; j < 200; j += 40) {
+    fctx.beginPath();
+    fctx.moveTo(0, j);
+    fctx.lineTo(200, j);
+    fctx.stroke();
+    fctx.beginPath();
+    fctx.moveTo(j, 0);
+    fctx.lineTo(j, 200);
+    fctx.stroke();
+  }
+  
+  // Draw face label
+  fctx.fillStyle = 'rgba(0,0,0,0.7)';
+  fctx.font = 'bold 30px Arial';
+  fctx.textAlign = 'center';
+  fctx.textBaseline = 'middle';
+  fctx.fillText(face.name.toUpperCase(), 100, 100);
+  
+  // Draw border
+  fctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  fctx.lineWidth = 4;
+  fctx.strokeRect(0, 0, 200, 200);
+  
+  faceCanvases[i] = fc;
+});
+
+let angleX = 0;
+let angleY = 0;
+
+function rotateY(point, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const x = point[0] * cos + point[2] * sin;
+  const z = -point[0] * sin + point[2] * cos;
+  return [x, point[1], z];
 }
 
-// Physics Configuration Settings
-const PHYSICS = {
-    gravity: 0.35,        // Downward force
-    restitution: 0.82,    // Bounciness coefficient [0..1]
-    friction: 0.998,      // Air resistance
-    floorFriction: 0.97,  // Sliding friction on walls/floor
-    subSteps: 4,          // Iteration solver substeps for stability
-    spawnRateMs: 35,      // Delay between continuous ball spawns (ms)
-    defaultRadius: 10     // Required radius = 10px
-};
-
-// Ball Class
-class Ball {
-    static radius = 10
-    static string = "abcdefghijklmnopqrstuvwxyz"
-    constructor(x, y, radius = 10, vx = 0, vy = 0, letter = null) {
-        this.x = x;
-        this.y = y;
-        this.radius = radius;
-        this.vx = vx;
-        this.vy = vy;
-        this.mass = Math.PI * radius * radius;
-        this.r = (Math.random() * 360) | 0;
-        this.g = (Math.random() * 360) | 0;
-        this.b = (Math.random() * 360) | 0;
-        this.color = `rgb(${this.r},${this.g},${this.b})`;
-        this.letter = letter??Ball.string[parseInt(Math.random()*Ball.string.length)]
-        console.log(this.letter)
-    }
-    
-    update(dt) {
-        // Apply Gravity & Air Drag
-        this.vy += PHYSICS.gravity * dt;
-        this.vx *= PHYSICS.friction;
-        this.vy *= PHYSICS.friction;
-        
-        // Update Coordinates
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-    }
-
-    static BallPath = new Path2D()
-    static BallShinePath = new Path2D()
-    
-    /**
-     * 
-     * @param {CanvasRenderingContext2D} ctx 
-     */
-    draw(ctx) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        
-        // Glow & Color
-        ctx.fillStyle = this.color;
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = 8;
-        ctx.fillText(this.letter,0,0);
-        
-        ctx.restore();
-    }
+function rotateX(point, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const y = point[1] * cos - point[2] * sin;
+  const z = point[1] * sin + point[2] * cos;
+  return [point[0], y, z];
 }
 
-Ball.BallPath.arc(0,0, Ball.radius, 0, Math.PI * 2)
-Ball.BallShinePath.arc(-Ball.radius*.3,-Ball.radius*.3, Ball.radius * 0.35, 0, Math.PI * 2)
-
-// State variables
-const balls = [];
-let isMouseDown = false;
-let mouseX = window.innerWidth / 2;
-let mouseY = window.innerHeight / 2;
-let lastSpawnTime = 0;
-
-// Statistics
-let frameCount = 0;
-let fps = 0;
-let lastFpsUpdate = performance.now();
-
-// Mouse & Touch Event Handlers
-canvas.onmousedown = (e) => {
-    isMouseDown = true;
-    mouseX = e.x;
-    mouseY = e.y;
-    spawnBall(mouseX, mouseY);
-    lastSpawnTime = performance.now();
-};
-
-canvas.onmousemove = (e) => {
-    mouseX = e.x;
-    mouseY = e.y;
-};
-
-canvas.onmouseup = () => {
-    isMouseDown = false;
-};
-
-canvas.ontouchstart = (e) => {
-    isMouseDown = true;
-    mouseX = e.x;
-    mouseY = e.y;
-    spawnBall(mouseX, mouseY);
-    lastSpawnTime = performance.now();
-};
-
-canvas.ontouchmove = (e) => {
-    mouseX = e.x;
-    mouseY = e.y;
-};
-
-canvas.ontouchend = () => {
-    isMouseDown = false;
-};
-
-// Spawn a single 10px ball with slight random scatter velocity
-function spawnBall(x, y) {
-    const scatterX = (Math.random() - 0.5) * 4;
-    const scatterY = (Math.random() - 0.5) * 4;
-    balls.push(new Ball(x, y, PHYSICS.defaultRadius, scatterX, scatterY));
+function project(point) {
+  const distance = 500;
+  const scale = distance / (distance + point[2]);
+  return [
+    point[0] * scale + canvas.width / 2,
+    point[1] * scale + canvas.height / 2,
+    point[2]
+  ];
 }
 
-// Boundary Collision Resolution
-function resolveBoundary(ball) {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    
-    // Floor
-    if (ball.y + ball.radius > h) {
-        ball.y = h - ball.radius;
-        ball.vy *= -PHYSICS.restitution;
-        ball.vx *= PHYSICS.floorFriction;
-    }
-    // Ceiling
-    else if (ball.y - ball.radius < 0) {
-        ball.y = ball.radius;
-        ball.vy *= -PHYSICS.restitution;
-    }
-    
-    // Left Wall
-    if (ball.x - ball.radius < 0) {
-        ball.x = ball.radius;
-        ball.vx *= -PHYSICS.restitution;
-    }
-    // Right Wall
-    else if (ball.x + ball.radius > w) {
-        ball.x = w - ball.radius;
-        ball.vx *= -PHYSICS.restitution;
-    }
+// Draw a textured quadrilateral by splitting into two triangles
+// Uses transformation (setTransform) to map image corners to projected corners
+function drawTexturedQuad(img, pts) {
+  const [p0, p1, p2, p3] = pts;
+  
+  // Triangle 1: p0, p1, p3  (maps to top-left, top-right, bottom-left of image)
+  drawTriangle(img, p0, p1, p3, 0, 0, 200, 0, 0, 200);
+  // Triangle 2: p1, p2, p3  (maps to top-right, bottom-right, bottom-left of image)
+  drawTriangle(img, p1, p2, p3, 200, 0, 200, 200, 0, 200);
 }
 
-// Ball-to-Ball Elastic Collisions
-function resolveCollisions() {
-    const len = balls.length;
-    for (let i = 0; i < len; i++) {
-        for (let j = i + 1; j < len; j++) {
-            const b1 = balls[i];
-            const b2 = balls[j];
-            
-            const dx = b2.x - b1.x;
-            const dy = b2.y - b1.y;
-            const distSq = dx * dx + dy * dy;
-            const minDist = b1.radius + b2.radius;
-            
-            if (distSq < minDist * minDist && distSq > 0) {
-                const dist = Math.sqrt(distSq);
-                const nx = dx / dist;
-                const ny = dy / dist;
-                
-                // Separate overlapping balls
-                const overlap = 0.5 * (minDist - dist);
-                b1.x -= nx * overlap;
-                b1.y -= ny * overlap;
-                b2.x += nx * overlap;
-                b2.y += ny * overlap;
-                
-                // Elastic impulse calculation
-                const kx = b1.vx - b2.vx;
-                const ky = b1.vy - b2.vy;
-                const p = 2 * (nx * kx + ny * ky) / (b1.mass + b2.mass);
-                
-                if (p > 0) {
-                    const impulse = p * PHYSICS.restitution;
-                    b1.vx -= impulse * b2.mass * nx;
-                    b1.vy -= impulse * b2.mass * ny;
-                    b2.vx += impulse * b1.mass * nx;
-                    b2.vy += impulse * b1.mass * ny;
-                }
-            }
-        }
-    }
+function drawTriangle(img, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
+  ctx.save();
+  
+  // Calculate affine transformation matrix
+  // Maps: (u0,v0)->p0, (u1,v1)->p1, (u2,v2)->p2
+  const x0 = p0[0], y0 = p0[1];
+  const x1 = p1[0], y1 = p1[1];
+  const x2 = p2[0], y2 = p2[1];
+  
+  const denom = (u0 - u1) * (v0 - v2) - (u0 - u2) * (v0 - v1);
+  if (Math.abs(denom) < 0.001) return;
+  
+  // Matrix elements for ctx.setTransform(a, b, c, d, e, f)
+  const a = ((x0 - x1) * (v0 - v2) - (x0 - x2) * (v0 - v1)) / denom;
+  const c = ((x0 - x2) * (u0 - u1) - (x0 - x1) * (u0 - u2)) / denom;
+  const b = ((y0 - y1) * (v0 - v2) - (y0 - y2) * (v0 - v1)) / denom;
+  const d = ((y0 - y2) * (u0 - u1) - (y0 - y1) * (u0 - u2)) / denom;
+  const e = x0 - a * u0 - c * v0;
+  const f = y0 - b * u0 - d * v0;
+  ctx.setTransform(a, b, c, d, e, f);
+  
+  // Clip to triangle and draw
+  ctx.beginPath();
+  ctx.moveTo(u0, v0);
+  ctx.lineTo(u1, v1);
+  ctx.lineTo(u2, v2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(img, 0, 0,200,200);
+  
+  ctx.restore();
 }
 
-// Overlay rendering
-function drawCanvasHUD(ctx) {
-    ctx.save();
+function draw() {
+  ctx.fillStyle = '#303e44';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Transform vertices
+  const transformedVerts = vertices.map(v => {
+    let r = rotateY(v, angleY);
+    r = rotateX(r, angleX);
+    return r;
+  });
+  
+  // Project vertices and calculate face depths
+  const projectedFaces = faces.map((face, i) => {
+    const pts = face.verts.map(vi => project(transformedVerts[vi]));
+    const z = pts.reduce((sum, p) => sum + p[2], 0) / 4;
+    return { face, pts, z, index: i };
+  });
+  
+  // Sort by depth (painter's algorithm - back faces first)
+  projectedFaces.sort((a, b) => a.z - b.z);
+  
+  // Draw faces
+  projectedFaces.forEach(({ face, pts, index }) => {
+    // Backface culling - skip faces pointing away
+    const [p0, p1, p2] = pts;
+    const cross = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]);
+    if (cross < 0) return;
     
-    // Header info box
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    drawTexturedQuad(faceCanvases[index], pts);
+    
+    // Draw wireframe edge
+    ctx.strokeStyle = 'rgba(255,255,255,0)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(16, 16, 210, 80, 8);
-    ctx.fill();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i][0], pts[i][1]);
+    }
+    ctx.closePath();
     ctx.stroke();
-    
-    // Text
-    ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 13px system-ui, sans-serif';
-    ctx.fillText(`WINDOW: ${wSizeStr}`, 28, 38);
-    
-    ctx.fillStyle = '#10b981';
-    ctx.font = '12px monospace';
-    ctx.fillText(`FPS: ${fps}`, 28, 58);
-    
-    ctx.fillStyle = '#e2e8f0';
-    ctx.fillText(`Objects: ${balls.length}`, 110, 58);
-    
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText('Hold click to spawn 10px balls', 28, 78);
-    
-    // Spawning Indicator under Cursor
-    if (isMouseDown) {
-        ctx.beginPath();
-        ctx.arc(mouseX, mouseY, PHYSICS.defaultRadius + 4, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.stroke();
-    }
-    
-    ctx.restore();
+  });
+  
+  angleY += 0.02;
+  angleX += 0.01;
+  
+  requestAnimationFrame(draw);
 }
 
-// Main Loop
-let lastFrameTime = performance.now();
-
-
-function step(now) {
-    const dt = Math.min((now - lastFrameTime) / 16.667, 2.0);
-    lastFrameTime = now;
-    
-    // Handle Continuous Spawning while Mouse Down
-    if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
-        spawnBall(mouseX, mouseY);
-        lastSpawnTime = now;
-    }
-    
-    // Sub-step physics solver for stability
-    const subDt = dt / PHYSICS.subSteps;
-    for (let s = 0; s < PHYSICS.subSteps; s++) {
-        for (let i = 0; i < balls.length; i++) {
-            balls[i].update(subDt);
-            resolveBoundary(balls[i]);
-        }
-        resolveCollisions();
-    }
-    
-    const grad = ctx.createLinearGradient(0,0,0,window.innerHeight);
-    grad.addColorStop(0, "#0d1125")
-    grad.addColorStop(1, "#162157")
-
-
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    
-    // Render all ball objects
-    for (let i = 0; i < balls.length; i++) {
-        balls[i].draw(ctx);
-    }
-    
-    // Render Canvas HUD
-    drawCanvasHUD(ctx);
-    
-    // FPS Counter
-    frameCount++;
-    if (now - lastFpsUpdate >= 500) {
-        fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
-        frameCount = 0;
-        lastFpsUpdate = now;
-    }
-    requestAnimationFrame(step);
-}
-
-// // Seed initial balls
-// for (let i = 0; i < 20; i++) {
-//     const rx = 100 + Math.random() * (window.innerWidth - 200);
-//     const ry = 50 + Math.random() * (window.innerHeight / 2);
-//     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));
-// }
-
-const kb_clicks = [
-    new Audio("./kb_click.mp3"),
-    new Audio("./kb_click_2.mp3"),
-]
-
-window.onkeydown = (evt)=>{
-    const rx = 100 + Math.random() * (window.innerWidth - 200);
-    const ry = 50 + Math.random() * (window.innerHeight / 2);
-    balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4,evt.key));
-    console.log(evt.location)
-    kb_clicks[parseInt(Math.random()*kb_clicks.length)].play()
-}
-
-// Start Animation Frame Loop
-requestAnimationFrame(step);
+draw();

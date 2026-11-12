@@ -34,7 +34,7 @@ public:
         config.pUserData         = this;
 
         if (ma_device_init(NULL, &config, &device) == MA_SUCCESS) {
-            std::cout << "ma_device_init  success!\n";
+            std::cout << "[OK] ma_device_init success!\n";
             valid = true;
         }else {
             std::cout << "Fail!!!\n";
@@ -51,13 +51,13 @@ public:
         ma_result result = ma_device_start(&device);
 
         if (result != MA_SUCCESS) {
-            std::cerr << "ma_device_start failed: "
+            std::cerr << "[CRIT_ERR] ma_device_start failed: "
                     << result << '\n';
             return;
         }
 
         started = true;
-        std::cout << "Audio device started!\n";
+        std::cout << "[OK] Audio device started!\n";
     }
 
     void addVoice(std::unique_ptr<AudioVoice> voice) {
@@ -166,7 +166,7 @@ public:
         ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
         
         if (ma_decoder_init_file(path.c_str(), &decoderConfig, &voice->decoder) != MA_SUCCESS) {
-            std::cerr << "Failed to load file: " << path << std::endl;
+            std::cerr << "[Err] Failed to load file: " << path << std::endl;
             return;
         }
 

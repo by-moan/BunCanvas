@@ -346,6 +346,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr"],
 		returns: "void",
 	},
+	canvas_destroy_all: {
+		args: [],
+		returns: "void",
+	},
 	image_create: {
 		args: [],
 		returns: "ptr",

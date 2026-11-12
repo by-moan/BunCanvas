@@ -62,7 +62,7 @@ build: $(TARGET)
 # Build (if needed) and run
 run: $(COPIED_LIB)
 	cd $(OUTPUT_DIR) && bun ../main.js --XX:BunCanvas.IgnoreImport
-# 	cd $(OUTPUT_DIR) && gdb -ex "set pagination off" -ex "handle SIGPWR nostop noprint pass" --args bun ../main.js bun ../main.js
+# 	cd $(OUTPUT_DIR) && gdb -ex "set pagination off" -ex "handle SIGPWR nostop noprint pass" --args bun ../main.js bun ../main.js --XX:BunCanvas.IgnoreImport
 
 # Run without building
 run_dry:
@@ -96,6 +96,8 @@ ifeq ($(IS_WINDOWS),1)
 			opengl32.lib user32.lib gdi32.lib shell32.lib dwrite.lib \
 			$(CANVAS_DIR)/Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib \
 			/Fe:$@
+
+
 
 # Linux build
 else ifeq ($(PLATFORM),linux)
@@ -131,7 +133,7 @@ else ifeq ($(PLATFORM),linux)
 				-std=c++23 -O3 \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
 				-I$(CANVAS_DIR)/Thirdparty/glad/include \
-				-lGL -lEGL -lglfw -lGLEW -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg \
+				-lvulkan -lglfw -lGLEW -lfontconfig -lfreetype -ldl -lpthread -lm -ljpeg \
 				-o $@
     endif
 

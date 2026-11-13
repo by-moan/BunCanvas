@@ -52,10 +52,11 @@ $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ python3 tools/git-sync-deps
-$ gn gen out/$(uname -o)_$(uname -m) --args='is_debug = false is_official_build=true skia_use_system_expat=false skia_use_system_icu=false skia_use_gl=true skia_enable_ganesh=true skia_use_egl=true skia_use_system_freetype2 = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_expat = false'
+$ gn gen out/$(uname -o)_$(uname -m) --args='is_debug = false is_official_build = true skia_use_system_expat = false skia_use_system_icu = false skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_system_freetype2 = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_expat = false skia_use_system_harfbuzz = false skia_use_system_libwebp = false skia_use_vma = true'
 $ ninja -C out/$(uname -o)_$(uname -m)
 ```
 After doing the previous steps, the environment is ready for development. Run `build.sh` to generate the `.so` library and test by running `./run.sh`
+
 
 **NOTE: `make run` and `make build` expects `{workingDirectory}\CPPCanvas\Thirdparty\skia_build\skia\out\Release\skia.a`, by following the steps accordingly you will get the dev environment ready to go**
 
@@ -95,7 +96,7 @@ $ mkdir -p skia_build && cd skia_build
 $ fetch skia
 $ cd skia
 $ python3 tools/git-sync-deps
-$ gn gen "out/$(uname -o)_$(uname -m)" --args='is_debug = false skia_use_system_expat = false skia_use_system_icu = false skia_use_gl = true skia_use_metal = false skia_use_vulkan = false target_cpu = "arm64" skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_libjpeg_turbo = false'
+$ gn gen "out/$(uname -o)_$(uname -m)" --args='is_debug = false is_official_build = true target_cpu = "arm64" skia_use_fontconfig = false skia_use_system_freetype2 = false skia_use_system_harfbuzz = false skia_use_system_icu = false skia_use_system_expat = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_enable_ganesh = true skia_use_gl = true skia_use_egl = true skia_use_system_libwebp = false'
 $ ninja -C "out/$(uname -o)_$(uname -m)"
 ```
 
@@ -136,7 +137,7 @@ cd skia_build
 fetch skia
 cd skia
 python3 tools/git-sync-deps
-gn gen out/windows_%PROCESSOR_ARCHITECTURE% --args="is_debug = false is_official_build = true target_cpu = \"x64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_harfbuzz = false"
+gn gen out/windows_%PROCESSOR_ARCHITECTURE% --args="is_debug = false is_official_build = true target_cpu = \"x64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_harfbuzz = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_libwebp = false skia_use_system_zlib = false"
 ninja -C out/windows_%PROCESSOR_ARCHITECTURE%
 ```
 
@@ -147,7 +148,7 @@ cd skia_build
 fetch skia
 cd skia
 python3 tools/git-sync-deps
-gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args="is_debug = false is_official_build = true target_cpu = \"arm64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_zlib = false skia_use_system_harfbuzz = false"
+gn gen out/windows_%PROCESSOR_ARCHITEW6432% --args="is_debug = false is_official_build = true target_cpu = \"arm64\" skia_use_vulkan = true skia_use_gl = false skia_enable_ganesh = true skia_use_vma = true skia_use_system_expat = false skia_use_system_harfbuzz = false skia_use_system_icu = false skia_use_system_libjpeg_turbo = false skia_use_system_libpng = false skia_use_system_libwebp = false skia_use_system_zlib = false"
 ninja -C out/windows_%PROCESSOR_ARCHITEW6432%
 ```
 
@@ -180,7 +181,7 @@ You are responsible for complying with Skia’s license terms when building or d
 ## System Libraries
 
 The following system-provided libraries are used at runtime or build time:
-- OpenGL (GL)
+- Vulkan
 - EGL
 - pthread
 - dl

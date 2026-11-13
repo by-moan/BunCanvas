@@ -97,7 +97,8 @@ ifeq ($(IS_WINDOWS),1)
 			/link /libpath:"$(VULKAN_SDK)\Lib" \
 			vulkan-1.lib user32.lib gdi32.lib shell32.lib dwrite.lib \
 			$(CANVAS_DIR)/Thirdparty\glfw-3.4.bin.WIN64\lib-vc2022\glfw3_mt.lib
-			
+			gn gen out/$(uname -o)_$(uname -m) --args='is_debug = false
+
 # Linux build
 else ifeq ($(PLATFORM),linux)
     SKIA_OUT := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/$(UNAME_O)_$(UNAME_M)

@@ -30,7 +30,7 @@ Copyright (c) Thomas G. Lane and contributors
 System Libraries
 ----------------------------------------
 This project uses standard system libraries provided by the operating system:
-- OpenGL (GL)
+- Vulkan
 - EGL
 - dl
 - pthread

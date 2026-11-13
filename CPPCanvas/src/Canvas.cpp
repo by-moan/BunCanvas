@@ -298,38 +298,42 @@ class BunCanvasRenderingContext2D {
     
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface> surface, SkImage* tmpImage) {
-        // std::lock_guard<std::mutex> lock(draw_mutex);
-        // ctx = surface->getCanvas();
-        sfc = surface;
-        sfc->getCanvas()->resetMatrix();
-        currentState = Rendering2DState{};
-        savedState = Rendering2DState{};
-        
-        jsResetCanvas();
-        
-        sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+     sfc = surface;
+     sfc->getCanvas()->resetMatrix();
+     currentState = Rendering2DState{};
+     savedState = Rendering2DState{};
 
-        
-        font_cache.setFont("10px sans-serif",currentState.font_current);
+     jsResetCanvas();
 
-    }
+     if (tmpImage) {
+         sfc->getCanvas()->drawImageRect(
+             tmpImage,
+             SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
+             currentState.sampling
+         );
+     }
+
+     font_cache.setFont("10px sans-serif", currentState.font_current);
+ }
+
     void reset(sk_sp<SkSurface> surface, sk_sp<SkImage> tmpImage) {
-        // std::lock_guard<std::mutex> lock(draw_mutex);
-        // ctx = surface->getCanvas();
         sfc = surface;
         sfc->getCanvas()->resetMatrix();
         currentState = Rendering2DState{};
         savedState = Rendering2DState{};
-        
-        
-        sfc->getCanvas()->drawImageRect(tmpImage, SkRect::MakeXYWH(0,0,tmpImage->width(),tmpImage->height()), currentState.sampling);
+
+        if (tmpImage) {
+            sfc->getCanvas()->drawImageRect(
+                tmpImage,
+                SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
+                currentState.sampling
+            );
+        }
         jsResetCanvas();
 
-        
-        font_cache.setFont("10px sans-serif",currentState.font_current);
+        font_cache.setFont("10px sans-serif", currentState.font_current);
         tmpImage.reset();
     }
-    
     SkCanvas* operator()() {
         return sfc->getCanvas();
     }
@@ -441,6 +445,10 @@ class BunCanvas {
         sk_sp<SkImage> tmp;
 
         #ifdef __APPLE__
+        if (surface) {
+            tmp = surface->makeImageSnapshot();
+        }
+        surface.reset();
         if (renderThreadContext == nullptr) {
             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
         } else {

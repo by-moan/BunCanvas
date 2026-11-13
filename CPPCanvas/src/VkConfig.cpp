@@ -113,6 +113,35 @@ namespace VK {
         VkInstanceCreateInfo instInfo{};
         instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instInfo.pApplicationInfo = &appInfo;
+#ifdef __APPLE__
+        uint32_t instExtCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &instExtCount, nullptr);
+        std::vector<VkExtensionProperties> availInstExts(instExtCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &instExtCount, availInstExts.data());
+
+        bool hasPortabilityEnum = std::any_of(
+            availInstExts.begin(), availInstExts.end(),
+            [](const VkExtensionProperties& ext) {
+                return std::strcmp(ext.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0;
+            }
+        );
+
+        if (hasPortabilityEnum) {
+            if (std::none_of(instanceExtensions.begin(), instanceExtensions.end(), [](const char* e) {
+                return std::strcmp(e, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0;
+            })) {
+                instanceExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            }
+            instInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        } else {
+            instanceExtensions.erase(
+                std::remove_if(instanceExtensions.begin(), instanceExtensions.end(), [](const char* e) {
+                    return std::strcmp(e, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0;
+                }),
+                instanceExtensions.end()
+            );
+        }
+#endif
         instInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
         instInfo.ppEnabledExtensionNames = instanceExtensions.data();
         instInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());

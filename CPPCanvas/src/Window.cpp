@@ -385,6 +385,7 @@ extern "C" {
 
     WINDOWS_EXPORT void update_window() {
     #ifdef __APPLE__
+        if (!ready || !window) return;
         wPropertiesViewer[3] = glfwWindowShouldClose(window);
         if (glfwWindowShouldClose(window)) return;
         glfwGetFramebufferSize(window, &width, &height);
@@ -396,7 +397,6 @@ extern "C" {
             width = pendingW;
             height = pendingH;
             clearSwapchainSurfaces();
-            renderThreadContext->context->freeGpuResources();
             VK::recreateSwapchain(pendingW, pendingH, currentVsync);
             rebuildSwapchainSurfaces();
             wPropertiesViewer[0] = true;
@@ -405,7 +405,12 @@ extern "C" {
         }
 
         uint32_t imageIndex = 0;
-        if (!VK::acquireNextImage(&imageIndex)) return;
+        if (!VK::acquireNextImage(&imageIndex)) {
+            clearSwapchainSurfaces();
+            VK::recreateSwapchain(width, height, currentVsync);
+            rebuildSwapchainSurfaces();
+            return;
+        }
 
         canvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
         canvas->clear(SK_ColorTRANSPARENT);
@@ -418,7 +423,6 @@ extern "C" {
         );
     #endif
     }
-
     WINDOWS_EXPORT void destroy_window() {
         ready = false;
         VK::waitIdle();

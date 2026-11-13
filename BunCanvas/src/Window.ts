@@ -335,7 +335,8 @@ export class Window {
 				if (frameSignal === 1) {
 					lib.symbols.create_window(width, height, titleBuf);
 				}
-
+			}
+			const loop = () => {
 				lib.symbols.signal_frame_ready();
 
 				const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
@@ -369,6 +370,8 @@ export class Window {
 
 				this.#processEvents();
 			};
+
+			setInterval(loop,0)
 		}else /* MACOS JS LOOP */ {
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {

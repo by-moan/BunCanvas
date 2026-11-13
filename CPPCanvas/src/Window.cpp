@@ -1,12 +1,20 @@
 bool pollingEvents = false;
 
 bool pendingResize = false;
-int pendingW = 1;
-int pendingH = 1;
+bool currentVsync = true;
 void window_resize_callback(GLFWwindow* window, int w, int h) {
-    pendingResize = true;
-    pendingW = w;
-    pendingH = h;
+    pendingResize = false;
+    width = w;
+    height = h;
+    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+    clearSwapchainSurfaces();
+    // renderThreadContext->context->freeGpuResources();
+    VK::recreateSwapchain(width, height, currentVsync);
+    rebuildSwapchainSurfaces();
+
+    wPropertiesViewer[0] = true;
+    wPropertiesViewer[1] = width;
+    wPropertiesViewer[2] = height;
 }
 
 double prevX = 0;
@@ -178,7 +186,6 @@ struct WindowUserData {
     JSCallback_WRefresh onrefresh;
 };
 
-bool currentVsync = true;
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title) {
@@ -234,8 +241,8 @@ extern "C" {
             return;
         }
 
-        auto* userData = new WindowUserData{ onrefresh };
-        glfwSetWindowUserPointer(window, userData);
+        // auto* userData = new WindowUserData{ onrefresh };
+        // glfwSetWindowUserPointer(window, userData);
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -244,8 +251,9 @@ extern "C" {
 
         auto window_refresh_callback = [](GLFWwindow* window) {
             if (!ready || swapchainSurfaces.empty()) return;
-            auto* data = static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
-            if (!data) return;
+            // auto* data = static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
+            // if (!data) return;
+            glfwGetFramebufferSize(window, &width, &height);
 
             uint32_t imageIndex = 0;
             if (!VK::acquireNextImage(&imageIndex)) return;
@@ -253,10 +261,10 @@ extern "C" {
             SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
             frameCanvas->clear(SK_ColorTRANSPARENT);
             render_composited_canvases(frameCanvas);
-            if (data->onrefresh) {
-                data->onrefresh(0);
-                std::cout << "refresh!\n";
-            }
+            // if (data->onrefresh) {
+            //     data->onrefresh(0);
+            //     std::cout << "refresh!\n";
+            // }
 
             VK::presentImage(
                 renderThreadContext->context.get(),
@@ -304,21 +312,6 @@ extern "C" {
                 continue;
             }
 
-            if (pendingResize) {
-                pendingResize = false;
-                width = pendingW;
-                height = pendingH;
-                renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-                clearSwapchainSurfaces();
-                // renderThreadContext->context->freeGpuResources();
-                VK::recreateSwapchain(pendingW, pendingH, currentVsync);
-                rebuildSwapchainSurfaces();
-
-                wPropertiesViewer[0] = true;
-                wPropertiesViewer[1] = pendingW;
-                wPropertiesViewer[2] = pendingH;
-            }
-
             if (!vsyncQueue.empty()) {
                 currentVsync = vsyncQueue.back();
                 vsyncQueue.clear();
@@ -342,7 +335,7 @@ extern "C" {
 
             render_composited_canvases(canvas);
 
-            onrefresh(0);
+            // onrefresh(0);
 
             VK::presentImage(
                 renderThreadContext->context.get(),
@@ -423,17 +416,17 @@ extern "C" {
         glfwPollEvents();
         if (width == 0 || height == 0) return;
 
-        if (pendingResize) {
-            pendingResize = false;
-            width = pendingW;
-            height = pendingH;
-            clearSwapchainSurfaces();
-            VK::recreateSwapchain(pendingW, pendingH, currentVsync);
-            rebuildSwapchainSurfaces();
-            wPropertiesViewer[0] = true;
-            wPropertiesViewer[1] = pendingW;
-            wPropertiesViewer[2] = pendingH;
-        }
+        // if (pendingResize) {
+        //     pendingResize = false;
+        //     width = pendingW;
+        //     height = pendingH;
+        //     clearSwapchainSurfaces();
+        //     VK::recreateSwapchain(pendingW, pendingH, currentVsync);
+        //     rebuildSwapchainSurfaces();
+        //     wPropertiesViewer[0] = true;
+        //     wPropertiesViewer[1] = pendingW;
+        //     wPropertiesViewer[2] = pendingH;
+        // }
 
         uint32_t imageIndex = 0;
         if (!VK::acquireNextImage(&imageIndex)) {

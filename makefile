@@ -139,36 +139,66 @@ else ifeq ($(PLATFORM),linux)
 # macOS build
 else ifeq ($(PLATFORM),darwin)
     SKIA_OUT := $(CANVAS_DIR)/Thirdparty/skia_build/skia/out/$(UNAME_O)_$(UNAME_M)
-    
+    VULKAN_SDK ?= /Users/by_chu/VulkanSDK/1.4.363.1/macOS
+    MOLTEN_STATIC := $(VULKAN_SDK)/lib/MoltenVK.xcframework/macos-arm64_x86_64/libMoltenVK.a
+
     ifeq ($(ARCH),x64)
         $(TARGET): $(ALL_SOURCES)
 			@mkdir -p $(BUILD_DIR)
-			clang++ -dynamiclib -shared -fPIC $(API_CPP) \
+			clang++ -dynamiclib -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
-				-std=c++23 -g -O3 -stdlib=libc++ \
-				-DGL_SILENCE_DEPRECATION \
+				-std=c++23 -O3 -stdlib=libc++ \
+				-DVK_USE_PLATFORM_MACOS_MVK \
+				-DGLFW_INCLUDE_VULKAN \
+				-DSK_GANESH -DSK_VULKAN \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
-				-I$(CANVAS_DIR)/Thirdparty/glad/include \
+				-I$(CANVAS_DIR)/Thirdparty/miniaudio \
+				-I"$(VULKAN_SDK)/include" \
 				-I/usr/local/include \
 				-L/usr/local/lib \
-				-framework OpenGL -framework CoreFoundation -framework CoreGraphics \
-				-framework CoreText -framework CoreServices \
-				-lglfw -lfreetype -ljpeg -lpthread \
+				-Wl,-force_load,"$(MOLTEN_STATIC)" \
+				-framework Metal \
+				-framework IOSurface \
+				-framework QuartzCore \
+				-framework Cocoa \
+				-framework IOKit \
+				-framework CoreVideo \
+				-framework CoreFoundation \
+				-framework CoreGraphics \
+				-framework CoreText \
+				-framework CoreServices \
+				-framework AudioToolbox \
+				-framework CoreAudio \
+				-lglfw -lpthread -lc++ \
 				-o $@
     else
         $(TARGET): $(ALL_SOURCES)
 			@mkdir -p $(BUILD_DIR)
-			clang++ -dynamiclib -shared -fPIC $(API_CPP) \
+			clang++ -dynamiclib -fPIC $(API_CPP) \
 				"$(SKIA_OUT)/libskia.a" \
 				-std=c++23 -O3 -stdlib=libc++ \
-				-DGL_SILENCE_DEPRECATION \
+				-DVK_USE_PLATFORM_MACOS_MVK \
+				-DGLFW_INCLUDE_VULKAN \
+				-DSK_GANESH -DSK_VULKAN \
 				-I$(CANVAS_DIR)/Thirdparty/skia_build/skia/ \
-				-I$(CANVAS_DIR)/Thirdparty/glad/include \
+				-I$(CANVAS_DIR)/Thirdparty/miniaudio \
+				-I"$(VULKAN_SDK)/include" \
 				-I/opt/homebrew/include \
 				-L/opt/homebrew/lib \
-				-framework OpenGL -framework CoreFoundation -framework CoreGraphics \
-				-framework CoreText -framework CoreServices \
-				-lglfw -lfreetype -ljpeg -lpthread \
+				-Wl,-force_load,"$(MOLTEN_STATIC)" \
+				-framework Metal \
+				-framework IOSurface \
+				-framework QuartzCore \
+				-framework Cocoa \
+				-framework IOKit \
+				-framework CoreVideo \
+				-framework CoreFoundation \
+				-framework CoreGraphics \
+				-framework CoreText \
+				-framework CoreServices \
+				-framework AudioToolbox \
+				-framework CoreAudio \
+				-lglfw -lpthread -lc++ \
 				-o $@
     endif
 endif

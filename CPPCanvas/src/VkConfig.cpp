@@ -113,19 +113,6 @@ namespace VK {
         VkInstanceCreateInfo instInfo{};
         instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instInfo.pApplicationInfo = &appInfo;
-#ifdef __APPLE__
-        uint32_t devExtCount = 0;
-        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, nullptr);
-        std::vector<VkExtensionProperties> availDevExts(devExtCount);
-        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, availDevExts.data());
-        for (const auto& ext : availDevExts) {
-            if (std::strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0) {
-                deviceExtensions.push_back("VK_KHR_portability_subset");
-                break;
-            }
-        }
-        instInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-#endif
         instInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
         instInfo.ppEnabledExtensionNames = instanceExtensions.data();
         instInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());
@@ -196,7 +183,16 @@ namespace VK {
 
         deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 #ifdef __APPLE__
-        deviceExtensions.push_back("VK_KHR_portability_subset");
+        uint32_t devExtCount = 0;
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, nullptr);
+        std::vector<VkExtensionProperties> availDevExts(devExtCount);
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &devExtCount, availDevExts.data());
+        for (const auto& ext : availDevExts) {
+            if (std::strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0) {
+                deviceExtensions.push_back("VK_KHR_portability_subset");
+                break;
+            }
+        }
 #endif
 
         VkDeviceCreateInfo devInfo{};

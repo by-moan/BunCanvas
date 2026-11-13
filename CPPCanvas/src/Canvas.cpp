@@ -450,6 +450,9 @@ class BunCanvas {
                 SkImageInfo::MakeN32Premul(w, h)
             );
         }
+        if (surface) {
+            surface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        }
         #else
         if (gpuContextReady && useGPU) {
             GrBackendTexture oldTex = backendTex;
@@ -546,7 +549,7 @@ class BunCanvas {
 std::vector<BunCanvas*> canvases;
 
 void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
-    if (!mainCtx) return;
+    if (!mainCtx) return;;
 
     skgpu::MutableTextureState readState =
         skgpu::MutableTextureStates::MakeVulkan(
@@ -556,9 +559,16 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
 
     for (auto* element : canvases) {
         std::lock_guard<std::mutex> lock(element->mutex);
+        #ifdef __APPLE__
+        if (element->surface) {
+            mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
+        }
+        #else
         if (element->hasBackendTex && element->surface) {
             mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
         }
+        #endif
+        
     }
 
     std::unique_lock<std::mutex> lock(sharedQueueMtx, std::defer_lock);

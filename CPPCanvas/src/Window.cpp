@@ -181,6 +181,10 @@ extern "C" {
     }
 
     WINDOWS_EXPORT void glfw_init() {
+        #ifdef __APPLE__
+        glfwInitVulkanLoader(vkGetInstanceProcAddr);
+        #endif
+        
         if (!glfwInit()) {
             std::cerr << "Couldn't initialize GLFW...\n";
             return;
@@ -425,11 +429,17 @@ extern "C" {
             delete renderThreadContext;
             renderThreadContext = nullptr;
         }
+        #ifdef __APPLE__
+        if (renderThreadContext) {
+            delete renderThreadContext;
+        }
+        #else
         if (mainThreadCtx) {
             delete mainThreadCtx;
             mainThreadCtx = nullptr;
             gpuContextReady = false;
         }
+        #endif
 
         VK::shutdown();
         glfwDestroyWindow(window);

@@ -1,4 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "./BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D } from "./BunCanvas";
 
 
 const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
@@ -109,11 +109,16 @@ class Ball {
     static BallPath = new Path2D()
     static BallShinePath = new Path2D()
     
+    /**
+     * 
+     * @param {CanvasRenderingContext2D} ctx 
+     */
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
         
         // Glow & Color
+        ctx.globalCompositeOperation = "multiply"
         ctx.fillStyle = this.color;
         ctx.fill(Ball.BallPath);
         

@@ -157,23 +157,27 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
     }
 }
 
-void window_refresh_callback(GLFWwindow* window) {
-    if (!ready || swapchainSurfaces.empty()) return;
-    uint32_t imageIndex = 0;
-    if (!VK::acquireNextImage(&imageIndex)) return;
+// void window_refresh_callback(GLFWwindow* window) {
+//     if (!ready || swapchainSurfaces.empty()) return;
+//     uint32_t imageIndex = 0;
+//     if (!VK::acquireNextImage(&imageIndex)) return;
 
-    SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
-    frameCanvas->clear(SK_ColorTRANSPARENT);
-    render_composited_canvases(frameCanvas);
+//     SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+//     frameCanvas->clear(SK_ColorTRANSPARENT);
+//     render_composited_canvases(frameCanvas);
 
-    VK::presentImage(
-        renderThreadContext->context.get(),
-        swapchainSurfaces[imageIndex]->surface.get(),
-        imageIndex
-    );
-}
+//     VK::presentImage(
+//         renderThreadContext->context.get(),
+//         swapchainSurfaces[imageIndex]->surface.get(),
+//         imageIndex
+//     );
+// }
 
 typedef int (*JSCallback_WRefresh)(int);
+struct WindowUserData {
+    JSCallback_WRefresh onrefresh;
+};
+
 bool currentVsync = true;
 
 extern "C" {
@@ -230,11 +234,37 @@ extern "C" {
             return;
         }
 
+        auto* userData = new WindowUserData{ onrefresh };
+        glfwSetWindowUserPointer(window, userData);
         glfwSetWindowSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window, keyboard_key_callback);
         glfwSetScrollCallback(window, window_scroll_callback);
+
+        auto window_refresh_callback = [](GLFWwindow* window) {
+            if (!ready || swapchainSurfaces.empty()) return;
+            auto* data = static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
+            if (!data) return;
+
+            uint32_t imageIndex = 0;
+            if (!VK::acquireNextImage(&imageIndex)) return;
+
+            SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+            frameCanvas->clear(SK_ColorTRANSPARENT);
+            render_composited_canvases(frameCanvas);
+            if (data->onrefresh) {
+                data->onrefresh(0);
+                std::cout << "refresh!\n";
+            }
+
+            VK::presentImage(
+                renderThreadContext->context.get(),
+                swapchainSurfaces[imageIndex]->surface.get(),
+                imageIndex
+            );
+        };
+
         glfwSetWindowRefreshCallback(window, window_refresh_callback);
 
         if (!VK::initCore()) {
@@ -362,6 +392,7 @@ extern "C" {
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window, keyboard_key_callback);
+        glfwSetScrollCallback(window, window_scroll_callback);
         glfwSetWindowRefreshCallback(window, window_refresh_callback);
 
         if (!VK::initCore()) return;

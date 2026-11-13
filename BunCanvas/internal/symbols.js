@@ -207,7 +207,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_set_composite_operation: {
-		args: ["ptr", "cstring"],
+		args: ["ptr", "int"],
 		returns: "bool",
 	},
 	canvas_draw_image_imageType: {
@@ -323,7 +323,7 @@ export const lib = dlopen(dlPath, {
 		returns: "bool",
 	},
 	canvas_set_line_join: {
-		args: ["ptr","int"],
+		args: ["ptr","i8"],
 		returns: "bool",
 	},
 	canvas_path_clip: {
@@ -332,11 +332,11 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_set_text_baseline: {
 		args: ["ptr", "int"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_set_text_align: {
 		args: ["ptr", "int"],
-		returns: "void",
+		returns: "bool",
 	},
 	canvas_measure_text: {
 		args: ["ptr", "cstring", "ptr"],

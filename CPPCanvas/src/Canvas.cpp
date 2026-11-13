@@ -2,36 +2,6 @@ SkPaint g_clearColor;
 SkPaint g_noAlphaClearColor;
 SkPaint pImageDataColor;
 
-std::unordered_map<std::string,SkBlendMode> compositeOperations{{
-    {"source-over",SkBlendMode::kSrcOver},
-    {"source-in",SkBlendMode::kSrcIn},
-    {"source-out",SkBlendMode::kSrcOut},
-    {"source-atop",SkBlendMode::kSrcATop},
-    {"destination-over",SkBlendMode::kDstOver},
-    {"destination-in",SkBlendMode::kDstIn},
-    {"destination-out",SkBlendMode::kDstOut},
-    {"destination-atop",SkBlendMode::kDstATop},
-    {"lighter",SkBlendMode::kLighten},
-    {"copy",SkBlendMode::kSrc},
-    {"xor",SkBlendMode::kXor},
-    {"multiply",SkBlendMode::kMultiply},
-    {"screen",SkBlendMode::kScreen},
-    {"overlay",SkBlendMode::kOverlay},
-    {"darken",SkBlendMode::kDarken},
-    {"lighten",SkBlendMode::kLighten},
-    {"color-dodge",SkBlendMode::kColorDodge},
-    {"color-burn",SkBlendMode::kColorBurn},
-    {"hard-light",SkBlendMode::kHardLight},
-    {"soft-light",SkBlendMode::kSoftLight},
-    {"difference",SkBlendMode::kDifference},
-    {"exclusion",SkBlendMode::kExclusion},
-    {"hue",SkBlendMode::kHue},
-    {"saturation",SkBlendMode::kSaturation},
-    {"color",SkBlendMode::kColor},
-    {"luminosity",SkBlendMode::kLuminosity},
-}};
-
-
 class BunCanvas;
 
 enum class GradientType {
@@ -55,6 +25,12 @@ enum class CanvasTextAlignment {
     Center,
     Start,
     End
+};
+
+enum class CanvasSmoothingQuality {
+    Low,
+    Medium,
+    High,
 };
 
 struct ColorStop {
@@ -99,9 +75,9 @@ class Rendering2DState {
     SkPaint strokeColor;
     sk_sp<SkPathEffect> lineDashEffect;
     sk_sp<SkShader> strokeShader;
-    sk_sp<SkImageFilter> filters;
-    sk_sp<SkImageFilter> shadowBlurFilter;
-    sk_sp<SkImageFilter> resolvedFilters;
+    sk_sp<SkImageFilter> filters{nullptr};
+    sk_sp<SkImageFilter> shadowBlurFilter{nullptr};
+    sk_sp<SkImageFilter> resolvedFilters{nullptr};
     SkPaint imageColor;
     SkPaint shadowBlurColor;
     // std::string cssFont = "10px sans-serif";
@@ -109,7 +85,7 @@ class Rendering2DState {
     float shadowBlurAmount = 0.f;
     float shadowBlurOffsetX = 0.f;
     float shadowBlurOffsetY = 0.f;
-    int samplingQuality = 1;
+    CanvasSmoothingQuality samplingQuality = CanvasSmoothingQuality::Low;
     SkSamplingOptions sampling = SkFilterMode::kLinear;
     float globalAlpha = 1.f;
 
@@ -129,91 +105,13 @@ class Rendering2DState {
         strokeColor.setImageFilter(nullptr);
         strokeColor.setAntiAlias(1);
         strokeColor.setStrokeCap(SkPaint::kDefault_Cap);
-        
-        shadowBlurAmount = 0.f;
-        shadowBlurOffsetX = 0.f;
-        shadowBlurOffsetY = 0.f;
-        shadowBlurFilter = nullptr;
-        // SkImageFilters::DropShadow(
-        //     shadowBlurOffsetX,           // dx
-        //     shadowBlurOffsetX,           // dy
-        //     shadowBlurAmount * 0.5f, // sigmaX
-        //     shadowBlurAmount * 0.5f, // sigmaY
-        //     shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-        //     nullptr,                      // input (no input filter)
-        //     nullptr                       // cropRect (optional, can omit)
-        // );
         shadowBlurColor.setColor4f({0,0,0,0});
         shadowBlurColor.setImageFilter(shadowBlurFilter);
-
-        samplingQuality = 1;
         sampling = SkFilterMode::kLinear;
         
         imageColor.setBlendMode(SkBlendMode::kSrcOver);
         imageColor.setImageFilter(nullptr);
-
-        filters = nullptr;
     };
-
-    // Rendering2DState(
-    //     SkPath sPath,
-    //     SkPaint fillColor,
-    //     sk_sp<SkShader> fillShader,
-    //     SkPaint strokeColor,
-    //     sk_sp<SkPathEffect> lineDashEffect,
-    //     sk_sp<SkShader> strokeShader,
-    //     sk_sp<SkImageFilter> filters,
-    //     sk_sp<SkImageFilter> shadowBlurFilter,
-    //     sk_sp<SkImageFilter> resolvedFilters,
-    //     SkPaint imageColor,
-    //     SkPaint shadowBlurColor,
-    //     std::string cssFont,
-    //     CanvasFontCache font_cache,
-    //     SkFont font_current,
-    //     float shadowBlurAmount,
-    //     float shadowBlurOffsetX,
-    //     float shadowBlurOffsetY,
-    //     SkSamplingOptions sampling
-    // ) : pathBuilder{sPath},
-    //     fillColor{fillColor},
-    //     fillShader{fillShader},
-    //     strokeColor{strokeColor},
-    //     lineDashEffect{lineDashEffect},
-    //     strokeShader{strokeShader},
-    //     filters{filters},
-    //     shadowBlurFilter{shadowBlurFilter},
-    //     resolvedFilters{resolvedFilters},
-    //     imageColor{imageColor},
-    //     shadowBlurColor{shadowBlurColor},
-    //     font_current{font_current},
-    //     shadowBlurAmount{shadowBlurAmount},
-    //     shadowBlurOffsetX{shadowBlurOffsetX},
-    //     shadowBlurOffsetY{shadowBlurOffsetY},
-    //     sampling{SkFilterMode::kLinear}
-    //     {}
-
-    // Rendering2DState& operator=(const Rendering2DState& other) {
-    //     if (this != &other) {
-    //         pathBuilder = other.pathBuilder.snapshot();
-    //         fillColor = other.fillColor;
-    //         fillShader = other.fillShader;
-    //         strokeColor = other.strokeColor;
-    //         lineDashEffect = other.lineDashEffect;
-    //         strokeShader = other.strokeShader;
-    //         filters = other.filters;
-    //         shadowBlurFilter = other.shadowBlurFilter;
-    //         resolvedFilters = other.resolvedFilters;
-    //         imageColor = other.imageColor;
-    //         shadowBlurColor = other.shadowBlurColor;
-    //         cssFont = other.cssFont;
-    //         font_current = other.font_current;
-    //         shadowBlurAmount = other.shadowBlurAmount;
-    //         shadowBlurOffsetX = other.shadowBlurOffsetX;
-    //         shadowBlurOffsetY = other.shadowBlurOffsetY;
-    //         sampling = other.sampling;
-    //     }
-    //     return *this;
-    // }
 };
 
 class BunCanvasRenderingContext2D {
@@ -227,64 +125,18 @@ class BunCanvasRenderingContext2D {
     bool desynchronized = false;
     bool alpha = true;
     SkPaint clearColor;
-    // SkPathBuilder pathBuilder;
-    // SkPaint fillColor;
-    // sk_sp<SkShader> fillShader;
-    // SkPaint strokeColor;
-    // sk_sp<SkPathEffect> lineDashEffect;
-    // sk_sp<SkShader> strokeShader;
-    // sk_sp<SkImageFilter> filters;
-    // sk_sp<SkImageFilter> shadowBlurFilter;
-    // sk_sp<SkImageFilter> resolvedFilters;
-    // SkPaint imageColor;
-    // SkPaint shadowBlurColor;
-    // std::string cssFont;
-    // SkFont font_current;
-    // float shadowBlurAmount = 0.f;
-    // float shadowBlurOffsetX = 0.f;
-    // float shadowBlurOffsetY = 0.f;
-    // SkSamplingOptions sampling;
-    // int samplingQuality = 1;
 
     Rendering2DState currentState{};
     Rendering2DState savedState;
     
     
-    BunCanvasRenderingContext2D(sk_sp<SkSurface> surface, BunCanvas* owner, JSCallback_CReset cb, bool desync, bool alpha) : sfc(surface), owner{owner}, jsResetCanvas(cb), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {
-        // currentState.strokeColor.setColor(SK_ColorBLACK);
-        // currentState.strokeColor.setStyle(SkPaint::kStroke_Style);
-        // currentState.strokeColor.setAlpha(255);
-        // currentState.strokeColor.setStrokeWidth(1);
-        // currentState.strokeColor.setAntiAlias(1);
-        // currentState.strokeColor.setBlendMode(SkBlendMode::kSrcOver);
-        // currentState.strokeColor.setPathEffect(nullptr);
-        // currentState.strokeColor.setShader(nullptr);
-        // currentState.strokeColor.setStrokeCap(SkPaint::kButt_Cap);
-
-        // currentState.imageColor.setColor(SK_ColorWHITE);
-        // currentState.imageColor.setAlpha(255);
-        // currentState.imageColor.setStyle(SkPaint::kFill_Style);
-        // currentState.imageColor.setAntiAlias(1);
-        // currentState.imageColor.setBlendMode(SkBlendMode::kSrcOver);
-        
-        // currentState.fillColor.setColor(SK_ColorBLACK);
-        // currentState.fillColor.setStyle(SkPaint::kFill_Style);
-        // currentState.fillColor.setShader(nullptr);
-        // currentState.fillColor.setAlpha(255);
-        // currentState.fillColor.setAntiAlias(1);
-        // currentState.fillColor.setBlendMode(SkBlendMode::kSrcOver);
-        
-        // currentState.shadowBlurFilter = SkImageFilters::DropShadow(
-        //     currentState.shadowBlurOffsetX,           // dx
-        //     currentState.shadowBlurOffsetX,           // dy
-        //     currentState.shadowBlurAmount * 0.5f, // sigmaX
-        //     currentState.shadowBlurAmount * 0.5f, // sigmaY
-        //     currentState.shadowBlurColor.getColor4f(),         // SkColor (uint32_t like SK_ColorBLACK or 0xFF000000)
-        //     nullptr,                      // input (no input filter)
-        //     nullptr                       // cropRect (optional, can omit)
-        // );
-
-    }
+    BunCanvasRenderingContext2D(
+        sk_sp<SkSurface> surface,
+        BunCanvas* owner,
+        JSCallback_CReset cb,
+        bool desync,
+        bool alpha
+    ) : sfc(surface), owner{owner}, jsResetCanvas(cb), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {}
 
     void save(){
         this->savedState = currentState;
@@ -1166,7 +1018,7 @@ extern "C" {
         #endif
     }
     
-    WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, const char* name) {
+    WINDOWS_EXPORT bool canvas_set_composite_operation(void* canvasObj, SkBlendMode operation) {
         if (!canvasObj) return false;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
@@ -1175,14 +1027,10 @@ extern "C" {
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
         );
-        try {
-            obj->currentState.fillColor.setBlendMode(compositeOperations.at(name));
-            obj->currentState.strokeColor.setBlendMode(compositeOperations.at(name));
-            obj->currentState.imageColor.setBlendMode(compositeOperations.at(name));
-            return true;
-        }catch(std::exception err) {
-            return false;
-        }
+        obj->currentState.fillColor.setBlendMode(operation);
+        obj->currentState.strokeColor.setBlendMode(operation);
+        obj->currentState.imageColor.setBlendMode(operation);
+        return true;
     }
     
     WINDOWS_EXPORT bool canvas_get_image_data(void* canvasObj,int x, int y, int w, int h, uint8_t* out_buffer) {
@@ -1417,7 +1265,6 @@ extern "C" {
     }
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
         float _a = std::clamp(a, 0.0f, 1.0f);
-        if (!canvasObj) return _a;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) return _a;
         nonapple(
@@ -1426,6 +1273,9 @@ extern "C" {
         );
         obj->currentState.globalAlpha = _a;
         obj->currentState.imageColor.setAlphaf(_a);
+        obj->currentState.fillColor.setAlphaf(_a);
+        obj->currentState.strokeColor.setAlphaf(_a);
+        obj->currentState.shadowBlurColor.setAlphaf(_a);
         return _a;
     }
     WINDOWS_EXPORT void canvas_save(void* canvasObj){
@@ -1708,29 +1558,24 @@ extern "C" {
         
         if (v){
             switch(ctx->currentState.samplingQuality) {
-                case 1:{
+                case CanvasSmoothingQuality::Low: {
                     ctx->currentState.sampling = SkFilterMode::kLinear;
-                    return true;
                 }
-                case 2: {
+                case CanvasSmoothingQuality::Medium: {
                     ctx->currentState.sampling = SkFilterMode::kLinear;
-                    return true;
                 }
-                case 3: {
+                case CanvasSmoothingQuality::High: {
                     ctx->currentState.sampling = SkCubicResampler::Mitchell();
-                    return true;
                 }
             }
-        }else{
-            ctx->currentState.samplingQuality = 0;
+            return true;
+        } else {
             ctx->currentState.sampling = SkFilterMode::kNearest;
             return true;
         }
-
-        return false;
     }
 
-    WINDOWS_EXPORT bool canvas_set_image_smoothing_quality(void* ctxPtr, int v){
+    WINDOWS_EXPORT bool canvas_set_image_smoothing_quality(void* ctxPtr, CanvasSmoothingQuality v){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
         nonapple(
@@ -1738,64 +1583,24 @@ extern "C" {
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
         switch(v) {
-            case 1:{
+            case CanvasSmoothingQuality::Low: {
                 ctx->currentState.sampling = SkFilterMode::kLinear;
                 ctx->currentState.samplingQuality = v;
                 return true;
             }
-            case 2: {
+            case CanvasSmoothingQuality::Medium: {
                 ctx->currentState.sampling = SkFilterMode::kLinear;
                 ctx->currentState.samplingQuality = v;
                 return true;
             }
-            case 3: {
+            case CanvasSmoothingQuality::High: {
                 ctx->currentState.sampling = SkCubicResampler::Mitchell();
-                std::cout << v << "\n";
                 ctx->currentState.samplingQuality = v;
                 return true;
             }
         }
         return false;
     }
-    
-    // WINDOWS_EXPORT void* canvas_create_linear_gradient(float x1, float y1, float x2, float y2){
-    //     return new BunCanvasGradient(GradientType::Linear, x1, y1, x2, y2);
-    // }
-
-    // WINDOWS_EXPORT void* canvas_create_radial_gradient(float x1, float y1, float x2, float y2, float r0, float r1){
-    //     return new BunCanvasGradient(GradientType::Radial, x1, y1, x2, y2, r0, r1);
-    // }
-
-    // WINDOWS_EXPORT void* canvas_create_conic_gradient(float a,float x1, float y1){
-    //     return new BunCanvasGradient(GradientType::Conic, x1, y1, a);
-    // }
-    // WINDOWS_EXPORT bool canvas_gradient_add_color_stop(void* gPtr, float offset, const char* c) {
-    //     // Validate offset (0 <= offset <= 1)
-    //     // Throw IndexSizeError if invalid
-    //     auto* grad = validated<BunCanvasGradient>(gPtr);
-    //     if (!grad) return false;
-    //     auto it = std::lower_bound(
-    //         grad->stops.begin(),
-    //         grad->stops.end(),
-    //         offset,
-    //         [](const ColorStop& s, float o) {
-    //             return s.offset < o;
-    //         }
-    //     );
-    //     auto col = parseCssColor(c);
-    //     if (col) {
-    //         grad->stops.insert(it, {offset, *col});
-    //         return true;
-    //     }
-    //     return false;
-    // }
-    // WINDOWS_EXPORT void canvas_gradient_destroy(void* gPtr) {
-    //     // Validate offset (0 <= offset <= 1)
-    //     // Throw IndexSizeError if invalid
-    //     auto* grad = validated<BunCanvasGradient>(gPtr);
-    //     if (!grad) return;
-    //     delete grad;
-    // }
     
     WINDOWS_EXPORT void canvas_destroy(void* ptr) {
         auto* cnv = validated<BunCanvas>(ptr);
@@ -1880,50 +1685,37 @@ extern "C" {
         ctx->currentState.strokeColor.setPathEffect(ctx->currentState.lineDashEffect);
     }
 
-    WINDOWS_EXPORT bool canvas_set_line_join(void* ctxPtr, int lJoinType){
+    WINDOWS_EXPORT bool canvas_set_line_join(void* ctxPtr, SkPaint::Join lJoinType){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
-        switch(lJoinType) {
-            case 1:{
-                ctx->currentState.strokeColor.setStrokeJoin(SkPaint::Join::kRound_Join);
-                return true;
-            }
-            case 2: {
-                ctx->currentState.strokeColor.setStrokeJoin(SkPaint::Join::kBevel_Join);
-                return true;
-            }
-            case 3: {
-                ctx->currentState.strokeColor.setStrokeJoin(SkPaint::Join::kMiter_Join);
-                return true;
-            }
-        }
-        return false;
+        ctx->currentState.strokeColor.setStrokeJoin(lJoinType);
+        return true;
     }
 
-    WINDOWS_EXPORT void canvas_set_text_baseline(void* ctxPtr, int bl){
+    WINDOWS_EXPORT bool canvas_set_text_baseline(void* ctxPtr, CanvasTextBaseLine bl){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return;
+        if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
-        CanvasTextBaseLine baseline = static_cast<CanvasTextBaseLine>(bl);
-        ctx->currentState.textBaseline = baseline;
+        ctx->currentState.textBaseline = bl;
+        return true;
     }
 
-    WINDOWS_EXPORT void canvas_set_text_align(void* ctxPtr, int al){
+    WINDOWS_EXPORT bool canvas_set_text_align(void* ctxPtr, CanvasTextAlignment al){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
-        if (!ctx) return;
+        if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
         );
-        CanvasTextAlignment alignment = static_cast<CanvasTextAlignment>(al);
-        ctx->currentState.textAlign = alignment;
+        ctx->currentState.textAlign = al;
+        return true;
     }
 
     WINDOWS_EXPORT void canvas_measure_text(void* ctxPtr, const char* txt, float* fMetrics){

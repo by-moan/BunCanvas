@@ -1,13 +1,17 @@
-import { lib,encoder, dlPath, encodeCString } from "../internal/symbols.js";
-
+import { lib,encoder, encodeCString } from "../internal/symbols.js";
 import { ptr, Pointer, JSCallback } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
-import { DOMMatrix, multipliedMatrices } from "../dom/DOMMatrix.js";
+import { DOMMatrix } from "../dom/DOMMatrix.js";
 import { TextMetrics } from "./TextMetrics.js";
 import { Path2D } from "./Path2D.js";
 import { isValidColor } from "../internal/colorCheck.js";
 import { INTERNAL_TOKEN, throwIllegalConstructor } from "../internal/ConstructEnforcer.js";
+import { CanvasBlendMode, CanvasBlendModeArg } from "../internal/canvas/blendModes.js";
+import { CanvasTextAlignment, CanvasTextAlignmentArg } from "../internal/canvas/textAlignment.js";
+import { CanvasTextBaseline, CanvasTextBaselineArg } from "../internal/canvas/textBaseline.js";
+import { CanvasLineJoin, CanvasLineJoinArg } from "../internal/canvas/lineJoin.js";
+import { CanvasSmoothingQuality, CanvasSmoothingQualityArg } from "../internal/canvas/smoothingQuality.js";
 
 const ptrs = new WeakMap();
 
@@ -258,23 +262,9 @@ export class CanvasRenderingContext2D {
 		return this.#currentState.globalAlpha
 	}
 
-	set imageSmoothingQuality(v : string) {
-		let res = false;
-		switch(v) {
-			case "low": {
-				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),1);
-				break;
-			}
-			case "medium": {
-				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),2);
-				break;
-			}
-			case "high": {
-				res = lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),3);
-				break;
-			}
-		}
-		if (res){
+	set imageSmoothingQuality(v : CanvasSmoothingQualityArg) {
+		let smQuality = CanvasSmoothingQuality[v];
+		if (lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),smQuality)) {
 			this.#currentState.imageSmoothingQuality = v;
 		}
 	}
@@ -284,7 +274,9 @@ export class CanvasRenderingContext2D {
 	}
 
 	set imageSmoothingEnabled(v : boolean) {
-		this.#currentState.imageSmoothingEnabled = lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)
+		if (lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)){
+			this.#currentState.imageSmoothingEnabled = v
+		}
 	}
 	
 	get imageSmoothingEnabled() : boolean {
@@ -301,13 +293,16 @@ export class CanvasRenderingContext2D {
 		return this.#currentState.filter;
 	}
 
-	set globalCompositeOperation(operation) {
-		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),encoder.encode(`${operation}\0`)) == true)
-			this.#currentState.compositeOperation = operation
+	set globalCompositeOperation(operation : CanvasBlendModeArg) {
+		const composite = CanvasBlendMode[operation]
+		if (!composite) return;
+		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),composite)) {
+			this.#currentState.compositeOperation = operation;
+		}
 	}
 	
-	get globalCompositeOperation(){
-		return this.#currentState.compositeOperation
+	get globalCompositeOperation() : string {
+		return this.#currentState.compositeOperation as string
 	}
 	
 	fillRect(x : number,y : number,w : number,h : number){
@@ -384,24 +379,9 @@ export class CanvasRenderingContext2D {
 	set shadowOffsetY(y : number){
 		lib.symbols.canvas_set_shadow_offsetY(ptrs.get(this),y)
 	}
-	set lineJoin(joinType : string){
-		let res = false;
-		switch(joinType) {
-			case "round": {
-				res = lib.symbols.canvas_set_line_join(ptrs.get(this),1)
-				break;
-			}
-			case "bevel": {
-				res = lib.symbols.canvas_set_line_join(ptrs.get(this),2)
-				break;
-			}
-			case "miter": {
-				res = lib.symbols.canvas_set_line_join(ptrs.get(this),3)
-				break;
-			}
-		}
-
-		if (res){
+	set lineJoin(joinType : CanvasLineJoinArg){
+		let ljType = CanvasLineJoin[joinType];
+		if (lib.symbols.canvas_set_line_join(ptrs.get(this),ljType)) {
 			this.#currentState.lineJoin = joinType
 		}
 	}
@@ -411,7 +391,6 @@ export class CanvasRenderingContext2D {
 	
 	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) : void;
 	drawImage(img : Image | Canvas, sx : number, sy : number, sw : number, sh : number, dx : number, dy : number, dw : number, dh : number) : void;
-	
 	drawImage(img : Image | Canvas, ...args : Array<number>) {
 		let _arr : number[] | Float32Array = args.length==2?[...args,img.width,img.height]:args;
 		const arr = new Float32Array(_arr)
@@ -553,56 +532,19 @@ export class CanvasRenderingContext2D {
 		this.#currentState.lineDashOffset = v;
 	}
 
-	set textBaseline(baseline : string){
-		let bl = -1;
-		switch (baseline) {
-			case "top":
-				bl = 0;
-				break;
-			case "hanging":
-				bl = 1
-				break;
-			case "middle":
-				bl = 2
-				break;
-			case "alphabetic":
-				bl = 3
-				break;
-			case "ideographic":
-				bl = 4
-				break;
-			case "bottom":
-				bl = 5
-				break;
-		}
-		if (bl != -1) {
-			// console.log(bl)
-			lib.symbols.canvas_set_text_baseline(ptrs.get(this),bl)
+	set textBaseline(baseline : CanvasTextBaselineArg){
+		const bl = CanvasTextBaseline[baseline]
+		if (!bl) return;
+		if (lib.symbols.canvas_set_text_baseline(ptrs.get(this),bl)) {
+			this.#currentState.textBaseline = baseline
 		}
 	}
 
-	set textAlign(alignment : string){
-		let al = -1;
-		switch (alignment) {
-			case "left":
-				al = 0;
-				break;
-			case "right":
-				al = 1
-				break;
-			case "center":
-				al = 2
-				break;
-			case "start":
-				al = 3
-				break;
-			case "end":
-				al = 4
-				break;
-		}
-		if (al != -1) {
-			// console.log(al)
-			lib.symbols.canvas_set_text_align(ptrs.get(this),al)
+	set textAlign(alignment : CanvasTextAlignmentArg){
+		const al = CanvasTextAlignment[alignment];
+		if (!al) return;
+		if (lib.symbols.canvas_set_text_align(ptrs.get(this),al)) {
+			this.#currentState.textAlign = alignment
 		}
 	}
 	measureText(text : string) : TextMetrics {
@@ -731,7 +673,3 @@ export class Canvas {
 		}
 	}
 }
-
-
-
-

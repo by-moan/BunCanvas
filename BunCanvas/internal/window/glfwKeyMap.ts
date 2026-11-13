@@ -1,5 +1,4 @@
-import { Event } from "./Event"
-const GLFW_KEY_MAP = {
+export const GLFW_KEY_MAP = {
 	"-1": "Unknown",
 	
 	// Printable ASCII
@@ -137,7 +136,7 @@ const GLFW_KEY_MAP = {
 	348: "ContextMenu"
 };
 
-const GLFW_KEY_MAP_SHIFT = {
+export const GLFW_KEY_MAP_SHIFT = {
 	"-1": "Unknown",
 	
 	// Printable ASCII (shifted)
@@ -275,7 +274,7 @@ const GLFW_KEY_MAP_SHIFT = {
 	348: "ContextMenu"
 };
 
-const GLFW_CODE_MAP = {
+export const GLFW_CODE_MAP = {
 	"-1": "Unknown",
 	
 	// Printable keys
@@ -409,68 +408,3 @@ const GLFW_CODE_MAP = {
 	347: "MetaRight",
 	348: "ContextMenu"
 };
-export class KeyboardEvent extends Event {
-	target = null
-	key = ""
-	code = ""
-	location = 0
-	repeat = false
-	ctrlKey = false
-	shiftKey = false
-	altKey = false
-	metaKey = false
-	
-	/**
-    * @param {string} type
-    * @param {any} args
-	* @param {any} kcode
-	* @param {any} target
-	* @param {any} repeat
-	* @param {any} shiftKey
-	* @param {any} ctrlKey
-	* @param {any} altKey
-	* @param {any} metaKey
-    */
-	constructor(type, args = {
-		target: null,
-		key: "",
-		code: "",
-		location: 0,
-		repeat: false,
-		ctrlKey: false,
-		shiftKey: false,
-		altKey: false,
-		metaKey: false
-	}, kcode = null, target = null, repeat = false, shiftKey = false, ctrlKey = false, altKey = false, metaKey = false){
-		super(type,(args)?args.target:target)
-		if (!!args) {
-			this.key = args.key
-			this.code = args.code
-			this.location = args.location
-			this.repeat = args.repeat
-			this.ctrlKey = args.ctrlKey
-			this.shiftKey = args.shiftKey
-			this.altKey = args.altKey
-			this.metaKey = args.metaKey
-		} else {
-			const glfwKey = kcode
-			if (glfwKey >= 65 && glfwKey <= 90) {
-				let c = String.fromCharCode(glfwKey);
-				// const uppercase = shift ^ caps;
-				this.key = shiftKey ?? args.shiftKey  ? c : c.toLowerCase();
-			}else {
-				this.key = shiftKey ?? args.shiftKey ? GLFW_KEY_MAP_SHIFT[kcode] : GLFW_KEY_MAP[kcode]
-				
-			}
-			this.code = GLFW_CODE_MAP[kcode]
-			this.location = 0
-			this.repeat = false
-			this.shiftKey = shiftKey
-			this.ctrlKey = ctrlKey
-			this.altKey = altKey
-			this.metaKey = metaKey
-		}
-		
-	}
-}
-

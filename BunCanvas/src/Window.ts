@@ -10,6 +10,7 @@ import { FontFace } from "./FontFace.js";
 import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
+import { GLFW_CODE_MAP, GLFW_KEY_MAP, GLFW_KEY_MAP_SHIFT } from "../internal/window/glfwKeyMap.js";
 
 let requestedFrames : ((arg?: number)=>void)[] = []
 
@@ -26,7 +27,15 @@ if (process.platform !== "darwin"){
 
 lib.symbols.canvas_init_gpu_context();
 
-let windowWasCreated = false;
+function attachTarget<T extends Event>(event: T, target: unknown): T {
+	Object.defineProperty(event, "target", {
+		value: target,
+		enumerable: true,
+		configurable: true,
+	});
+	return event;
+}
+
 export class Window {
 	#rEvts = new Map();
 	#mMoveEvts = new Map();
@@ -51,164 +60,199 @@ export class Window {
 	
 	#freeIndex = new Array();
 	#eIndex = 0
+	#getGlfwKeyLocation(kcode: number): number {
+	if (kcode >= 320 && kcode <= 336) {
+		return KeyboardEvent.DOM_KEY_LOCATION_NUMPAD;
+	}
+	if (kcode >= 340 && kcode <= 343) {
+		return KeyboardEvent.DOM_KEY_LOCATION_LEFT;
+	}
+	if (kcode >= 344 && kcode <= 347) {
+		return KeyboardEvent.DOM_KEY_LOCATION_RIGHT;
+	}
+	return KeyboardEvent.DOM_KEY_LOCATION_STANDARD;
+	}
 
-	#processEvents(){
-		if (this.#wPropertiesViewer[0] != 0) {
-			this.#wPropertiesViewer[0] = 0
-			const details = new Event("resize",this);
-			
-			// this.#dim[0] = this.#wResizeViewer[1]
-			// this.#dim[1] = this.#wResizeViewer[2]
-			if (this.onresize) this.onresize(details)
-			
-			this.#rEvts.forEach((item,key)=>{
-				item.cb(details);
-			})
+	#createKeyboardEvent(type: "keydown" | "keyup", viewer: ArrayLike<number>): KeyboardEvent {
+	const repeat = Boolean(viewer[1]);
+	const kcode = viewer[2] as keyof typeof GLFW_CODE_MAP;
+	const shiftKey = Boolean(viewer[3]);
+	const ctrlKey = Boolean(viewer[4]);
+	const altKey = Boolean(viewer[5]);
+	const metaKey = Boolean(viewer[6]);
+
+	const key = shiftKey
+		? (GLFW_KEY_MAP_SHIFT[kcode] ?? "Unidentified")
+		: (GLFW_KEY_MAP[kcode] ?? "Unidentified");
+	const code = GLFW_CODE_MAP[kcode] ?? "";
+
+	return attachTarget(
+		new KeyboardEvent(type, {
+			key,
+			code,
+			location: this.#getGlfwKeyLocation(Number(kcode)),
+			repeat,
+			shiftKey,
+			ctrlKey,
+			altKey,
+			metaKey,
+			bubbles: true,
+			cancelable: true,
+		}),
+		this
+	);
+	}
+
+	#processEvents() {
+		if (this.#wPropertiesViewer[0] !== 0) {
+			this.#wPropertiesViewer[0] = 0;
+			const details = attachTarget(new Event("resize"), this);
+
+			if (this.onresize) this.onresize(details);
+			this.#rEvts.forEach((item) => item.cb(details));
 		}
-		if(this.#mMoveViewer[0] != 0) {
-			this.#mMoveViewer[0] = 0				
-			const evt = new MouseEvent("move",
-				{
-					target:this,
-					altKey:false,
-					button:0,
-					buttons:this.#mMoveViewer[5],
-					clientX:this.#mMoveViewer[1],
-					clientY:this.#mMoveViewer[2],
-					movementX: this.#mMoveViewer[3],
-					movementY: this.#mMoveViewer[4],
-					ctrlKey:false,
-					metaKey:false,
-					screenX:0,
-					screenY:0,
-					shiftKey:false
-				}
-			)
-			if (this.onmousemove) this.onmousemove(evt)
-			
-			this.#mMoveEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+
+		if (this.#mMoveViewer[0] !== 0) {
+			this.#mMoveViewer[0] = 0;
+			const evt = attachTarget(
+			new MouseEvent("mousemove", {
+				button: 0,
+				buttons: this.#mMoveViewer[5],
+				clientX: this.#mMoveViewer[1],
+				clientY: this.#mMoveViewer[2],
+				movementX: this.#mMoveViewer[3],
+				movementY: this.#mMoveViewer[4],
+				screenX: this.#mMoveViewer[1],
+				screenY: this.#mMoveViewer[2],
+				shiftKey: Boolean(this.#mMoveViewer[6]),
+				ctrlKey: Boolean(this.#mMoveViewer[7]),
+				altKey: Boolean(this.#mMoveViewer[8]),
+				metaKey: Boolean(this.#mMoveViewer[9]),
+				bubbles: true,
+				cancelable: true,
+			}),
+			this
+			);
+
+			if (this.onmousemove) this.onmousemove(evt);
+			this.#mMoveEvts.forEach((item) => item.cb(evt));
 		}
-		if(this.#mDownViewer[0] != 0) {
-			this.#mDownViewer[0] = 0
-			const evt = new MouseEvent("down",
-				{
-					target:this,
-					altKey:this.#mDownViewer[7],
-					button:this.#mDownViewer[3],
-					buttons:this.#mDownViewer[4],
-					clientX:this.#mDownViewer[1],
-					clientY:this.#mDownViewer[2],
-					movementX: 0,
-					movementY: 0,
-					ctrlKey:this.#mDownViewer[6],
-					metaKey:this.#mDownViewer[8],
-					screenX:this.#mDownViewer[1],
-					screenY:this.#mDownViewer[2],
-					shiftKey:this.#mDownViewer[5]
-				}
-			)
+
+		if (this.#mDownViewer[0] !== 0) {
+			this.#mDownViewer[0] = 0;
+			const evt = attachTarget(
+			new MouseEvent("mousedown", {
+				clientX: this.#mDownViewer[1],
+				clientY: this.#mDownViewer[2],
+				button: this.#mDownViewer[3],
+				buttons: this.#mDownViewer[4],
+				shiftKey: Boolean(this.#mDownViewer[5]),
+				ctrlKey: Boolean(this.#mDownViewer[6]),
+				altKey: Boolean(this.#mDownViewer[7]),
+				metaKey: Boolean(this.#mDownViewer[8]),
+				screenX: this.#mDownViewer[1],
+				screenY: this.#mDownViewer[2],
+				bubbles: true,
+				cancelable: true,
+			}),
+			this
+			);
+
 			if (this.onmousedown) this.onmousedown(evt);
-
-			this.#mDownEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+			this.#mDownEvts.forEach((item) => item.cb(evt));
 		}
-		if(this.#mUpViewer[0] != 0) {
-			this.#mUpViewer[0] = 0
-			const evt = new MouseEvent("up",
-				{
-					target:this,
-					altKey:this.#mUpViewer[7],
-					button:this.#mUpViewer[3],
-					buttons:this.#mUpViewer[4],
-					clientX:this.#mUpViewer[1],
-					clientY:this.#mUpViewer[2],
-					movementX: 0,
-					movementY: 0,
-					ctrlKey:this.#mUpViewer[6],
-					metaKey:this.#mUpViewer[8],
-					screenX:this.#mUpViewer[1],
-					screenY:this.#mUpViewer[2],
-					shiftKey:this.#mUpViewer[5]
-				}
-			)
+
+		if (this.#mUpViewer[0] !== 0) {
+			this.#mUpViewer[0] = 0;
+			const evt = attachTarget(
+			new MouseEvent("mouseup", {
+				clientX: this.#mUpViewer[1],
+				clientY: this.#mUpViewer[2],
+				button: this.#mUpViewer[3],
+				buttons: this.#mUpViewer[4],
+				shiftKey: Boolean(this.#mUpViewer[5]),
+				ctrlKey: Boolean(this.#mUpViewer[6]),
+				altKey: Boolean(this.#mUpViewer[7]),
+				metaKey: Boolean(this.#mUpViewer[8]),
+				screenX: this.#mUpViewer[1],
+				screenY: this.#mUpViewer[2],
+				bubbles: true,
+				cancelable: true,
+			}),
+			this
+			);
+
 			if (this.onmouseup) this.onmouseup(evt);
-
-			this.#mMUpEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
-		}
-		if(this.#mClickViewer[0] != 0) {
-			this.#mClickViewer[0] = 0
-			const evt = new MouseEvent("click",
-				{
-					target:this,
-					altKey:this.#mClickViewer[7],
-					button:this.#mClickViewer[3],
-					buttons:this.#mClickViewer[4],
-					clientX:this.#mClickViewer[1],
-					clientY:this.#mClickViewer[2],
-					movementX: 0,
-					movementY: 0,
-					ctrlKey:this.#mClickViewer[6],
-					metaKey:this.#mClickViewer[8],
-					screenX:this.#mClickViewer[1],
-					screenY:this.#mClickViewer[2],
-					shiftKey:this.#mClickViewer[5]
-				}
-			)
-			if (this.onclick) this.onclick(evt)
-			
-			this.#mClickEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+			this.#mMUpEvts.forEach((item) => item.cb(evt));
 		}
 
-		if(this.#mWheelViewer[0] != 0) {
-			this.#mWheelViewer[0] = 0
-			const evt = new WheelEvent("wheel",
-				{
-					target:this,
-					altKey:this.#mMoveViewer[7],
-					button:this.#mWheelViewer[3],
-					buttons:this.#mWheelViewer[4],
-					clientX:this.#mMoveViewer[3],
-					clientY:this.#mMoveViewer[4],
-					deltaX: -this.#mWheelViewer[1]*120,
-					deltaY: -this.#mWheelViewer[2]*120,
-					movementX: 0,
-					movementY: 0,
-					ctrlKey:this.#mMoveViewer[6],
-					metaKey:this.#mMoveViewer[8],
-					screenX:this.#mMoveViewer[3],
-					screenY:this.#mMoveViewer[4],
-					shiftKey:this.#mMoveViewer[5]
-				}
-			)
-			if (this.onwheel) this.onwheel(evt)
+		if (this.#mClickViewer[0] !== 0) {
+			this.#mClickViewer[0] = 0;
+			const evt = attachTarget(
+			new MouseEvent("click", {
+				clientX: this.#mClickViewer[1],
+				clientY: this.#mClickViewer[2],
+				button: this.#mClickViewer[3],
+				buttons: this.#mClickViewer[4],
+				shiftKey: Boolean(this.#mClickViewer[5]),
+				ctrlKey: Boolean(this.#mClickViewer[6]),
+				altKey: Boolean(this.#mClickViewer[7]),
+				metaKey: Boolean(this.#mClickViewer[8]),
+				screenX: this.#mClickViewer[1],
+				screenY: this.#mClickViewer[2],
+				detail: 1,
+				bubbles: true,
+				cancelable: true,
+			}),
+			this
+			);
 
-			this.#mWheelEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+			if (this.onclick) this.onclick(evt);
+			this.#mClickEvts.forEach((item) => item.cb(evt));
 		}
-		if(this.#kDownViewer[0] != 0) {
+
+		if (this.#mWheelViewer[0] !== 0) {
+			this.#mWheelViewer[0] = 0;
+			const evt = attachTarget(
+			new WheelEvent("wheel", {
+				deltaX: -this.#mWheelViewer[1] * 120,
+				deltaY: -this.#mWheelViewer[2] * 120,
+				deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+				button: this.#mWheelViewer[3],
+				buttons: this.#mWheelViewer[4],
+				// Use current cursor position from #mMoveViewer[1]/[2] (indices [3]/[4] were movementX/Y)
+				clientX: this.#mMoveViewer[1],
+				clientY: this.#mMoveViewer[2],
+				screenX: this.#mMoveViewer[1],
+				screenY: this.#mMoveViewer[2],
+				shiftKey: Boolean(this.#mMoveViewer[6]),
+				ctrlKey: Boolean(this.#mMoveViewer[7]),
+				altKey: Boolean(this.#mMoveViewer[8]),
+				metaKey: Boolean(this.#mMoveViewer[9]),
+				bubbles: true,
+				cancelable: true,
+			}),
+			this
+			);
+
+			if (this.onwheel) this.onwheel(evt);
+			this.#mWheelEvts.forEach((item) => item.cb(evt));
+		}
+
+		if (this.#kDownViewer[0] !== 0) {
 			this.#kDownViewer[0] = 0;
-			const evt = new KeyboardEvent("down",null,this.#kDownViewer[2],this,this.#kDownViewer[1],this.#kDownViewer[3],this.#kDownViewer[4],this.#kDownViewer[5],this.#kDownViewer[6],)
-			if (this.onkeydown) this.onkeydown(evt)
+			const evt = this.#createKeyboardEvent("keydown", this.#kDownViewer);
 
-			this.#keyDownEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+			if (this.onkeydown) this.onkeydown(evt);
+			this.#keyDownEvts.forEach((item) => item.cb(evt));
 		}
-		if(this.#kUpViewer[0] != 0) {
+
+		if (this.#kUpViewer[0] !== 0) {
 			this.#kUpViewer[0] = 0;
-			const evt = new KeyboardEvent("up",null,this.#kUpViewer[2],this,this.#kUpViewer[1],this.#kUpViewer[3],this.#kUpViewer[4],this.#kUpViewer[5],this.#kUpViewer[6],)
-			if (this.onkeyup) this.onkeyup(evt)
-			this.#keyUpEvts.forEach((item,key)=>{
-				item.cb(evt);
-			})
+			const evt = this.#createKeyboardEvent("keyup", this.#kUpViewer);
+
+			if (this.onkeyup) this.onkeyup(evt);
+			this.#keyUpEvts.forEach((item) => item.cb(evt));
 		}
 	}
 
@@ -248,7 +292,6 @@ export class Window {
 
 	constructor(width : number, height : number, title = "App", args : {vsync:boolean, maxFramerate:number}) {
 		if (process.platform !== "darwin") (render_thread as any).ref?.();
-		windowWasCreated = true;
 		this.#wPropertiesViewer[1] = width;
 		this.#wPropertiesViewer[2] = height;
 

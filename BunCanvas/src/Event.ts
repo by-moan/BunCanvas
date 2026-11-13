@@ -1,9 +1,9 @@
 export class Event {
-    type = null
-    target = null
+    type : any = null
+    target : any = null
     timeStamp = performance.now()
 
-    constructor(type, target) {
+    constructor(type?: string, target?: string) {
         this.type = type;
         this.target = target;
     }

@@ -16,6 +16,8 @@
 #include <condition_variable>
 #include <filesystem>
 
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
 // #include <pthread.h>
 
@@ -25,7 +27,7 @@
 #define NOMINMAX
 #define _Float64_t double
 #include <windows.h>
-
+#include <GLFW/glfw3native.h>
 
 
 // This... This is the worst thing humanity would create.... Why??????
@@ -122,8 +124,7 @@
 #error "Platform is not supported by BunCanvas"
 #endif
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+
 
 #include "src/VkConfig.cpp"
 

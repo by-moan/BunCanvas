@@ -2,19 +2,93 @@ bool pollingEvents = false;
 
 bool pendingResize = false;
 bool currentVsync = true;
-void window_resize_callback(GLFWwindow* window, int w, int h) {
-    pendingResize = false;
-    width = w;
-    height = h;
-    renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-    clearSwapchainSurfaces();
-    // renderThreadContext->context->freeGpuResources();
-    VK::recreateSwapchain(width, height, currentVsync);
-    rebuildSwapchainSurfaces();
+static std::mutex renderMutex;
 
-    wPropertiesViewer[0] = true;
-    wPropertiesViewer[1] = width;
-    wPropertiesViewer[2] = height;
+void render_composited_canvases(SkCanvas* targetCanvas);
+
+void present_composited_frame() {
+    std::lock_guard<std::mutex> lock(renderMutex);
+
+    if (!ready || swapchainSurfaces.empty()) return;
+
+    glfwGetFramebufferSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+
+    uint32_t imageIndex = 0;
+    if (!VK::acquireNextImage(&imageIndex)) {
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+        clearSwapchainSurfaces();
+        VK::recreateSwapchain(width, height, currentVsync);
+        rebuildSwapchainSurfaces();
+        return;
+    }
+
+    SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
+    frameCanvas->clear(SK_ColorTRANSPARENT);
+    render_composited_canvases(frameCanvas);
+
+    VK::presentImage(
+        renderThreadContext->context.get(),
+        swapchainSurfaces[imageIndex]->surface.get(),
+        imageIndex
+    );
+}
+
+#ifdef _WIN32
+static WNDPROC originalWndProc = nullptr;
+static constexpr UINT_PTR MODAL_RENDER_TIMER_ID = 1;
+
+static LRESULT CALLBACK ModalLoopWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_ENTERSIZEMOVE:
+            SetTimer(hwnd, MODAL_RENDER_TIMER_ID, 16, nullptr);
+            break;
+
+        case WM_EXITSIZEMOVE:
+            KillTimer(hwnd, MODAL_RENDER_TIMER_ID);
+            break;
+
+        case WM_TIMER:
+            if (wParam == MODAL_RENDER_TIMER_ID) {
+                present_composited_frame();
+                return 0;
+            }
+            break;
+    }
+    return CallWindowProc(originalWndProc, hwnd, uMsg, wParam, lParam);
+}
+
+static void install_win32_modal_render_hook(GLFWwindow* win) {
+    HWND hwnd = glfwGetWin32Window(win);
+    if (hwnd) {
+        originalWndProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ModalLoopWndProc))
+        );
+    }
+}
+#endif
+
+void window_resize_callback(GLFWwindow* window, int w, int h) {
+    if (w <= 0 || h <= 0) return;
+
+    {
+        std::lock_guard<std::mutex> lock(renderMutex);
+        pendingResize = false;
+        width = w;
+        height = h;
+        if (renderThreadContext && renderThreadContext->context) {
+            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+        }
+        clearSwapchainSurfaces();
+        VK::recreateSwapchain(width, height, currentVsync);
+        rebuildSwapchainSurfaces();
+
+        wPropertiesViewer[0] = true;
+        wPropertiesViewer[1] = width;
+        wPropertiesViewer[2] = height;
+    }
+
+    present_composited_frame();
 }
 
 double prevX = 0;
@@ -35,16 +109,16 @@ bool clickStarted = false;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (pollingEvents == true) return;
     
-    if (action == GLFW_PRESS) { //Indicates that the mouse was pressed down.
-        clickStarted = (button == GLFW_MOUSE_BUTTON_LEFT)?true:false;
-        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_LEFT && !((int)mClickViewer[4]&0b1))?0b1:0;
-        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_RIGHT && !((int)mClickViewer[4]&0b10))?0b10:0;
-        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_MIDDLE && !((int)mClickViewer[4]&0b100))?0b100:0;
-        //Backwards mouse navigation button
-        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_4 && !((int)mClickViewer[4]&0b1000))?0b1000:0;
+    if (action == GLFW_PRESS) { // Indicates that the mouse was pressed down.
+        clickStarted = (button == GLFW_MOUSE_BUTTON_LEFT) ? true : false;
+        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_LEFT && !((int)mClickViewer[4]&0b1)) ? 0b1 : 0;
+        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_RIGHT && !((int)mClickViewer[4]&0b10)) ? 0b10 : 0;
+        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_MIDDLE && !((int)mClickViewer[4]&0b100)) ? 0b100 : 0;
+        // Backwards mouse navigation button
+        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_4 && !((int)mClickViewer[4]&0b1000)) ? 0b1000 : 0;
         // Forward mouse navigation button
-        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_5 && !((int)mClickViewer[4]&0b10000))?0b10000:0;
-        //Buttons field for mouseMove viewer
+        mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_5 && !((int)mClickViewer[4]&0b10000)) ? 0b10000 : 0;
+        // Buttons field for mouseMove viewer
         mMoveViewer[5] = mClickViewer[4];
 
         mDownViewer[0] = true;
@@ -57,14 +131,14 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mDownViewer[8] = kDownViewer[6];
     } 
     if (action == GLFW_RELEASE) {
-        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_LEFT && (int)mClickViewer[4]&0b1)?0b1:0;
-        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_RIGHT && (int)mClickViewer[4]&0b10)?0b10:0;
-        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_MIDDLE && (int)mClickViewer[4]&0b100)?0b100:0;
-        //Backwards mouse navigation button
-        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_4 && (int)mClickViewer[4]&0b1000)?0b1000:0;
+        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_LEFT && (int)mClickViewer[4]&0b1) ? 0b1 : 0;
+        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_RIGHT && (int)mClickViewer[4]&0b10) ? 0b10 : 0;
+        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_MIDDLE && (int)mClickViewer[4]&0b100) ? 0b100 : 0;
+        // Backwards mouse navigation button
+        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_4 && (int)mClickViewer[4]&0b1000) ? 0b1000 : 0;
         // Forward mouse navigation button
-        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_5 && (int)mClickViewer[4]&0b10000)?0b10000:0;
-        //Buttons field for mouseMove viewer
+        mClickViewer[4] -= (button == GLFW_MOUSE_BUTTON_5 && (int)mClickViewer[4]&0b10000) ? 0b10000 : 0;
+        // Buttons field for mouseMove viewer
         mMoveViewer[5] = mClickViewer[4];
 
         mUpViewer[0] = true;
@@ -76,57 +150,55 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mUpViewer[7] = kDownViewer[5];
         mUpViewer[8] = kDownViewer[6];
     }
-    //Mouse pressed down was done and now is being released? Then mark the event as dirty so it can be triggered on js window.
+    // Mouse pressed down was done and now is being released? Then mark the event as dirty so it can be triggered on js window.
     if (button == GLFW_MOUSE_BUTTON_LEFT && clickStarted == true && action == GLFW_RELEASE) {
         mClickViewer[0] = true;
         clickStarted = false;
         mClickViewer[1] = mMoveViewer[1];
         mClickViewer[2] = mMoveViewer[2];
         
-        //shift key pressed
-        mClickViewer[5] = (mods&0b1)?true:false;
-        //ctrl key pressed
-        mClickViewer[6] = (mods&0b10)?true:false;
-        //alt key pressed
-        mClickViewer[7] = (mods&0b100)?true:false;
-        //meta key pressed
-        mClickViewer[8] = (mods&0b1000)?true:false;
+        // shift key pressed
+        mClickViewer[5] = (mods&0b1) ? true : false;
+        // ctrl key pressed
+        mClickViewer[6] = (mods&0b10) ? true : false;
+        // alt key pressed
+        mClickViewer[7] = (mods&0b100) ? true : false;
+        // meta key pressed
+        mClickViewer[8] = (mods&0b1000) ? true : false;
     }
 }
 
-
 void keyboard_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if(action == GLFW_PRESS || action == 2) {
+    if (action == GLFW_PRESS || action == 2) {
         kDownViewer[0] = true;
         kDownViewer[1] = false;
         kDownViewer[2] = key;
         
-        //shift key pressed
-        kDownViewer[3] = (mods&0b1)?true:false;
-        //ctrl key pressed
-        kDownViewer[4] = (mods&0b10)?true:false;
-        //alt key pressed
-        kDownViewer[5] = (mods&0b100)?true:false;
-        //meta key pressed
-        kDownViewer[6] = (mods&0b1000)?true:false;
-        
+        // shift key pressed
+        kDownViewer[3] = (mods&0b1) ? true : false;
+        // ctrl key pressed
+        kDownViewer[4] = (mods&0b10) ? true : false;
+        // alt key pressed
+        kDownViewer[5] = (mods&0b100) ? true : false;
+        // meta key pressed
+        kDownViewer[6] = (mods&0b1000) ? true : false;
     }
-    if(action == 2) {
+    if (action == 2) {
         kDownViewer[1] = true;
     }
-    if(action == GLFW_RELEASE) {
+    if (action == GLFW_RELEASE) {
         kUpViewer[0] = true;
         kUpViewer[1] = false;
         kUpViewer[2] = key;
         
-        //shift key pressed
-        kUpViewer[3] = (mods&0b1)?true:false;
-        //ctrl key pressed
-        kUpViewer[4] = (mods&0b10)?true:false;
-        //alt key pressed
-        kUpViewer[5] = (mods&0b100)?true:false;
-        //meta key pressed
-        kUpViewer[6] = (mods&0b1000)?true:false;
+        // shift key pressed
+        kUpViewer[3] = (mods&0b1) ? true : false;
+        // ctrl key pressed
+        kUpViewer[4] = (mods&0b10) ? true : false;
+        // alt key pressed
+        kUpViewer[5] = (mods&0b100) ? true : false;
+        // meta key pressed
+        kUpViewer[6] = (mods&0b1000) ? true : false;
     }
 }
 
@@ -165,27 +237,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
     }
 }
 
-// void window_refresh_callback(GLFWwindow* window) {
-//     if (!ready || swapchainSurfaces.empty()) return;
-//     uint32_t imageIndex = 0;
-//     if (!VK::acquireNextImage(&imageIndex)) return;
-
-//     SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
-//     frameCanvas->clear(SK_ColorTRANSPARENT);
-//     render_composited_canvases(frameCanvas);
-
-//     VK::presentImage(
-//         renderThreadContext->context.get(),
-//         swapchainSurfaces[imageIndex]->surface.get(),
-//         imageIndex
-//     );
-// }
-
 typedef int (*JSCallback_WRefresh)(int);
-struct WindowUserData {
-    JSCallback_WRefresh onrefresh;
-};
-
 
 extern "C" {
     WINDOWS_EXPORT void create_window(int w, int h, const char* title) {
@@ -225,7 +277,7 @@ extern "C" {
     }
 
     #ifndef __APPLE__
-    // Called in the bun worker thread.
+    // Called in the bun worker thread (Windows & Linux)
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync) {
         width = w;
         height = h;
@@ -241,39 +293,18 @@ extern "C" {
             return;
         }
 
-        // auto* userData = new WindowUserData{ onrefresh };
-        // glfwSetWindowUserPointer(window, userData);
-        glfwSetWindowSizeCallback(window, window_resize_callback);
+        #ifdef _WIN32
+        install_win32_modal_render_hook(window);
+        #endif
+
+        glfwSetFramebufferSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window, keyboard_key_callback);
         glfwSetScrollCallback(window, window_scroll_callback);
-
-        auto window_refresh_callback = [](GLFWwindow* window) {
-            if (!ready || swapchainSurfaces.empty()) return;
-            // auto* data = static_cast<WindowUserData*>(glfwGetWindowUserPointer(window));
-            // if (!data) return;
-            glfwGetFramebufferSize(window, &width, &height);
-
-            uint32_t imageIndex = 0;
-            if (!VK::acquireNextImage(&imageIndex)) return;
-
-            SkCanvas* frameCanvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
-            frameCanvas->clear(SK_ColorTRANSPARENT);
-            render_composited_canvases(frameCanvas);
-            // if (data->onrefresh) {
-            //     data->onrefresh(0);
-            //     std::cout << "refresh!\n";
-            // }
-
-            VK::presentImage(
-                renderThreadContext->context.get(),
-                swapchainSurfaces[imageIndex]->surface.get(),
-                imageIndex
-            );
-        };
-
-        glfwSetWindowRefreshCallback(window, window_refresh_callback);
+        glfwSetWindowRefreshCallback(window, [](GLFWwindow*) {
+            present_composited_frame();
+        });
 
         if (!VK::initCore()) {
             std::cerr << "Failed to initialize Vulkan core!\n";
@@ -304,15 +335,10 @@ extern "C" {
         ready = true;
 
         while (!(wPropertiesViewer[3] = glfwWindowShouldClose(window))) {
-            glfwGetFramebufferSize(window, &width, &height);
             glfwPollEvents();
 
-            // Skip rendering while window is minimized (0x0 framebuffer)
-            if (width == 0 || height == 0) {
-                continue;
-            }
-
             if (!vsyncQueue.empty()) {
+                std::lock_guard<std::mutex> lock(renderMutex);
                 currentVsync = vsyncQueue.back();
                 vsyncQueue.clear();
                 renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
@@ -321,28 +347,7 @@ extern "C" {
                 rebuildSwapchainSurfaces();
             }
 
-            uint32_t imageIndex = 0;
-            if (!VK::acquireNextImage(&imageIndex)) {
-                // Swapchain became out-of-date; recreate and retry next frame
-                clearSwapchainSurfaces();
-                VK::recreateSwapchain(width, height, currentVsync);
-                rebuildSwapchainSurfaces();
-                continue;
-            }
-
-            canvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
-            canvas->clear(SK_ColorTRANSPARENT);
-
-            render_composited_canvases(canvas);
-
-            // onrefresh(0);
-
-            VK::presentImage(
-                renderThreadContext->context.get(),
-                swapchainSurfaces[imageIndex]->surface.get(),
-                imageIndex
-            );
-
+            present_composited_frame();
             frameReady = false;
         }
         onrefresh(2);
@@ -363,6 +368,7 @@ extern "C" {
 
     WINDOWS_EXPORT void canvas_flush_gpu() {
         if (!gpuContextReady) return;
+        std::lock_guard<std::mutex> lock(renderMutex);
         VK::flushAndSyncMainContext(mainThreadCtx->context.get());
     }
     #else
@@ -381,12 +387,14 @@ extern "C" {
             return;
         }
 
-        glfwSetWindowSizeCallback(window, window_resize_callback);
+        glfwSetFramebufferSizeCallback(window, window_resize_callback);
         glfwSetCursorPosCallback(window, cursor_pos_callback);
         glfwSetMouseButtonCallback(window, mouse_button_callback);
         glfwSetKeyCallback(window, keyboard_key_callback);
         glfwSetScrollCallback(window, window_scroll_callback);
-        glfwSetWindowRefreshCallback(window, window_refresh_callback);
+        glfwSetWindowRefreshCallback(window, [](GLFWwindow*) {
+            present_composited_frame();
+        });
 
         if (!VK::initCore()) return;
         renderThreadContext = new ContextWrapper(VK::createRenderThreadContext());
@@ -412,42 +420,13 @@ extern "C" {
         if (!ready || !window) return;
         wPropertiesViewer[3] = glfwWindowShouldClose(window);
         if (glfwWindowShouldClose(window)) return;
-        glfwGetFramebufferSize(window, &width, &height);
         glfwPollEvents();
-        if (width == 0 || height == 0) return;
-
-        // if (pendingResize) {
-        //     pendingResize = false;
-        //     width = pendingW;
-        //     height = pendingH;
-        //     clearSwapchainSurfaces();
-        //     VK::recreateSwapchain(pendingW, pendingH, currentVsync);
-        //     rebuildSwapchainSurfaces();
-        //     wPropertiesViewer[0] = true;
-        //     wPropertiesViewer[1] = pendingW;
-        //     wPropertiesViewer[2] = pendingH;
-        // }
-
-        uint32_t imageIndex = 0;
-        if (!VK::acquireNextImage(&imageIndex)) {
-            clearSwapchainSurfaces();
-            VK::recreateSwapchain(width, height, currentVsync);
-            rebuildSwapchainSurfaces();
-            return;
-        }
-
-        canvas = swapchainSurfaces[imageIndex]->surface->getCanvas();
-        canvas->clear(SK_ColorTRANSPARENT);
-        render_composited_canvases(canvas);
-
-        VK::presentImage(
-            renderThreadContext->context.get(),
-            swapchainSurfaces[imageIndex]->surface.get(),
-            imageIndex
-        );
+        present_composited_frame();
     #endif
     }
+
     WINDOWS_EXPORT void destroy_window() {
+        std::lock_guard<std::mutex> lock(renderMutex);
         ready = false;
         VK::waitIdle();
         clearSwapchainSurfaces();
@@ -457,11 +436,7 @@ extern "C" {
             delete renderThreadContext;
             renderThreadContext = nullptr;
         }
-        #ifdef __APPLE__
-        if (renderThreadContext) {
-            delete renderThreadContext;
-        }
-        #else
+        #ifndef __APPLE__
         if (mainThreadCtx) {
             delete mainThreadCtx;
             mainThreadCtx = nullptr;

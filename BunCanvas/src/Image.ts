@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { lib,encoder } from "../internal/symbols.js";
-import { Event } from "./Event.js";
 import { ptr } from "bun:ffi"
-const ptrs = new WeakMap();
+import { ptrs } from "../internal/pointers.js";
+import { attachEventTarget } from "../internal/attachEventTarget.js";
+
 const fRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.image_destroy(ptr)
-	console.log("destroy!")
 });
 
 function computePath(url: string) : string {
@@ -78,15 +78,15 @@ export class Image {
 				if (lib.symbols.image_load(iptr,ptr(tArr))) {
 					this.#width = !this.#setWidth?tArr[0]:this.#width;
 					this.#height = !this.#setHeight?tArr[1]:this.#height;
-					self.onload?.call(self, new Event("load", self));
+					self.onload?.call(self, attachEventTarget(new Event("load", {}),self));
 				} else {
-					self.onerror?.call(self, new Event("error", self));
+					self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
 				}
 				
 			}).catch((ex) => {
 				const self = weakThis.deref();
 				if (!self) return;
-				self.onerror?.call(self, new Event("error", self));
+				self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
 			}).finally(()=>{});
 			return;
 		}else {
@@ -104,9 +104,9 @@ export class Image {
 				if (lib.symbols.image_load(_ptr,ptr(tArr))) {
 					this.#width = !this.#setWidth?tArr[0]:this.#width;
 					this.#height = !this.#setHeight?tArr[1]:this.#height;
-					self.onload?.call(self, new Event("load", self));
+					self.onload?.call(self, attachEventTarget(new Event("error", {}),self));
 				} else {
-					self.onerror?.call(self, new Event("error", self));
+					self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
 				}
 				clearTimeout(tm);
 			}, 0);

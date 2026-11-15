@@ -1,9 +1,8 @@
 import { lib,encoder, dlPath } from "../internal/symbols.js";
-import { Event } from "./Event.js";
 import { MouseEvent } from "./MouseEvent.js"
 
 import { dlopen, ptr, toArrayBuffer, JSCallback } from "bun:ffi"
-import { KeyboardEvent } from "./KeyboardEvent.js";
+import { KeyboardEvent, KeyboardEventCode, KeyboardEventKey } from "./KeyboardEvent.js";
 import { FontFace } from "./FontFace.js";
 
 // @ts-expect-error Suppressing missing default export for text asset import
@@ -11,40 +10,85 @@ import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 import { GLFW_CODE_MAP, GLFW_KEY_MAP, GLFW_KEY_MAP_SHIFT } from "../internal/window/glfwKeyMap.js";
+import { attachEventTarget } from "../internal/attachEventTarget.js";
 
+
+// #region Init
 let requestedFrames : ((arg?: number)=>void)[] = []
 
 let render_thread : Worker;
 
-lib.symbols.glfw_init();
+//Avoid making native calls if the library is imported on a worker thread
+if (Bun.isMainThread) {
+	lib.symbols.glfw_init();
 
-if (process.platform !== "darwin"){
-	render_thread = new Worker(
-		URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"})),
-		{ref:false}
-	);
+	if (process.platform !== "darwin"){
+		render_thread = new Worker(
+			URL.createObjectURL(new Blob([WindowThread], {type: "application/javascript"})),
+			{ref:false}
+		);
+	}
+
+	lib.symbols.canvas_init_gpu_context();
 }
 
-lib.symbols.canvas_init_gpu_context();
 
-function attachTarget<T extends Event>(event: T, target: unknown): T {
-	Object.defineProperty(event, "target", {
-		value: target,
-		enumerable: true,
-		configurable: true,
-	});
-	return event;
-}
 
-export class Window {
-	#rEvts = new Map();
-	#mMoveEvts = new Map();
-	#mDownEvts = new Map();
-	#mMUpEvts = new Map();
-	#mWheelEvts = new Map();
-	#mClickEvts = new Map();
-	#keyDownEvts = new Map();
-	#keyUpEvts = new Map();
+//#endregion
+
+export class Window extends EventTarget {
+	#setHandler<T extends Event>(
+        type: string,
+        current: ((evt: T) => any) | null,
+        next: ((evt: T) => any) | null
+    ) {
+        if (current) {
+            this.removeEventListener(type, current as EventListener);
+        }
+        if (next) {
+            this.addEventListener(type, next as EventListener);
+        }
+        return next;
+    }
+
+	#resizeHandler : ((this: Window, evt: Event) => any) | null = null;
+	#mousemoveHandler : ((evt: MouseEvent) => any) | null = null;
+	#mousedownHandler : ((evt: MouseEvent) => any) | null = null;
+	#mouseupHandler : ((evt: MouseEvent) => any) | null = null;
+	#clickHandler : ((evt: MouseEvent) => any) | null = null;
+	#keydownHandler : ((evt: KeyboardEvent) => any) | null = null;
+	#keyupHandler : ((evt: KeyboardEvent) => any) | null = null;
+	#wheelHandler : ((evt: WheelEvent) => any) | null = null;
+
+	get onresize() { return this.#resizeHandler; }
+    set onresize(fn : ((this: Window, evt: Event) => any) | null) { this.#resizeHandler = this.#setHandler('resize', this.#resizeHandler, fn); }
+
+    get onmousemove() { return this.#mousemoveHandler; }
+    set onmousemove(fn : ((evt: MouseEvent) => any) | null) { this.#mousemoveHandler = this.#setHandler('mousemove', this.#mousemoveHandler, fn); }
+
+    get onmousedown() { return this.#mousedownHandler; }
+    set onmousedown(fn : ((evt: MouseEvent) => any) | null) { this.#mousedownHandler = this.#setHandler('mousedown', this.#mousedownHandler, fn); }
+
+    get onmouseup() { return this.#mouseupHandler; }
+    set onmouseup(fn : ((evt: MouseEvent) => any) | null) { this.#mouseupHandler = this.#setHandler('mouseup', this.#mouseupHandler, fn); }
+
+    get onclick() { return this.#clickHandler; }
+    set onclick(fn : ((evt: MouseEvent) => any) | null) { this.#clickHandler = this.#setHandler('click', this.#clickHandler, fn); }
+
+    get onkeydown() { return this.#keydownHandler; }
+    set onkeydown(fn : ((evt: KeyboardEvent) => any) | null) { this.#keydownHandler = this.#setHandler('keydown', this.#keydownHandler, fn); }
+
+    get onkeyup() { return this.#keyupHandler; }
+    set onkeyup(fn : ((evt: KeyboardEvent) => any) | null) { this.#keyupHandler = this.#setHandler('keyup', this.#keyupHandler, fn); }
+
+    get onwheel() { return this.#wheelHandler; }
+    set onwheel(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('wheel', this.#wheelHandler, fn); }
+
+    get onfocus() { return this.#wheelHandler; }
+    set onfocus(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('focus', this.#wheelHandler, fn); }
+	
+    get onblur() { return this.#wheelHandler; }
+    set onblur(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('blur', this.#wheelHandler, fn); }
 
 	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 4 * 4));
 	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
@@ -53,13 +97,10 @@ export class Window {
 	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
 	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
 	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
+	#wFocusBlurViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wFocusBlurViewer()!,0, 2 * 4));
 	
 	#mWheelViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mWheelViewer()!,0, 5 * 8));
-	
-	#evtDetails = new WeakMap();
-	
-	#freeIndex = new Array();
-	#eIndex = 0
+
 	#getGlfwKeyLocation(kcode: number): number {
 	if (kcode >= 320 && kcode <= 336) {
 		return KeyboardEvent.DOM_KEY_LOCATION_NUMPAD;
@@ -74,20 +115,19 @@ export class Window {
 	}
 
 	#createKeyboardEvent(type: "keydown" | "keyup", viewer: ArrayLike<number>): KeyboardEvent {
-	const repeat = Boolean(viewer[1]);
-	const kcode = viewer[2] as keyof typeof GLFW_CODE_MAP;
-	const shiftKey = Boolean(viewer[3]);
-	const ctrlKey = Boolean(viewer[4]);
-	const altKey = Boolean(viewer[5]);
-	const metaKey = Boolean(viewer[6]);
+		const repeat = Boolean(viewer[1]);
+		const kcode = viewer[2] as keyof typeof GLFW_CODE_MAP;
+		const shiftKey = Boolean(viewer[3]);
+		const ctrlKey = Boolean(viewer[4]);
+		const altKey = Boolean(viewer[5]);
+		const metaKey = Boolean(viewer[6]);
 
-	const key = shiftKey
-		? (GLFW_KEY_MAP_SHIFT[kcode] ?? "Unidentified")
-		: (GLFW_KEY_MAP[kcode] ?? "Unidentified");
-	const code = GLFW_CODE_MAP[kcode] ?? "";
+		const key = (shiftKey
+			? (GLFW_KEY_MAP_SHIFT[kcode] ?? "Unknown")
+			: (GLFW_KEY_MAP[kcode] ?? "Unknown")) as KeyboardEventKey;
+		const code = (GLFW_CODE_MAP[kcode] ?? "Unknown") as KeyboardEventCode;
 
-	return attachTarget(
-		new KeyboardEvent(type, {
+		return new KeyboardEvent(type, {
 			key,
 			code,
 			location: this.#getGlfwKeyLocation(Number(kcode)),
@@ -98,24 +138,19 @@ export class Window {
 			metaKey,
 			bubbles: true,
 			cancelable: true,
-		}),
-		this
-	);
+		});
 	}
 
 	#processEvents() {
 		if (this.#wPropertiesViewer[0] !== 0) {
 			this.#wPropertiesViewer[0] = 0;
-			const details = attachTarget(new Event("resize"), this);
-
-			if (this.onresize) this.onresize(details);
-			this.#rEvts.forEach((item) => item.cb(details));
+			const details = new Event("resize");
+			this.dispatchEvent(details)
 		}
 
 		if (this.#mMoveViewer[0] !== 0) {
 			this.#mMoveViewer[0] = 0;
-			const evt = attachTarget(
-			new MouseEvent("mousemove", {
+			const evt = new MouseEvent("mousemove", {
 				button: 0,
 				buttons: this.#mMoveViewer[5],
 				clientX: this.#mMoveViewer[1],
@@ -130,18 +165,16 @@ export class Window {
 				metaKey: Boolean(this.#mMoveViewer[9]),
 				bubbles: true,
 				cancelable: true,
-			}),
-			this
-			);
+			});
 
-			if (this.onmousemove) this.onmousemove(evt);
-			this.#mMoveEvts.forEach((item) => item.cb(evt));
+			// if (this.onmousemove) this.onmousemove(evt);
+			// this.#mMoveEvts.forEach((item) => item.cb(evt));
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#mDownViewer[0] !== 0) {
 			this.#mDownViewer[0] = 0;
-			const evt = attachTarget(
-			new MouseEvent("mousedown", {
+			const evt = new MouseEvent("mousedown", {
 				clientX: this.#mDownViewer[1],
 				clientY: this.#mDownViewer[2],
 				button: this.#mDownViewer[3],
@@ -154,18 +187,13 @@ export class Window {
 				screenY: this.#mDownViewer[2],
 				bubbles: true,
 				cancelable: true,
-			}),
-			this
-			);
-
-			if (this.onmousedown) this.onmousedown(evt);
-			this.#mDownEvts.forEach((item) => item.cb(evt));
+			});
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#mUpViewer[0] !== 0) {
 			this.#mUpViewer[0] = 0;
-			const evt = attachTarget(
-			new MouseEvent("mouseup", {
+			const evt = new MouseEvent("mouseup", {
 				clientX: this.#mUpViewer[1],
 				clientY: this.#mUpViewer[2],
 				button: this.#mUpViewer[3],
@@ -178,18 +206,13 @@ export class Window {
 				screenY: this.#mUpViewer[2],
 				bubbles: true,
 				cancelable: true,
-			}),
-			this
-			);
-
-			if (this.onmouseup) this.onmouseup(evt);
-			this.#mMUpEvts.forEach((item) => item.cb(evt));
+			});
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#mClickViewer[0] !== 0) {
 			this.#mClickViewer[0] = 0;
-			const evt = attachTarget(
-			new MouseEvent("click", {
+			const evt = new MouseEvent("click", {
 				clientX: this.#mClickViewer[1],
 				clientY: this.#mClickViewer[2],
 				button: this.#mClickViewer[3],
@@ -203,18 +226,13 @@ export class Window {
 				detail: 1,
 				bubbles: true,
 				cancelable: true,
-			}),
-			this
-			);
-
-			if (this.onclick) this.onclick(evt);
-			this.#mClickEvts.forEach((item) => item.cb(evt));
+			});
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#mWheelViewer[0] !== 0) {
 			this.#mWheelViewer[0] = 0;
-			const evt = attachTarget(
-			new WheelEvent("wheel", {
+			const evt = new WheelEvent("wheel", {
 				deltaX: -this.#mWheelViewer[1] * 120,
 				deltaY: -this.#mWheelViewer[2] * 120,
 				deltaMode: WheelEvent.DOM_DELTA_PIXEL,
@@ -231,32 +249,47 @@ export class Window {
 				metaKey: Boolean(this.#mMoveViewer[9]),
 				bubbles: true,
 				cancelable: true,
-			}),
-			this
-			);
-
-			if (this.onwheel) this.onwheel(evt);
-			this.#mWheelEvts.forEach((item) => item.cb(evt));
+			});
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#kDownViewer[0] !== 0) {
 			this.#kDownViewer[0] = 0;
 			const evt = this.#createKeyboardEvent("keydown", this.#kDownViewer);
-
-			if (this.onkeydown) this.onkeydown(evt);
-			this.#keyDownEvts.forEach((item) => item.cb(evt));
+			this.dispatchEvent(evt)
 		}
 
 		if (this.#kUpViewer[0] !== 0) {
 			this.#kUpViewer[0] = 0;
 			const evt = this.#createKeyboardEvent("keyup", this.#kUpViewer);
-
-			if (this.onkeyup) this.onkeyup(evt);
-			this.#keyUpEvts.forEach((item) => item.cb(evt));
+			this.dispatchEvent(evt)
+		}
+		
+		if (this.#wFocusBlurViewer[0] !== 0) {
+			this.#wFocusBlurViewer[0] = 0;
+			this.dispatchEvent(new Event("focus"))
+		}
+		if (this.#wFocusBlurViewer[1] !== 0) {
+			this.#wFocusBlurViewer[1] = 0;
+			this.dispatchEvent(new Event("blur"))
 		}
 	}
 
 	maxFramerate = 0
+	#isFullscreen = false;
+	
+	get fullscreen(){
+		return this.#isFullscreen;
+	}
+	set fullscreen(v : boolean){
+		lib.symbols.window_set_fullscreen(v)
+		this.#isFullscreen = v;
+	}
+
+	toggleFullscreen(){
+		this.#isFullscreen = this.#isFullscreen?false:true
+		lib.symbols.window_set_fullscreen(this.#isFullscreen)
+	}
 
 	#vsync = true;
 	get vsync(){return this.#vsync}
@@ -271,17 +304,6 @@ export class Window {
 			lib.symbols.font_add_to_registry(encoder.encode(`${font.family}\0`),font._nativePtr)
 		}
 	}
-	
-	onresize : ((this: Window, evt: Event) => any) | null = null;
-	onmousemove : ((evt: MouseEvent) => any) | null = null;
-	onmousedown : ((evt: MouseEvent) => any) | null = null;
-	onmouseup : ((evt: MouseEvent) => any) | null = null;
-	onclick : ((evt: MouseEvent) => any) | null = null;
-	onkeydown : ((evt: KeyboardEvent) => any) | null = null;
-	onkeyup : ((evt: KeyboardEvent) => any) | null = null;
-	
-	onwheel : ((evt: MouseEvent) => any) | null = null;
-
 
 	get innerWidth(){
 		return this.#wPropertiesViewer[1]
@@ -291,6 +313,13 @@ export class Window {
 	}
 
 	constructor(width : number, height : number, title = "App", args : {vsync:boolean, maxFramerate:number}) {
+		super();
+
+		if (!Bun.isMainThread) {
+			console.error(`[CRIT_ERR] Creating the window in a worker thread is unsupported.`)
+			process.exit(-1)
+		}
+
 		if (process.platform !== "darwin") (render_thread as any).ref?.();
 		this.#wPropertiesViewer[1] = width;
 		this.#wPropertiesViewer[2] = height;
@@ -367,11 +396,11 @@ export class Window {
 						});
 					}
 				}
-
 				this.#processEvents();
+				setImmediate(loop);
 			};
 
-			setInterval(loop,0)
+			setImmediate(loop);
 		}else /* MACOS JS LOOP */ {
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {
@@ -418,83 +447,7 @@ export class Window {
 		}
 		
 	}
-	
-	addEventListener(name : string,fn : ((event:any)=>void)){
-		const pop = this.#freeIndex.pop()
-		const usedIndex = pop!=undefined?pop:this.#eIndex;
-		if (usedIndex == this.#eIndex) this.#eIndex++;
-		
-		if (name == "resize") {
-			this.#rEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		} else if (name == "mousemove") {
-			this.#mMoveEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "mousedown") {
-			this.#mDownEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "mouseup") {
-			this.#mMUpEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "wheel") {
-			this.#mWheelEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "click") {
-			this.#mClickEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "keydown") {
-			this.#keyDownEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}else if (name == "keyup") {
-			this.#keyUpEvts.set(usedIndex, {name: name, cb: fn})
-			this.#evtDetails.set(fn,usedIndex)
-		}
-	}
-	removeEventListener(name : string,fn : ((event:any)=>void)){
-		const det = this.#evtDetails.get(fn)
-		if (name == "resize") {
-			if (det != undefined) {
-				this.#rEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "mousemove") {
-			if (det != undefined) {
-				this.#mMoveEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "mousedown") {
-			if (det != undefined) {
-				this.#mDownEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "mouseup") {
-			if (det != undefined) {
-				this.#mMUpEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "wheel") {
-			if (det != undefined) {
-				this.#mWheelEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "click") {
-			if (det != undefined) {
-				this.#mClickEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "keydown") {
-			if (det != undefined) {
-				this.#keyDownEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}else if (name == "keyup") {
-			if (det != undefined) {
-				this.#keyUpEvts.delete(det)
-				this.#evtDetails.delete(fn)
-			}
-		}
-	}
-	
+
 	append(canvas : Canvas){
 		const canvasPtr = canvas._ptr
 		if (canvasPtr == undefined) {
@@ -503,7 +456,10 @@ export class Window {
 		}
 		lib.symbols.canvas_append(canvasPtr)
 	}
-	//Other Implementations to be done...
+
+	requestAnimationFrame(callback :(cb : any)=>void) : void {
+		setImmediate(()=>{requestedFrames.push(callback);})
+	}
 };
 
 {
@@ -522,17 +478,12 @@ export class Window {
 	}
 }
 
-
 let rAf;
-if (globalThis.requestAnimationFrame!) {
-	rAf = globalThis.requestAnimationFrame
-}else {
-	rAf = function requestAnimationFrame(callback :(cb : any)=>void) : void {
-		setImmediate(()=>{requestedFrames.push(callback);})
-	}
-	rAf.toString = () =>
-		`function requestAnimationFrame() { [native code] }`;
+rAf = function requestAnimationFrame(callback :(cb : any)=>void) : void {
+	setImmediate(()=>{requestedFrames.push(callback);})
 }
+rAf.toString = () =>
+	`function requestAnimationFrame() { [native code] }`;
 
 export const requestAnimationFrame = rAf
 

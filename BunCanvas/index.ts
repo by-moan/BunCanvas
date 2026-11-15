@@ -1,10 +1,13 @@
+if (!process.versions.bun) {
+    throw new Error('BunCanvas only supports Bun! Other runtimes like Node or Deno are unsupported.')
+}
+
 export { Image } from "./src/Image";
 
 export { FontFace } from "./src/FontFace";
 
 export { TextMetrics } from "./src/TextMetrics";
 
-export { Event } from "./src/Event";
 export { MouseEvent } from "./src/MouseEvent";
 export { WheelEvent } from "./src/WheelEvent";
 export { KeyboardEvent } from "./src/KeyboardEvent";

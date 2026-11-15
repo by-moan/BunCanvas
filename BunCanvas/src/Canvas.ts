@@ -12,8 +12,8 @@ import { CanvasTextAlignment, CanvasTextAlignmentArg } from "../internal/canvas/
 import { CanvasTextBaseline, CanvasTextBaselineArg } from "../internal/canvas/textBaseline.js";
 import { CanvasLineJoin, CanvasLineJoinArg } from "../internal/canvas/lineJoin.js";
 import { CanvasSmoothingQuality, CanvasSmoothingQualityArg } from "../internal/canvas/smoothingQuality.js";
+import { ptrs } from "../internal/pointers.js";
 
-const ptrs = new WeakMap();
 
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
@@ -120,18 +120,18 @@ export class CanvasGradient {
 class Render2DState {
 	lineWidth = 0;
 	globalAlpha = 1;
-	imageSmoothingQuality = "low";
-	imageSmoothingEnabled = true;
+	imageSmoothingQuality : CanvasSmoothingQualityArg = "low";
+	imageSmoothingEnabled : boolean = true;
 	fillStyle : string | CanvasGradient = "#000000";
 	strokeStyle : string | CanvasGradient = "#000000";
-	compositeOperation = "source-over";
-	filter = "none";
-	fontCss = "10px sans-serif";
-	textBaseline = "alphabetic";
-	textAlign = "start";
+	compositeOperation : CanvasBlendModeArg = "source-over";
+	filter : string = "none";
+	fontCss : string = "10px sans-serif";
+	textBaseline : CanvasTextBaselineArg = "alphabetic";
+	textAlign : CanvasTextAlignmentArg = "start";
 	lineDash : number[] = []
-	lineDashOffset = 0;
-	lineJoin = "miter";
+	lineDashOffset : number = 0;
+	lineJoin : CanvasLineJoinArg = "miter";
 
 	constructor(other? : Render2DState){
 		if (other instanceof Render2DState) {
@@ -209,9 +209,11 @@ export class CanvasRenderingContext2D {
 	}
 	
 	set font(css: string) {
-		this.#currentState.fontCss = css.trim().toLowerCase();
 		// The native side will parse the CSS string, resolve a typeface and cache it.
-		lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${this.#currentState.fontCss}\0`));
+		const normalized = css.trim().toLowerCase()
+		if (lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${normalized}\0`))) {
+			this.#currentState.fontCss = normalized;
+		}
 	}
 	get font(): string { 
 		return this.#currentState.fontCss;
@@ -231,11 +233,10 @@ export class CanvasRenderingContext2D {
 		return this.#currentState.fillStyle
 	}
 	set strokeStyle(style : string | CanvasGradient) {
-		// lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
 		if (style == this.#currentState.strokeStyle) return;
 		let res = false;
 		if (typeof style === "string") {
-			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encoder.encode(`${style.trim()}\0`))
+			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encodeCString(style.trim()))
 		} else if (style instanceof CanvasGradient) {
 			res = this.#setStyleGradient(style, true);
 		}
@@ -362,10 +363,12 @@ export class CanvasRenderingContext2D {
 		}
 	}
 	fill(path? : Path2D){
-		lib.symbols.canvas_path_fill(ptrs.get(this), path?path.ptr:undefined)
+		let _ptr = path?ptrs.get(path):null;
+		lib.symbols.canvas_path_fill(ptrs.get(this), _ptr)
 	}
-	stroke(path? : Path2D){
-		lib.symbols.canvas_path_stroke(ptrs.get(this), path?path.ptr:undefined)
+	stroke(path : Path2D){
+		let _ptr = path?ptrs.get(path):null;
+		lib.symbols.canvas_path_stroke(ptrs.get(this), _ptr)
 	}
 	set shadowBlur(blur : number){
 		lib.symbols.canvas_set_shadow_blur(ptrs.get(this),blur)
@@ -608,9 +611,15 @@ export class Canvas {
 		this.#dim[0] = w;
 		this.#dim[1] = h;
 
-		const {gpu = true} = options??{}
+		let ptr : bigint | Pointer | null; 
 
-		let ptr = lib.symbols.canvas_create(w,h,gpu);
+		if (Bun.isMainThread) {
+			ptr = lib.symbols.canvas_create(w,h,options?options.gpu:true);
+		} else {
+			ptr = lib.symbols.canvas_create(w,h,false);
+		}
+
+		
 		ptrs.set(this,ptr)
 		canvasFinalizationRegistry.register(this,ptr)
 	}
@@ -622,9 +631,7 @@ export class Canvas {
 	set width(v : string){
 		this.#dim[0] = Number.parseInt(v)
 		this.#rCapture.cb()
-		// console.log("before")
 		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
-		// console.log("after")
 	}
 	set height(v : string){
 		this.#dim[1] = Number.parseInt(v)

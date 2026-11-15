@@ -245,10 +245,12 @@ static _Float64_t mMoveViewer[9]{};
 static _Float64_t mClickViewer[9]{};
 static _Float64_t mDownViewer[9]{};
 static _Float64_t mUpViewer[9]{};
+static _Float64_t mWheelViewer[5]{};
 static int32_t kDownViewer[7]{};
 static int32_t kUpViewer[7]{};
 
-static _Float64_t mWheelViewer[5]{};
+static int32_t wFocusBlurViewer[2]{};
+
 
 std::mutex frameMtx;
 std::condition_variable frameCv;
@@ -264,6 +266,8 @@ extern "C" {
     WINDOWS_EXPORT int32_t* get_kUpViewer(){return kUpViewer;}
 
     WINDOWS_EXPORT _Float64_t* get_mWheelViewer(){return mWheelViewer;}
+
+    WINDOWS_EXPORT int32_t* get_wFocusBlurViewer(){return wFocusBlurViewer;}
 
     WINDOWS_EXPORT void signal_frame_ready() {
         {

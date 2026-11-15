@@ -717,7 +717,7 @@ extern "C" {
             //This should lock at all costs. Otherwise it will cause a segfault
             //because the surface becomes invalid for a brief period
             nonapple(std::lock_guard<std::mutex> lock(obj->mutex));
-            obj->resize(std::clamp(w, 1, 2147483647),std::clamp(h, 1, 2147483647));
+            obj->resize(std::max(w, 1),std::max(h, 1));
         }
     }
     

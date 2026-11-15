@@ -1,7 +1,8 @@
-bool pollingEvents = false;
-
-bool pendingResize = false;
 bool currentVsync = true;
+
+int pFullscreenX{},pFullscreenY{};
+int pFullscreenW{},pFullscreenH{};
+
 static std::mutex renderMutex;
 
 void render_composited_canvases(SkCanvas* targetCanvas);
@@ -68,12 +69,42 @@ static void install_win32_modal_render_hook(GLFWwindow* win) {
 }
 #endif
 
+//Helper to get where the window is currently.
+GLFWmonitor* getCurrentMonitor(GLFWwindow* window) {
+    int winX, winY, winWidth, winHeight;
+    glfwGetWindowPos(window, &winX, &winY);
+    glfwGetWindowSize(window, &winWidth, &winHeight);
+
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+
+    GLFWmonitor* bestMonitor = glfwGetPrimaryMonitor();
+    int maxOverlap = 0;
+
+    for (int i = 0; i < monitorCount; i++) {
+        int monX, monY;
+        glfwGetMonitorPos(monitors[i], &monX, &monY);
+        const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
+
+        // Calculate intersection rectangle between the window and this monitor
+        int overlapX = std::max(0, std::min(winX + winWidth, monX + mode->width) - std::max(winX, monX));
+        int overlapY = std::max(0, std::min(winY + winHeight, monY + mode->height) - std::max(winY, monY));
+        int overlapArea = overlapX * overlapY;
+
+        if (overlapArea > maxOverlap) {
+            maxOverlap = overlapArea;
+            bestMonitor = monitors[i];
+        }
+    }
+
+    return bestMonitor;
+}
+
 void window_resize_callback(GLFWwindow* window, int w, int h) {
     if (w <= 0 || h <= 0) return;
 
     {
         std::lock_guard<std::mutex> lock(renderMutex);
-        pendingResize = false;
         width = w;
         height = h;
         if (renderThreadContext && renderThreadContext->context) {
@@ -95,7 +126,6 @@ double prevX = 0;
 double prevY = 0;
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (pollingEvents == true) return;
     mMoveViewer[0] = true;
     mMoveViewer[1] = xpos;
     mMoveViewer[2] = ypos;
@@ -107,8 +137,6 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 
 bool clickStarted = false;
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (pollingEvents == true) return;
-    
     if (action == GLFW_PRESS) { // Indicates that the mouse was pressed down.
         clickStarted = (button == GLFW_MOUSE_BUTTON_LEFT) ? true : false;
         mClickViewer[4] += (button == GLFW_MOUSE_BUTTON_LEFT && !((int)mClickViewer[4]&0b1)) ? 0b1 : 0;
@@ -206,6 +234,13 @@ void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) 
     mWheelViewer[0] = true;
     mWheelViewer[1] = xoffset;
     mWheelViewer[2] = yoffset;
+}
+void window_focus_callback(GLFWwindow* window, int focused) {
+    if (focused) {
+        wFocusBlurViewer[0] = true;
+    }else {
+        wFocusBlurViewer[1] = true;
+    }
 }
 
 void render_composited_canvases(SkCanvas* targetCanvas) {
@@ -305,6 +340,7 @@ extern "C" {
         glfwSetWindowRefreshCallback(window, [](GLFWwindow*) {
             present_composited_frame();
         });
+        glfwSetWindowFocusCallback(window, window_focus_callback);
 
         if (!VK::initCore()) {
             std::cerr << "Failed to initialize Vulkan core!\n";
@@ -447,5 +483,59 @@ extern "C" {
         VK::shutdown();
         glfwDestroyWindow(window);
         glfwTerminate();
+    }
+
+    // WINDOWS_EXPORT void window_toggle_fullscreen() {
+    //     if (!isFullscreen) {
+    //         GLFWmonitor* monitor = getCurrentMonitor(window);
+    //         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    //         glfwGetWindowPos(window,&pFullscreenX,&pFullscreenY);
+    //         // Switch to fullscreen
+    //         glfwSetWindowMonitor(
+    //             window, 
+    //             monitor, 
+    //             0, 0, 
+    //             mode->width, mode->height, 
+    //             mode->refreshRate
+    //         );
+    //     } else {
+    //         // Switch back to windowed mode (e.g., 1280x720 at position 100, 100)
+    //         glfwSetWindowMonitor(
+    //             window, 
+    //             NULL, 
+    //             pFullscreenX, pFullscreenY, 
+    //             1280, 720, 
+    //             GLFW_DONT_CARE
+    //         );
+    //     }
+    // }
+    WINDOWS_EXPORT void window_set_fullscreen(int32_t value) {
+        bool enable = (value != 0);
+
+        if (enable) {
+            // Save windowed size on ALL platforms (glfwGetWindowSize works on Wayland)
+            glfwGetWindowSize(window, &pFullscreenW, &pFullscreenH);
+
+            if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+                GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+                const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+                glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+            } else {
+                GLFWmonitor* monitor = getCurrentMonitor(window);
+                const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+                glfwGetWindowPos(window, &pFullscreenX, &pFullscreenY);
+                glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+            }
+        } else {
+            int restoreW = (pFullscreenW > 0) ? pFullscreenW : 800;
+            int restoreH = (pFullscreenH > 0) ? pFullscreenH : 600;
+
+            if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+                glfwSetWindowMonitor(window, NULL, 0, 0, restoreW, restoreH, GLFW_DONT_CARE);
+                glfwSetWindowSize(window, restoreW, restoreH);
+            } else {
+                glfwSetWindowMonitor(window, NULL, pFullscreenX, pFullscreenY, restoreW, restoreH, GLFW_DONT_CARE);
+            }
+        }
     }
 }

@@ -1,3 +1,6 @@
+export type KeyboardEventKey = "Unknown" | " " | "'" | "," | "-" | "." | "/" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | ";" | "=" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | "[" | "\\" | "]" | "`" | "World1" | "World2" | "Escape" | "Enter" | "Tab" | "Backspace" | "Insert" | "Delete" | "ArrowRight" | "ArrowLeft" | "ArrowDown" | "ArrowUp" | "PageUp" | "PageDown" | "Home" | "End" | "CapsLock" | "ScrollLock" | "NumLock" | "PrintScreen" | "Pause" | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12" | "F13" | "F14" | "F15" | "F16" | "F17" | "F18" | "F19" | "F20" | "F21" | "F22" | "F23" | "F24" | "F25" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "." | "/" | "*" | "-" | "+" | "Enter" | "=" | "Shift" | "Control" | "Alt" | "Meta" | "Control" | "Alt" | "Meta" | "ContextMenu" | "\"" | "<" | "_" | ">" | "?" | ")" | "!" | "@" | "#" | "$" | "%" | "^" | "&" | "*" | "(" | ":" | "+" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "{" | "|" | "}" | "~" | "World1" | "World2" | "Escape" | "Enter" | "Tab" | "Backspace" | "Insert" | "Delete" | "ArrowRight" | "ArrowLeft" | "ArrowDown" | "ArrowUp" | "PageUp" | "PageDown" | "Home" | "End" | "CapsLock" | "ScrollLock" | "NumLock" | "PrintScreen" | "Pause" | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "." | "/" | "*" | "-" | "+" | "Enter" | "=" | "Control" | "Alt" | "Meta" | "Control" | "Alt" | "Meta" | "ContextMenu"
+export type KeyboardEventCode = "Unknown" | "Space" | "Quote" | "Comma" | "Minus" | "Period" | "Slash" | "Digit0" | "Digit1" | "Digit2" | "Digit3" | "Digit4" | "Digit5" | "Digit6" | "Digit7" | "Digit8" | "Digit9" | "Semicolon" | "Equal" | "KeyA" | "KeyB" | "KeyC" | "KeyD" | "KeyE" | "KeyF" | "KeyG" | "KeyH" | "KeyI" | "KeyJ" | "KeyK" | "KeyL" | "KeyM" | "KeyN" | "KeyO" | "KeyP" | "KeyQ" | "KeyR" | "KeyS" | "KeyT" | "KeyU" | "KeyV" | "KeyW" | "KeyX" | "KeyY" | "KeyZ" | "BracketLeft" | "Backslash" | "BracketRight" | "Backquote" | "IntlBackslash" | "Escape" | "Enter" | "Tab" | "Backspace" | "Insert" | "Delete" | "ArrowRight" | "ArrowLeft" | "ArrowDown" | "ArrowUp" | "PageUp" | "PageDown" | "Home" | "End" | "CapsLock" | "ScrollLock" | "NumLock" | "PrintScreen" | "Pause" | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12" | "F13" | "F14" | "F15" | "F16" | "F17" | "F18" | "F19" | "F20" | "F21" | "F22" | "F23" | "F24" | "F25" | "Numpad0" | "Numpad1" | "Numpad2" | "Numpad3" | "Numpad4" | "Numpad5" | "Numpad6" | "Numpad7" | "Numpad8" | "Numpad9" | "NumpadDecimal" | "NumpadDivide" | "NumpadMultiply" | "NumpadSubtract" | "NumpadAdd" | "NumpadEnter" | "NumpadEqual" | "ShiftLeft" | "ControlLeft" | "AltLeft" | "MetaLeft" | "ShiftRight" | "ControlRight" | "AltRight" | "MetaRight" | "ContextMenu"
+
 export interface KeyboardEventInit extends EventInit {
 	// UIEventInit properties
 	detail?: number;
@@ -20,8 +23,8 @@ export interface KeyboardEventInit extends EventInit {
 	modifierSymbolLock?: boolean;
 	
 	// KeyboardEventInit properties
-	key?: string;
-	code?: string;
+	key?: KeyboardEventKey;
+	code?: KeyboardEventCode;
 	location?: number;
 	repeat?: boolean;
 	isComposing?: boolean;
@@ -36,11 +39,11 @@ export class KeyboardEvent extends Event {
 	
 	// Private backing fields for runtime immutability
 	#altKey: boolean;
-	#code: string;
+	#code: KeyboardEventCode;
 	#ctrlKey: boolean;
 	#detail: number;
 	#isComposing: boolean;
-	#key: string;
+	#key: KeyboardEventKey;
 	#location: number;
 	#metaKey: boolean;
 	#repeat: boolean;
@@ -56,11 +59,11 @@ export class KeyboardEvent extends Event {
 		});
 		
 		this.#altKey = Boolean(eventInitDict.altKey);
-		this.#code = String(eventInitDict.code ?? "");
+		this.#code = String(eventInitDict.code ?? "") as KeyboardEventCode;
 		this.#ctrlKey = Boolean(eventInitDict.ctrlKey);
 		this.#detail = Number(eventInitDict.detail ?? 0);
 		this.#isComposing = Boolean(eventInitDict.isComposing);
-		this.#key = String(eventInitDict.key ?? "");
+		this.#key = String(eventInitDict.key ?? "") as KeyboardEventKey;
 		this.#location = Number(eventInitDict.location ?? KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
 		this.#metaKey = Boolean(eventInitDict.metaKey);
 		this.#repeat = Boolean(eventInitDict.repeat);
@@ -90,7 +93,7 @@ export class KeyboardEvent extends Event {
 		return this.#altKey;
 	}
 	
-	get code(): string {
+	get code(): KeyboardEventCode {
 		return this.#code;
 	}
 	
@@ -102,7 +105,7 @@ export class KeyboardEvent extends Event {
 		return this.#isComposing;
 	}
 	
-	get key(): string {
+	get key(): KeyboardEventKey {
 		return this.#key;
 	}
 	
@@ -135,4 +138,3 @@ export class KeyboardEvent extends Event {
 		return this.#modifiers.get(keyArg) ?? false;
 	}
 }
-

@@ -1,4 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D } from "./BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D, KeyboardEvent } from "./BunCanvas";
 
 
 const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
@@ -118,7 +118,7 @@ class Ball {
         ctx.translate(this.x, this.y);
         
         // Glow & Color
-        ctx.globalCompositeOperation = "multiply"
+        // ctx.globalCompositeOperation = "multiply"
         ctx.fillStyle = this.color;
         ctx.fill(Ball.BallPath);
         
@@ -343,15 +343,32 @@ function step(now) {
         frameCount = 0;
         lastFpsUpdate = now;
     }
-    requestAnimationFrame(step);
+    window.requestAnimationFrame(step);
 }
 
 // Seed initial balls
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 1000 ; i++) {
     const rx = 100 + Math.random() * (window.innerWidth - 200);
     const ry = 50 + Math.random() * (window.innerHeight / 2);
     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));
 }
 
+window.onfocus = ()=>{
+    console.log("window is focused")
+    window.maxFramerate = 165;
+}
+window.onblur = ()=>{
+    console.log("window is blurred")
+    window.maxFramerate = 15;
+}
+
+/**
+ * 
+ * @param {KeyboardEvent} evt 
+ */
+window.onkeydown = (evt) => {
+    if (evt.key == "F11") window.toggleFullscreen()
+}
+
 // Start Animation Frame Loop
-requestAnimationFrame(step);
+window.requestAnimationFrame(step);

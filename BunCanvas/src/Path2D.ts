@@ -1,3 +1,4 @@
+import { ptrs } from "../internal/pointers.js";
 import { lib } from "../internal/symbols.js";
 import { ptr, Pointer } from "bun:ffi"
 
@@ -5,13 +6,12 @@ const p2dFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.path2d_destroy(ptr);
 });
 
-const ptrs = new WeakMap();
-
 export class Path2D {
-        constructor(path : Path2D);
-        constructor(path : Path2D | undefined){
+        constructor(path? : Path2D){
             if (path && path instanceof Path2D) {
-                let _ptr = lib.symbols.path2d_create_from_copy(path.ptr);
+                let ptr = ptrs.get(path);
+                if (!ptr) return;
+                let _ptr = lib.symbols.path2d_create_from_copy(ptr);
                 ptrs.set(this,_ptr);
                 p2dFinalizationRegistry.register(this,_ptr)
 
@@ -60,9 +60,9 @@ export class Path2D {
             lib.symbols.path2d_close(ptrs.get(this))
         }
 
-        get ptr(){
-            return ptrs.get(this)
-        }
+        // get ptr(){
+        //     return ptrs.get(this)
+        // }
     };
 
     const proto = Path2D.prototype;

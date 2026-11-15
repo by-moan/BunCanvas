@@ -74,6 +74,10 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
+	get_wFocusBlurViewer:{
+		args: [],
+		returns: "ptr",
+	},
 	signal_frame_ready:{
 		args: [],
 		returns: "void",
@@ -84,6 +88,14 @@ export const lib = dlopen(dlPath, {
 	},
 	create_window: {
 		args: ["int","int", "cstring"],
+		returns: "void",
+	},
+	// window_toggle_fullscreen: {
+	// 	args: [],
+	// 	returns: "void",
+	// },
+	window_set_fullscreen: {
+		args: ["bool"],
 		returns: "void",
 	},
 	update_window: {

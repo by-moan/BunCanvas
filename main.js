@@ -29,6 +29,7 @@ if (canvas) {
         const pos = getPos(e);
         const evt = { x: pos.x, y: pos.y, button: e.button, type: 'mousedown' };
         if (canvas.onmousedown) canvas.onmousedown(evt);
+        
     });
     
     window.addEventListener('mousemove', (e) => {

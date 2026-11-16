@@ -237,9 +237,9 @@ void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) 
 }
 void window_focus_callback(GLFWwindow* window, int focused) {
     if (focused) {
-        wFocusBlurViewer[0] = true;
+        wPropertiesViewer[4] = true;
     }else {
-        wFocusBlurViewer[1] = true;
+        wPropertiesViewer[5] = true;
     }
 }
 

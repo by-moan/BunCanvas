@@ -15,12 +15,13 @@ try {
 	nativeLib = req.resolve(`@buncanvas/native-${process.platform}-${process.arch}`)
 }
 
-console.log(nativeLib)
-
 if(!nativeLib) {
 	console.error(`BunCanvas.${process.arch}.${suffix} binary was not found in the working directory!`)
 	process.exit(-1)
 }
+
+console.info(`[INFO] Chosen native library: ${nativeLib}`)
+
 
 export const dlPath = nativeLib
 
@@ -74,10 +75,6 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
-	get_wFocusBlurViewer:{
-		args: [],
-		returns: "ptr",
-	},
 	signal_frame_ready:{
 		args: [],
 		returns: "void",
@@ -90,10 +87,6 @@ export const lib = dlopen(dlPath, {
 		args: ["int","int", "cstring"],
 		returns: "void",
 	},
-	// window_toggle_fullscreen: {
-	// 	args: [],
-	// 	returns: "void",
-	// },
 	window_set_fullscreen: {
 		args: ["bool"],
 		returns: "void",
@@ -294,26 +287,6 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr","bool"],
 		returns: "bool",
 	},
-	// canvas_create_conic_gradient: {
-	// 	args: ["float","float","float"],
-	// 	returns: "ptr",
-	// },
-	// canvas_create_linear_gradient: {
-	// 	args: ["float","float","float","float"],
-	// 	returns: "ptr",
-	// },
-	// canvas_create_radial_gradient: {
-	// 	args: ["float","float","float","float","float","float"],
-	// 	returns: "ptr",
-	// },
-	// canvas_gradient_add_color_stop: {
-	// 	args: ["ptr", "float", "cstring"],
-	// 	returns: "bool",
-	// },
-	// canvas_gradient_destroy: {
-	// 	args: ["ptr"],
-	// 	returns: "void",
-	// },
 	canvas_get_transform: {
 		args: ["ptr", "ptr"],
 		returns: "void",

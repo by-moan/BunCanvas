@@ -90,14 +90,13 @@ export class Window extends EventTarget {
     get onblur() { return this.#wheelHandler; }
     set onblur(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('blur', this.#wheelHandler, fn); }
 
-	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 4 * 4));
+	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 6 * 4));
 	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
 	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
 	#mDownViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mDownViewer()!,0, 9 * 8));
 	#mUpViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mUpViewer()!,0, 9 * 8));
 	#kDownViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kDownViewer()!,0, 7 * 4));
 	#kUpViewer = new Int32Array(toArrayBuffer(lib.symbols.get_kUpViewer()!,0, 7 * 4));
-	#wFocusBlurViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wFocusBlurViewer()!,0, 2 * 4));
 	
 	#mWheelViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mWheelViewer()!,0, 5 * 8));
 
@@ -265,12 +264,12 @@ export class Window extends EventTarget {
 			this.dispatchEvent(evt)
 		}
 		
-		if (this.#wFocusBlurViewer[0] !== 0) {
-			this.#wFocusBlurViewer[0] = 0;
+		if (this.#wPropertiesViewer[4] !== 0) {
+			this.#wPropertiesViewer[4] = 0;
 			this.dispatchEvent(new Event("focus"))
 		}
-		if (this.#wFocusBlurViewer[1] !== 0) {
-			this.#wFocusBlurViewer[1] = 0;
+		if (this.#wPropertiesViewer[5] !== 0) {
+			this.#wPropertiesViewer[5] = 0;
 			this.dispatchEvent(new Event("blur"))
 		}
 	}

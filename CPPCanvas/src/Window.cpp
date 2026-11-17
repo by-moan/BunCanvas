@@ -382,7 +382,7 @@ extern "C" {
                 VK::recreateSwapchain(width, height, currentVsync);
                 rebuildSwapchainSurfaces();
             }
-
+            onrefresh(0);
             present_composited_frame();
             frameReady = false;
         }

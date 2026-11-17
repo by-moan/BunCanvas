@@ -370,6 +370,5 @@ window.onblur = ()=>{
 window.onkeydown = (evt) => {
     if (evt.key == "F11") window.toggleFullscreen()
 }
-
 // Start Animation Frame Loop
 window.requestAnimationFrame(step);

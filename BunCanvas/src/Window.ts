@@ -378,10 +378,7 @@ export class Window extends EventTarget {
 					}
 
 					if (!pendingFrame) {
-						pendingFrame = true;
-
-						setImmediate(() => {
-							const queueLen = requestedFrames.length;
+						const queueLen = requestedFrames.length;
 							if (queueLen > 0) {
 								// Atomic swap avoids .splice() O(N) array re-indexing
 								const framesToProcess = requestedFrames;
@@ -391,15 +388,13 @@ export class Window extends EventTarget {
 								}
 							}
 							lib.symbols.canvas_flush_gpu();
-							pendingFrame = false;
-						});
 					}
 				}
 				this.#processEvents();
 				setImmediate(loop);
 			};
 
-			setImmediate(loop);
+			loop()
 		}else /* MACOS JS LOOP */ {
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {

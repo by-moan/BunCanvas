@@ -327,6 +327,10 @@ export const lib = dlopen(dlPath, {
 		args: ["ptr", "cstring", "ptr"],
 		returns: "void",
 	},
+	canvas_submit_batch: {
+		args: ["ptr", "ptr", "int"],
+		returns: "void",
+	},
 	canvas_destroy: {
 		args: ["ptr"],
 		returns: "void",

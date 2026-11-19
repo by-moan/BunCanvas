@@ -2,36 +2,8 @@ SkPaint g_clearColor;
 SkPaint g_noAlphaClearColor;
 SkPaint pImageDataColor;
 
-class BunCanvas;
-
-enum class GradientType {
-    Linear,
-    Radial,
-    Conic
-};
-
-enum class CanvasTextBaseLine {
-    Top,
-    Hanging,
-    Middle,
-    Alphabetic,
-    Ideographic,
-    Bottom,
-};
-
-enum class CanvasTextAlignment {
-    Left,
-    Right,
-    Center,
-    Start,
-    End
-};
-
-enum class CanvasSmoothingQuality {
-    Low,
-    Medium,
-    High,
-};
+#include "./Canvas/Enums.cpp"
+#include "./Canvas/Structs.cpp"
 
 struct ColorStop {
     float offset;      // 0..1
@@ -113,6 +85,8 @@ class Rendering2DState {
         imageColor.setImageFilter(nullptr);
     };
 };
+
+class BunCanvas;
 
 class BunCanvasRenderingContext2D {
     sk_sp<SkSurface> sfc = nullptr;
@@ -204,6 +178,8 @@ struct RetiredTexture {
 class BunCanvas {
     bool useGPU = true;
     public:
+
+    size_t pendingOps{0};
     
     static constexpr uint64_t MAGIC = 0xBCA1155A;
     uint64_t magic = MAGIC;
@@ -251,6 +227,7 @@ class BunCanvas {
                 );
                 hasBackendTex = true;
             }
+            
         }
         if (!surface) {
             std::cout << "rasted used!\n";
@@ -589,7 +566,7 @@ extern "C" {
         // obj->ctx = obj->surface->getCanvas();
     }
     
-    
+    #pragma region CanvasRenderingContext2D
     WINDOWS_EXPORT bool canvas_set_fill_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
@@ -612,6 +589,7 @@ extern "C" {
     ) {
         return setCanvasGradientInternal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, true);
     }
+    
     WINDOWS_EXPORT bool canvas_set_stroke_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
@@ -743,6 +721,7 @@ extern "C" {
         );
         obj->currentState.path.moveTo(x,y);
     }
+    
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -811,6 +790,7 @@ extern "C" {
         );
         obj->currentState.path.bezierTo(x1,y1,x2,y2,x3,y3);
     }
+    
     WINDOWS_EXPORT void canvas_path_quad_to(void* canvasObj, float x1, float y1, float x2, float y2) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -822,6 +802,7 @@ extern "C" {
         );
         obj->currentState.path.quadraticCurveTo(x1,y1,x2,y2);
     }
+    
     WINDOWS_EXPORT void canvas_path_fill(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -846,6 +827,7 @@ extern "C" {
         }
         (*obj)()->drawPath(finalPath, fColor);
     }
+    
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
 
@@ -886,6 +868,7 @@ extern "C" {
 
         (*obj)()->drawPath(finalPath, strokePaint);
     }
+    
     WINDOWS_EXPORT void canvas_path_clip(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -922,6 +905,7 @@ extern "C" {
         );
         obj->currentState.path.rect(x,y,w,h);
     }
+    
     WINDOWS_EXPORT void canvas_path_roundrect(void* canvasObj, float x, float y, float w, float h, float radii) {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
@@ -932,6 +916,7 @@ extern "C" {
         );
         obj->currentState.path.roundRect(x,y,w,h,radii);
     }
+    
     WINDOWS_EXPORT void canvas_path_roundrect_array(void* canvasObj, float x, float y, float w, float h, float* radii, int len) {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
@@ -1118,7 +1103,6 @@ extern "C" {
     //             kPremul_SkAlphaType
     //         );
     //         size_t rowBytes = w * 4;
-    
     //         if (obj->owner->hasBackendTex) {
     //             auto _img = SkImages::BorrowTextureFrom(
     //                 renderThreadContext->context.get(),
@@ -1148,14 +1132,10 @@ extern "C" {
     //                 y, 
     //                 SkImage::CachingHint::kDisallow_CachingHint
     //             );
-    
     //             return false;
     //         }
-    
-    
     //     }
     // }
-    
     
     WINDOWS_EXPORT bool canvas_put_image_data(
         void* canvasObj,
@@ -1263,6 +1243,7 @@ extern "C" {
 
         return true;
     }
+    
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
         float _a = std::clamp(a, 0.0f, 1.0f);
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1278,6 +1259,7 @@ extern "C" {
         obj->currentState.shadowBlurColor.setAlphaf(_a);
         return _a;
     }
+    
     WINDOWS_EXPORT void canvas_save(void* canvasObj){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1289,6 +1271,7 @@ extern "C" {
         );
         obj->save();
     }
+    
     WINDOWS_EXPORT void canvas_restore(void* canvasObj){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1300,6 +1283,7 @@ extern "C" {
         );
         obj->restore();
     }
+    
     WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1311,6 +1295,7 @@ extern "C" {
         );
         (*obj)()->translate(x,y);
     }
+    
     WINDOWS_EXPORT void canvas_rotate(void* canvasObj, float deg){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1662,6 +1647,7 @@ extern "C" {
 
         // SkImageFilters::Compose
     }
+    
     WINDOWS_EXPORT void canvas_reset_transform(void* ctxPtr){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
@@ -1751,4 +1737,65 @@ extern "C" {
         fMetrics[10] = ctx->currentState.textBaseline == CanvasTextBaseLine::Hanging;
         fMetrics[11] = ctx->currentState.textBaseline == CanvasTextBaseLine::Ideographic;
     }
+
+    WINDOWS_EXPORT void canvas_submit_batch(void* ctxPtr, const uint8_t* batch, int byteLength) {
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+
+        size_t offset = 0;
+        while (offset < byteLength) {
+            offset = (offset + 7) & ~7; // Match 8-byte alignment
+
+            //Flush to prevent overallocation of GrOp's 
+            if (++ctx->owner->pendingOps >= 8192) {
+                ctx->owner->pendingOps = 0;
+
+                #ifndef __APPLE__
+                if (gpuContextReady && ctx->owner->hasBackendTex && ctx->owner->surface) {
+                    mainThreadCtx->context->flush(ctx->owner->surface.get());
+                }
+                #endif
+            }
+
+            CanvasBatchOperationType op = *reinterpret_cast<const CanvasBatchOperationType*>(batch + offset);
+
+            switch (op) {
+                case CanvasBatchOperationType::FillRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::FillRect*>(batch + offset);
+                    SkPaint fColor = ctx->currentState.fillColor;
+                    fColor.setAlphaf(ctx->currentState.fillColor.getAlphaf()*ctx->currentState.globalAlpha);
+                    if(ctx->currentState.shadowBlurAmount > 0.01f) {
+                        SkPaint shColor = ctx->currentState.shadowBlurColor;
+                        auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
+                        shColor.setAlphaf(_af);
+                        (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), shColor);
+                    }
+                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), fColor);
+                    offset += sizeof(CanvasBatchCommands::FillRect);
+                    break;
+                }
+                case CanvasBatchOperationType::SetFillStyleColor: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyle*>(batch + offset);
+                    auto col = parseCssColor(cmd->color);
+                    if (col){
+                        ctx->currentState.fillColor.setColor4f(*col);
+                        ctx->currentState.fillColor.setShader(nullptr);
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetFillStyle);
+                    break;
+                }
+                case CanvasBatchOperationType::ClearRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::ClearRect*>(batch + offset);
+                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), ctx->clearColor);
+                    offset += sizeof(CanvasBatchCommands::ClearRect);
+                    break;
+                }
+
+                default: {
+                    return;
+                }
+            }
+        }
+    }
+    #pragma endregion
 }

@@ -291,10 +291,10 @@ targetPtr* validated(void* ptr){
 #include "src/Audio.cpp"
 
 
+#include "src/Font.cpp"
 #include "src/KeywordColors.h"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"
-#include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Path2D.cpp"
 #include "src/Canvas.cpp"

@@ -13,6 +13,7 @@ import { CanvasTextBaseline, CanvasTextBaselineArg } from "../internal/canvas/te
 import { CanvasLineJoin, CanvasLineJoinArg } from "../internal/canvas/lineJoin.js";
 import { CanvasSmoothingQuality, CanvasSmoothingQualityArg } from "../internal/canvas/smoothingQuality.js";
 import { ptrs } from "../internal/pointers.js";
+import { CanvasBatchOperationType } from "../internal/native/enums.js";
 
 
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
@@ -173,6 +174,61 @@ class Render2DState {
 }
 
 export class CanvasRenderingContext2D {
+	#rawBuf = new ArrayBuffer(256 * 1024);
+	static readonly #MAX_BUF_SIZE = 4 * 1024 * 1024; // 4 MB cap
+
+	#alloc(bytes: number): number {
+		let off = (this.#byteOffset + 7) & ~7;
+		if (off + bytes > this.#rawBuf.byteLength) {
+			this.flush();
+			off = 0;
+
+			// Grow buffer for future frames if we hit the ceiling
+			if (this.#rawBuf.byteLength < CanvasRenderingContext2D.#MAX_BUF_SIZE) {
+				console.log("increase!")
+
+				this.#rawBuf = new ArrayBuffer(this.#rawBuf.byteLength * 2);
+				this.#i32 = new Int32Array(this.#rawBuf);
+				this.#f64 = new Float64Array(this.#rawBuf);
+				this.#u64 = new BigUint64Array(this.#rawBuf);
+			}
+		}
+		this.#byteOffset = off + bytes;
+		return off;
+	}
+	#i32 = new Int32Array(this.#rawBuf);
+	#f64 = new Float64Array(this.#rawBuf);
+	#u64 = new BigUint64Array(this.#rawBuf);
+	#byteOffset = 0;
+	#retained : any[] = [];
+
+	#flushHandle : NodeJS.Immediate | null = null;
+
+	#flushBound = () => this.flush();
+
+	flush() {
+		if (this.#flushHandle !== null) {
+			clearImmediate(this.#flushHandle);
+			this.#flushHandle = null;
+		}
+		if (this.#byteOffset === 0) return;
+
+		lib.symbols.canvas_submit_batch(
+			ptrs.get(this),
+			ptr(this.#rawBuf),
+			this.#byteOffset
+		);
+
+		this.#byteOffset = 0;
+		this.#retained.length = 0;
+	}
+
+	#scheduleFlush() {
+		if (this.#flushHandle === null) {
+			this.#flushHandle = setImmediate(this.#flushBound);
+		}
+	}
+
 	#currentState : Render2DState = new Render2DState();
 	#savedState : Render2DState = new Render2DState();
 	#owner : Canvas;
@@ -221,13 +277,29 @@ export class CanvasRenderingContext2D {
 	
 	set fillStyle(style : string | CanvasGradient) {
 		if (style == this.#currentState.fillStyle) return;
-		let res = false;
+		
 		if (typeof style === "string") {
-			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
+			if (isValidColor(style)){
+				this.#currentState.fillStyle = style;
+				const encoded = encodeCString(style)
+				// this.#retained.push(encoded)
+
+				let off = this.#alloc(16);
+
+				this.#i32[off >> 2] = CanvasBatchOperationType.SetFillStyleColor;
+				this.#u64[(off + 8) >> 3] = BigInt(ptr(encoded));
+
+				this.#scheduleFlush();
+			}
 		} else if (style instanceof CanvasGradient) {
-			res = this.#setStyleGradient(style, false);
 		}
-		if (res) this.#currentState.fillStyle = style;
+		// let res = false;
+		// if (typeof style === "string") {
+		// 	res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
+		// } else if (style instanceof CanvasGradient) {
+		// 	res = this.#setStyleGradient(style, false);
+		// }
+		// if (res) this.#currentState.fillStyle = style;
 	}
 	get fillStyle(){
 		return this.#currentState.fillStyle
@@ -307,13 +379,35 @@ export class CanvasRenderingContext2D {
 	}
 	
 	fillRect(x : number,y : number,w : number,h : number){
-		lib.symbols.canvas_fill_rect(ptrs.get(this),x,y,w,h)
+		// lib.symbols.canvas_fill_rect(ptrs.get(this),x,y,w,h)
+
+		// Ensure 8-byte alignment for 64-bit pointers & doubles
+		let off = this.#alloc(40);
+
+		this.#i32[off >> 2] = CanvasBatchOperationType.FillRect;
+		this.#f64[(off + 8) >> 3] = x;
+		this.#f64[(off + 16) >> 3] = y;
+		this.#f64[(off + 24) >> 3] = w;
+		this.#f64[(off + 32) >> 3] = h;
+
+		// this.#byteOffset = off + 40;
+		this.#scheduleFlush();
 	}
 	strokeRect(x : number,y : number,w : number,h : number){
 		lib.symbols.canvas_stroke_rect(ptrs.get(this),x,y,w,h)
 	}
 	clearRect(x : number, y : number, w : number, h : number){
-		lib.symbols.canvas_clear_rect(ptrs.get(this),x,y,w,h)
+		// lib.symbols.canvas_clear_rect(ptrs.get(this),x,y,w,h)
+		let off = this.#alloc(40);
+
+		this.#i32[off >> 2] = CanvasBatchOperationType.ClearRect;
+		this.#f64[(off + 8) >> 3] = x;
+		this.#f64[(off + 16) >> 3] = y;
+		this.#f64[(off + 24) >> 3] = w;
+		this.#f64[(off + 32) >> 3] = h;
+
+		// this.#byteOffset = off + 40;
+		this.#scheduleFlush();
 	}
 	fillText(text:string,x:number,y:number, maxWidth = -1){
 		lib.symbols.canvas_fill_text(ptrs.get(this),encoder.encode(`${text}\0`),x,y,maxWidth)

@@ -379,15 +379,15 @@ export class Window extends EventTarget {
 
 					if (!pendingFrame) {
 						const queueLen = requestedFrames.length;
-							if (queueLen > 0) {
-								// Atomic swap avoids .splice() O(N) array re-indexing
-								const framesToProcess = requestedFrames;
-								requestedFrames = [];
-								for (let i = 0; i < queueLen; i++) {
-									framesToProcess[i](now);
-								}
+						if (queueLen > 0) {
+							// Atomic swap avoids .splice() O(N) array re-indexing
+							const framesToProcess = requestedFrames;
+							requestedFrames = [];
+							for (let i = 0; i < queueLen; i++) {
+								framesToProcess[i](now);
 							}
-							lib.symbols.canvas_flush_gpu();
+						}
+						lib.symbols.canvas_flush_gpu();
 					}
 				}
 				this.#processEvents();
@@ -452,7 +452,7 @@ export class Window extends EventTarget {
 	}
 
 	requestAnimationFrame(callback :(cb : any)=>void) : void {
-		setImmediate(()=>{requestedFrames.push(callback);})
+		requestedFrames.push(callback);
 	}
 };
 

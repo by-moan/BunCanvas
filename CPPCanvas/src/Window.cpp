@@ -103,21 +103,18 @@ GLFWmonitor* getCurrentMonitor(GLFWwindow* window) {
 void window_resize_callback(GLFWwindow* window, int w, int h) {
     if (w <= 0 || h <= 0) return;
 
-    {
-        std::lock_guard<std::mutex> lock(renderMutex);
-        width = w;
-        height = h;
-        if (renderThreadContext && renderThreadContext->context) {
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-        }
-        clearSwapchainSurfaces();
-        VK::recreateSwapchain(width, height, currentVsync);
-        rebuildSwapchainSurfaces();
-
-        wPropertiesViewer[0] = true;
-        wPropertiesViewer[1] = width;
-        wPropertiesViewer[2] = height;
+    width = w;
+    height = h;
+    if (renderThreadContext && renderThreadContext->context) {
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
     }
+    clearSwapchainSurfaces();
+    VK::recreateSwapchain(width, height, currentVsync);
+    rebuildSwapchainSurfaces();
+
+    wPropertiesViewer[0] = true;
+    wPropertiesViewer[1] = width;
+    wPropertiesViewer[2] = height;
 
     present_composited_frame();
 }
@@ -250,7 +247,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
         if (element->hasBackendTex) {
             auto img = SkImages::BorrowTextureFrom(
                 renderThreadContext->context.get(),
-                element->backendTex,
+                element->renderBackendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
@@ -264,7 +261,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
                 );
             }
         } else {
-            targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+            targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         }
         #else
         targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);

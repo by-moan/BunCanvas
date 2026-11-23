@@ -52,7 +52,6 @@ class Rendering2DState {
     sk_sp<SkImageFilter> resolvedFilters{nullptr};
     SkPaint imageColor;
     SkPaint shadowBlurColor;
-    // std::string cssFont = "10px sans-serif";
     SkFont font_current;
     float shadowBlurAmount = 0.f;
     float shadowBlurOffsetX = 0.f;
@@ -93,7 +92,6 @@ class BunCanvasRenderingContext2D {
     public:
     BunCanvas* owner;
     CanvasFontCache font_cache;
-    JSCallback_CReset jsResetCanvas;
     static constexpr uint64_t MAGIC = 0x5E5A8750;
     uint64_t magic = MAGIC;
     bool desynchronized = false;
@@ -107,10 +105,9 @@ class BunCanvasRenderingContext2D {
     BunCanvasRenderingContext2D(
         sk_sp<SkSurface> surface,
         BunCanvas* owner,
-        JSCallback_CReset cb,
         bool desync,
         bool alpha
-    ) : sfc(surface), owner{owner}, jsResetCanvas(cb), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {}
+    ) : sfc(surface), owner{owner}, desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {}
 
     void save(){
         this->savedState = currentState;
@@ -124,23 +121,20 @@ class BunCanvasRenderingContext2D {
     
     //Mimicking the behavior of values reset when resizing a canvas object.
     void reset(sk_sp<SkSurface> surface, SkImage* tmpImage) {
-     sfc = surface;
-     sfc->getCanvas()->resetMatrix();
-     currentState = Rendering2DState{};
-     savedState = Rendering2DState{};
+        sfc = surface;
+        sfc->getCanvas()->resetMatrix();
+        currentState = Rendering2DState{};
+        savedState = Rendering2DState{};
+        if (tmpImage) {
+            sfc->getCanvas()->drawImageRect(
+                tmpImage,
+                SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
+                currentState.sampling
+            );
+        }
 
-     jsResetCanvas();
-
-     if (tmpImage) {
-         sfc->getCanvas()->drawImageRect(
-             tmpImage,
-             SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
-             currentState.sampling
-         );
-     }
-
-     font_cache.setFont("10px sans-serif", currentState.font_current);
- }
+        font_cache.setFont("10px sans-serif", currentState.font_current);
+    }
 
     void reset(sk_sp<SkSurface> surface, sk_sp<SkImage> tmpImage) {
         sfc = surface;
@@ -155,7 +149,6 @@ class BunCanvasRenderingContext2D {
                 currentState.sampling
             );
         }
-        jsResetCanvas();
 
         font_cache.setFont("10px sans-serif", currentState.font_current);
         tmpImage.reset();
@@ -175,6 +168,8 @@ struct RetiredTexture {
     int framesLeft;
 };
 
+static const std::string RasterCanvasUseGPUSpecifiedWarn = "[WARN] Raster layer was used when it was automatically specified that a GPU is used to back the layer!\n";
+
 class BunCanvas {
     bool useGPU = true;
     public:
@@ -183,7 +178,8 @@ class BunCanvas {
     
     static constexpr uint64_t MAGIC = 0xBCA1155A;
     uint64_t magic = MAGIC;
-    sk_sp<SkSurface> surface;
+    sk_sp<SkSurface> workSurface;
+    sk_sp<SkSurface> renderSurface;
     std::mutex mutex;
 
     CanvasContextType ctxType;
@@ -191,13 +187,20 @@ class BunCanvas {
     BunCanvasRenderingContext2D* rendering2D = nullptr;
     
     #ifndef __APPLE__
-    GrBackendTexture backendTex;
+    private:
+    GrBackendTexture workBackendTex;
+    public:
+    GrBackendTexture renderBackendTex;
     bool hasBackendTex = false;
     std::vector<RetiredTexture> retiredTextures;
     #endif
     
     
     BunCanvas(int w, int h, bool gpu = true) : useGPU(gpu){
+        initSurfaces(w,h);
+    }
+
+    void initSurfaces(int w, int h){
         // nonapple(std::lock_guard lock(mutex, std::defer_lock));
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
@@ -206,8 +209,16 @@ class BunCanvas {
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         }
         #else
+
         if (gpuContextReady && useGPU) {
-            backendTex = mainThreadCtx->context->createBackendTexture(
+            workBackendTex = mainThreadCtx->context->createBackendTexture(
+                w, h,
+                kN32_SkColorType,
+                skgpu::Mipmapped::kNo,
+                GrRenderable::kYes,
+                GrProtected::kNo
+            );
+            renderBackendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
                 skgpu::Mipmapped::kNo,
@@ -215,10 +226,22 @@ class BunCanvas {
                 GrProtected::kNo
             );
             
-            if (backendTex.isValid()) {
-                surface = SkSurfaces::WrapBackendTexture(
+            bool workIsValid = workBackendTex.isValid();
+            bool renderIsValid = renderBackendTex.isValid();
+            
+            if (workIsValid && renderIsValid) {
+                workSurface = SkSurfaces::WrapBackendTexture(
                     mainThreadCtx->context.get(),
-                    backendTex,
+                    workBackendTex,
+                    kTopLeft_GrSurfaceOrigin,
+                    1,
+                    kN32_SkColorType,
+                    nullptr,
+                    nullptr
+                );
+                renderSurface = SkSurfaces::WrapBackendTexture(
+                    mainThreadCtx->context.get(),
+                    renderBackendTex,
                     kTopLeft_GrSurfaceOrigin,
                     1,
                     kN32_SkColorType,
@@ -226,12 +249,28 @@ class BunCanvas {
                     nullptr
                 );
                 hasBackendTex = true;
+            } else if ((!workIsValid && renderIsValid) || (workIsValid && !renderIsValid)) {
+                // Fallback in case one succeeds creation and the second one fails
+
+                if (workIsValid) mainThreadCtx->context->deleteBackendTexture(workBackendTex);
+                if (renderIsValid) mainThreadCtx->context->deleteBackendTexture(renderBackendTex);
+                std::cout << RasterCanvasUseGPUSpecifiedWarn;
+                workSurface = SkSurfaces::Raster(
+                    SkImageInfo::MakeN32Premul(w,h)
+                );
+                renderSurface = SkSurfaces::Raster(
+                    SkImageInfo::MakeN32Premul(w,h)
+                );
+                hasBackendTex = false;
             }
             
         }
-        if (!surface) {
-            std::cout << "rasted used!\n";
-            surface = SkSurfaces::Raster(
+        if (!workSurface || !renderSurface) {
+            std::cout << RasterCanvasUseGPUSpecifiedWarn;
+            workSurface= SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            renderSurface = SkSurfaces::Raster(
                 SkImageInfo::MakeN32Premul(w,h)
             );
             hasBackendTex = false;
@@ -242,13 +281,15 @@ class BunCanvas {
     //Maybe future support for webGPU rendering context if possible
     ~BunCanvas(){
         delete rendering2D;
-        surface.reset();
+        workSurface.reset();
+        renderSurface.reset();
         
         #ifndef __APPLE__
         // Flush to ensure no pending operations on the current texture
         if (hasBackendTex && mainThreadCtx) {
             mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-            mainThreadCtx->context->deleteBackendTexture(backendTex);
+            mainThreadCtx->context->deleteBackendTexture(workBackendTex);
+            mainThreadCtx->context->deleteBackendTexture(renderBackendTex);
         }
         // Clean up any retired textures immediately
         if (mainThreadCtx && mainThreadCtx->context) {
@@ -260,10 +301,10 @@ class BunCanvas {
         #endif
     }
     
-    void* getContext2D(JSCallback_CReset cb, bool desync, bool alpha) {
+    void* getContext2D(bool desync, bool alpha) {
         if (!rendering2D) {
             ctxType = CanvasContextType::Rendering2D;
-            rendering2D = new BunCanvasRenderingContext2D(surface,this,cb, desync, alpha);
+            rendering2D = new BunCanvasRenderingContext2D(workSurface,this, desync, alpha);
             return rendering2D;
         };
         return rendering2D;
@@ -273,112 +314,108 @@ class BunCanvas {
         if (!rendering2D) return;
         sk_sp<SkImage> tmp;
 
-        #ifdef __APPLE__
+    #ifdef __APPLE__
         if (surface) {
             tmp = surface->makeImageSnapshot();
         }
         surface.reset();
-        if (renderThreadContext == nullptr) {
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-        } else {
-            surface = SkSurfaces::RenderTarget(
-                renderThreadContext->context.get(),
-                skgpu::Budgeted::kYes,
-                SkImageInfo::MakeN32Premul(w, h)
-            );
-        }
+
+        initSurfaces(w, h);
+
         if (surface) {
             surface->getCanvas()->clear(SK_ColorTRANSPARENT);
         }
-        #else
-        if (gpuContextReady && useGPU) {
-            GrBackendTexture oldTex = backendTex;
-            bool hadOldTex = hasBackendTex;
-
-            backendTex = mainThreadCtx->context->createBackendTexture(
-                w, h,
-                kN32_SkColorType,
-                skgpu::Mipmapped::kNo,
-                GrRenderable::kYes,
-                GrProtected::kNo
-            );
-
-            if (!retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
-                for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
-                    it->framesLeft--;
-                    if (it->framesLeft <= 0) {
-                        mainThreadCtx->context->deleteBackendTexture(it->tex);
-                        it = retiredTextures.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-            }
-
-            if (backendTex.isValid()) {
-                surface.reset();
-                surface = SkSurfaces::WrapBackendTexture(
-                    mainThreadCtx->context.get(),
-                    backendTex,
-                    kTopLeft_GrSurfaceOrigin,
-                    1,
-                    kN32_SkColorType,
-                    nullptr,
-                    nullptr
-                );
-                hasBackendTex = true;
-
-                // Clear entire new texture so expanded borders never expose uninitialized VMA memory
-                surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-
-                // GPU-to-GPU copy from old texture without CPU readback
-                if (hadOldTex && oldTex.isValid()) {
-                    tmp = SkImages::BorrowTextureFrom(
-                        mainThreadCtx->context.get(),
-                        oldTex,
-                        kTopLeft_GrSurfaceOrigin,
-                        kN32_SkColorType,
-                        kPremul_SkAlphaType,
-                        nullptr
-                    );
-                }
-
-                if (ctxType == CanvasContextType::Rendering2D) {
-                    rendering2D->reset(surface, std::move(tmp));
-                }
-
-                // Transition new backendTex to SHADER_READ_ONLY_OPTIMAL before releasing element->mutex
-                skgpu::MutableTextureState readState =
-                    skgpu::MutableTextureStates::MakeVulkan(
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        VK_QUEUE_FAMILY_IGNORED
-                    );
-                mainThreadCtx->context->flush(surface.get(), GrFlushInfo{}, &readState);
-                mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-
-                if (hadOldTex) {
-                    retiredTextures.push_back({oldTex, 3});
-                }
-                return;
-            } else {
-                tmp = surface ? surface->makeTemporaryImage() : nullptr;
-                surface.reset();
-                surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-                surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-                hasBackendTex = false;
-            }
-        } else {
-            tmp = surface ? surface->makeTemporaryImage() : nullptr;
-            surface.reset();
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-            surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-            hasBackendTex = false;
-        }
-        #endif
-
         if (ctxType == CanvasContextType::Rendering2D) {
             rendering2D->reset(surface, std::move(tmp));
         }
+    #else
+        if (gpuContextReady && useGPU && !retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
+            for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
+                it->framesLeft--;
+                if (it->framesLeft <= 0) {
+                    mainThreadCtx->context->deleteBackendTexture(it->tex);
+                    it = retiredTextures.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
+        GrBackendTexture oldWorkTex = workBackendTex;
+        GrBackendTexture oldRenderTex = renderBackendTex;
+        bool hadOldTex = hasBackendTex;
+
+        // If currently on a raster surface, grab a temporary image before resetting
+        if (!hadOldTex && workSurface) {
+            tmp = workSurface->makeTemporaryImage();
+        }
+
+        // Reset existing surfaces so initSurfaces() cleanly recreates them (and its
+        // `if (!workSurface || !renderSurface)` raster fallback always triggers if needed)
+        workSurface.reset();
+        renderSurface.reset();
+        hasBackendTex = false;
+
+        initSurfaces(w, h);
+
+        // Clear both surfaces so expanded borders never expose uninitialized VMA memory
+        if (workSurface) {
+            workSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        }
+        if (renderSurface) {
+            renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        }
+
+        // Borrow the previous GPU texture for a zero-copy transfer (also works if
+        // initSurfaces fell back to raster—Skia will perform the readback on draw)
+        if (hadOldTex && oldWorkTex.isValid() && mainThreadCtx && mainThreadCtx->context) {
+            tmp = SkImages::BorrowTextureFrom(
+                mainThreadCtx->context.get(),
+                oldWorkTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
+        }
+
+        if (ctxType == CanvasContextType::Rendering2D) {
+            // Note: if Rendering2D::reset now accepts both buffers, pass (workSurface, renderSurface, std::move(tmp))
+            rendering2D->reset(workSurface, std::move(tmp));
+            commit();
+        }
+
+        if (hasBackendTex && mainThreadCtx && mainThreadCtx->context) {
+            // Transition new backend textures to SHADER_READ_ONLY_OPTIMAL before releasing mutex
+            skgpu::MutableTextureState readState =
+                skgpu::MutableTextureStates::MakeVulkan(
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_QUEUE_FAMILY_IGNORED
+                );
+            if (workSurface) {
+                mainThreadCtx->context->flush(workSurface.get(), GrFlushInfo{}, &readState);
+            }
+            if (renderSurface) {
+                mainThreadCtx->context->flush(renderSurface.get(), GrFlushInfo{}, &readState);
+            }
+            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+        }
+
+        if (hadOldTex) {
+            if (oldWorkTex.isValid()) {
+                retiredTextures.push_back({oldWorkTex, 3});
+            }
+            if (oldRenderTex.isValid()) {
+                retiredTextures.push_back({oldRenderTex, 3});
+            }
+        }
+    #endif
+    }
+    
+    // Commit all the draw operations to the render surface
+    void commit(){
+        renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        renderSurface->getCanvas()->drawImage(workSurface->makeTemporaryImage(),0,0);
     }
 };
 
@@ -401,8 +438,8 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
             mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
         }
         #else
-        if (element->hasBackendTex && element->surface) {
-            mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
+        if (element->hasBackendTex && element->renderSurface) {
+            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
         }
         #endif
         
@@ -553,13 +590,13 @@ extern "C" {
     }
     
     //Sets native internal context so it is returned if is asked again.
-    WINDOWS_EXPORT void* canvas_get_context2D(void* canvasObj, JSCallback_CReset cb, bool desync, bool alpha){
+    WINDOWS_EXPORT void* canvas_get_context2D(void* canvasObj, bool desync, bool alpha){
         if (!canvasObj) return nullptr;
         BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
         if (obj == nullptr) return nullptr;
         
-        void* ptr = obj->getContext2D(cb, desync, alpha);
+        void* ptr = obj->getContext2D(desync, alpha);
         
         return ptr;
         
@@ -971,7 +1008,7 @@ extern "C" {
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
-                img->backendTex,
+                img->renderBackendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
@@ -987,7 +1024,7 @@ extern "C" {
                 drawImage(obj,_img,dimensions,argc);
             }
         } else {
-            auto _img = img->surface->makeTemporaryImage();
+            auto _img = img->renderSurface->makeTemporaryImage();
             // if(obj->shadowBlurAmount > 0.5f) {
             //     SkPaint shColor = obj->shadowBlurColor;
             //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
@@ -1040,7 +1077,7 @@ extern "C" {
             if (gpuContextReady && obj->owner->hasBackendTex) {
                 auto img = SkImages::BorrowTextureFrom(
                     mainThreadCtx->context.get(),
-                    obj->owner->backendTex,
+                    obj->owner->renderBackendTex,
                     kTopLeft_GrSurfaceOrigin,
                     kN32_SkColorType,
                     kPremul_SkAlphaType,
@@ -1254,9 +1291,9 @@ extern "C" {
         );
         obj->currentState.globalAlpha = _a;
         obj->currentState.imageColor.setAlphaf(_a);
-        obj->currentState.fillColor.setAlphaf(_a);
-        obj->currentState.strokeColor.setAlphaf(_a);
-        obj->currentState.shadowBlurColor.setAlphaf(_a);
+        // obj->currentState.fillColor.setAlphaf(_a);
+        // obj->currentState.strokeColor.setAlphaf(_a);
+        // obj->currentState.shadowBlurColor.setAlphaf(_a);
         return _a;
     }
     
@@ -1601,11 +1638,12 @@ extern "C" {
         for (auto* cnv : canvases) {
             if (!cnv) continue;
             std::lock_guard<std::mutex> lock(cnv->mutex);
-            cnv->surface.reset();
+            cnv->workSurface.reset();
+            cnv->renderSurface.reset();
             #ifndef __APPLE__
             if (mainThreadCtx && mainThreadCtx->context) {
                 if (cnv->hasBackendTex) {
-                    mainThreadCtx->context->deleteBackendTexture(cnv->backendTex);
+                    mainThreadCtx->context->deleteBackendTexture(cnv->renderBackendTex);
                     cnv->hasBackendTex = false;
                 }
                 for (auto& r : cnv->retiredTextures) {
@@ -1627,7 +1665,7 @@ extern "C" {
         );
         
         auto matrix = (*ctx)()->getLocalToDevice();
-        matrix.getRowMajor(mtx);
+        matrix.getColMajor(mtx);
     }
     
     WINDOWS_EXPORT void canvas_set_transform(void* ctxPtr, double* mtx){
@@ -1738,21 +1776,22 @@ extern "C" {
         fMetrics[11] = ctx->currentState.textBaseline == CanvasTextBaseLine::Ideographic;
     }
 
-    WINDOWS_EXPORT void canvas_submit_batch(void* ctxPtr, const uint8_t* batch, int byteLength) {
+    WINDOWS_EXPORT void canvas_submit_batch(void* ctxPtr, const uint8_t* batch, int byteLength, bool commit = false) {
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
+
 
         size_t offset = 0;
         while (offset < byteLength) {
             offset = (offset + 7) & ~7; // Match 8-byte alignment
 
             //Flush to prevent overallocation of GrOp's 
-            if (++ctx->owner->pendingOps >= 8192) {
+            if (++ctx->owner->pendingOps >= 16384) {
                 ctx->owner->pendingOps = 0;
 
                 #ifndef __APPLE__
-                if (gpuContextReady && ctx->owner->hasBackendTex && ctx->owner->surface) {
-                    mainThreadCtx->context->flush(ctx->owner->surface.get());
+                if (gpuContextReady && ctx->owner->hasBackendTex && ctx->owner->workSurface) {
+                    mainThreadCtx->context->flush(ctx->owner->workSurface.get());
                 }
                 #endif
             }
@@ -1760,28 +1799,15 @@ extern "C" {
             CanvasBatchOperationType op = *reinterpret_cast<const CanvasBatchOperationType*>(batch + offset);
 
             switch (op) {
+                case CanvasBatchOperationType::StrokeRect:
                 case CanvasBatchOperationType::FillRect: {
                     const auto* cmd = reinterpret_cast<const CanvasBatchCommands::FillRect*>(batch + offset);
-                    SkPaint fColor = ctx->currentState.fillColor;
-                    fColor.setAlphaf(ctx->currentState.fillColor.getAlphaf()*ctx->currentState.globalAlpha);
-                    if(ctx->currentState.shadowBlurAmount > 0.01f) {
-                        SkPaint shColor = ctx->currentState.shadowBlurColor;
-                        auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
-                        shColor.setAlphaf(_af);
-                        (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), shColor);
-                    }
-                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), fColor);
+                    SkPaint selColor = op == CanvasBatchOperationType::FillRect
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), selColor);
                     offset += sizeof(CanvasBatchCommands::FillRect);
-                    break;
-                }
-                case CanvasBatchOperationType::SetFillStyleColor: {
-                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyle*>(batch + offset);
-                    auto col = parseCssColor(cmd->color);
-                    if (col){
-                        ctx->currentState.fillColor.setColor4f(*col);
-                        ctx->currentState.fillColor.setShader(nullptr);
-                    }
-                    offset += sizeof(CanvasBatchCommands::SetFillStyle);
                     break;
                 }
                 case CanvasBatchOperationType::ClearRect: {
@@ -1790,11 +1816,346 @@ extern "C" {
                     offset += sizeof(CanvasBatchCommands::ClearRect);
                     break;
                 }
+                case CanvasBatchOperationType::SetStrokeStyleColor:
+                case CanvasBatchOperationType::SetFillStyleColor: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyle*>(batch + offset);
+                    auto col = parseCssColor(cmd->color);
+                    
+                    SkPaint& selectedColor = op == CanvasBatchOperationType::SetFillStyleColor
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    if (col){
+                        selectedColor.setColor4f(*col);
+                        selectedColor.setShader(nullptr);
+                    }else {
+                        selectedColor.setColor(SK_ColorBLACK);
+                        selectedColor.setShader(nullptr);
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetFillStyle);
+                    break;
+                }
+                case CanvasBatchOperationType::SetStrokeStyleGradient:
+                case CanvasBatchOperationType::SetFillStyleGradient: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyleGradient*>(batch + offset);
+
+                    sk_sp<SkShader> shader = buildSkiaShader(cmd->gradType, cmd->gradientArgs, cmd->stopsLength, cmd->stopsColor, cmd->stopsOffset);
+                    if (shader){
+                        SkPaint& selectedColor = op == CanvasBatchOperationType::SetFillStyleGradient
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+
+                        selectedColor.setShader(std::move(shader));
+                    }
+
+                    
+                    offset += sizeof(CanvasBatchCommands::SetFillStyleGradient);
+                    break;
+                }
+                case CanvasBatchOperationType::UploadTransform: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::UploadTransform*>(batch + offset);
+                    // (*ctx)()->setMatrix(SkM44::ColMajor(cmd->matrix));
+                    double * mtx = cmd->matrix;
+                    (*ctx)()->setMatrix(SkM44{
+                        (float)mtx[0],  (float)mtx[4],  (float)mtx[8],  (float)mtx[12],
+                        (float)mtx[1],  (float)mtx[5],  (float)mtx[9],  (float)mtx[13],
+                        (float)mtx[2],  (float)mtx[6],  (float)mtx[10], (float)mtx[14],
+                        (float)mtx[3], (float)mtx[7], (float)mtx[11], (float)mtx[15]
+                    });
+                    offset += sizeof(CanvasBatchCommands::UploadTransform);
+                    break;
+                }
+                case CanvasBatchOperationType::UploadTransformNoArray: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::UploadTransformNoArray*>(batch + offset);
+                    // (*ctx)()->setMatrix(SkM44::ColMajor(cmd->matrix));
+                    (*ctx)()->setMatrix(SkM44{
+                        cmd->v0,  cmd->v4,  cmd->v8,  cmd->v12,
+                        cmd->v1,  cmd->v5,  cmd->v9,  cmd->v13,
+                        cmd->v2,  cmd->v6,  cmd->v10, cmd->v14,
+                        cmd->v3, cmd->v7, cmd->v11, cmd->v15
+                    });
+                    offset += sizeof(CanvasBatchCommands::UploadTransformNoArray);
+                    break;
+                }
+                case CanvasBatchOperationType::Save: {
+                    ctx->save();
+                    offset += sizeof(CanvasBatchCommands::Save);
+                    break;
+                }
+                case CanvasBatchOperationType::Restore: {
+                    ctx->restore();
+                    offset += sizeof(CanvasBatchCommands::Restore);
+                    break;
+                }
+
+                case CanvasBatchOperationType::BeginPath: {
+                    ctx->currentState.path.reset();
+
+                    offset += sizeof(CanvasBatchCommands::BeginPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::MoveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::MoveTo*>(batch + offset);
+                    ctx->currentState.path.moveTo(cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::MoveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::LineTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::MoveTo*>(batch + offset);
+                    ctx->currentState.path.lineTo(cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::LineTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Arc: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Arc*>(batch + offset);
+                    ctx->currentState.path.arc(cmd->x,cmd->y,cmd->radius,cmd->startAngle,cmd->sweepAngle);
+                    offset += sizeof(CanvasBatchCommands::Arc);
+                    break;
+                }
+                case CanvasBatchOperationType::ArcTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::ArcTo*>(batch + offset);
+                    ctx->currentState.path.arcTo(cmd->x1,cmd->y1,cmd->x2,cmd->y2,cmd->radius);
+                    offset += sizeof(CanvasBatchCommands::ArcTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Ellipse: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Ellipse*>(batch + offset);
+                    ctx->currentState.path.ellipse(cmd->x,cmd->y,cmd->radiusX,cmd->radiusY,cmd->rotation,cmd->startAngle,cmd->endAngle,!!cmd->counterclockwise);
+                    offset += sizeof(CanvasBatchCommands::Ellipse);
+                    break;
+                }
+                case CanvasBatchOperationType::BezierCurveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::BezierCurveTo*>(batch + offset);
+                    ctx->currentState.path.bezierTo(cmd->cp1x,cmd->cp1y,cmd->cp2x,cmd->cp2y,cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::BezierCurveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::QuadraticCurveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::QuadraticCurveTo*>(batch + offset);
+                    ctx->currentState.path.quadraticCurveTo(cmd->cpx,cmd->cpy,cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::QuadraticCurveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Stroke:
+                case CanvasBatchOperationType::Fill:{
+                    SkPaint selColor = (op == CanvasBatchOperationType::Fill)
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+
+                    (*ctx)()->drawPath(ctx->currentState.path(), selColor);
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithoutPath);
+                    break;
+                }
+                case CanvasBatchOperationType::StrokePath:
+                case CanvasBatchOperationType::FillPath: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::PathOpWithPath*>(batch + offset);
+                    
+                    Path2D* path = validated<Path2D>(cmd->path2d);
+
+                    if (!path) {
+                        offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                        continue;
+                    };
+
+                    SkPaint selColor = (op == CanvasBatchOperationType::Fill)
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+                    (*ctx)()->drawPath((*path)(), selColor);
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::Clip:{
+                    (*ctx)()->clipPath(ctx->currentState.path());
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithoutPath);
+                    break;
+                }
+                
+                case CanvasBatchOperationType::ClipPath: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::PathOpWithPath*>(batch + offset);
+                    
+                    Path2D* path = validated<Path2D>(cmd->path2d);
+                        
+                    (*ctx)()->clipPath((*path)());
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::Rect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Rect*>(batch + offset);
+                    ctx->currentState.path.rect(cmd->x,cmd->y,cmd->w,cmd->h);
+                    offset += sizeof(CanvasBatchCommands::Rect);
+                    break;
+                }
+                case CanvasBatchOperationType::RoundRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::RoundRect*>(batch + offset);
+                    ctx->currentState.path.roundRect(cmd->x,cmd->y,cmd->w,cmd->h,cmd->radius);
+                    offset += sizeof(CanvasBatchCommands::RoundRect);
+                    break;
+                }
+                case CanvasBatchOperationType::RoundRectArray: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::RoundRectArray*>(batch + offset);
+                    ctx->currentState.path.roundRect_array(cmd->x,cmd->y,cmd->w,cmd->h,new float[]{cmd->a0,cmd->a1,cmd->a2,cmd->a3},cmd->len);
+                    offset += sizeof(CanvasBatchCommands::RoundRectArray);
+                    break;
+                }
+
+                case CanvasBatchOperationType::ClosePath: {
+                    ctx->currentState.path.close();
+                    offset += sizeof(CanvasBatchCommands::ClosePath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetFont: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFont*>(batch + offset);
+                    
+                    if (cmd->cssString) ctx->font_cache.setFont(cmd->cssString,ctx->currentState.font_current);
+                    offset += sizeof(CanvasBatchCommands::SetFont);
+                    break;
+                }
+                case CanvasBatchOperationType::SetTextAlign: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetTextAlign*>(batch + offset);
+                    ctx->currentState.textAlign = cmd->alignment;
+                    offset += sizeof(CanvasBatchCommands::SetTextAlign);
+                    break;
+                }
+                case CanvasBatchOperationType::SetTextBaseline: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetTextBaseline*>(batch + offset);
+                    ctx->currentState.textBaseline = cmd->baseline;
+                    offset += sizeof(CanvasBatchCommands::SetTextBaseline);
+                    break;
+                }
+                case CanvasBatchOperationType::StrokeText:
+                case CanvasBatchOperationType::FillText: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::FillText*>(batch + offset);
+                    float width = ctx->currentState.font_current.measureText(
+                        cmd->text,
+                        cmd->strLen,
+                        SkTextEncoding::kUTF8
+                    );
+                    
+                    SkPaint selColor = (op == CanvasBatchOperationType::FillText)
+                        ?ctx->currentState.fillColor
+                        :ctx->currentState.strokeColor;
+                    auto alphaf = selColor.getAlphaf() * ctx->currentState.globalAlpha;
+                    selColor.setAlphaf(alphaf);
+
+                    SkFontMetrics m;
+                    ctx->currentState.font_current.getMetrics(&m);
+                    float finalY = 0.f;
+
+                    int x = cmd->x;
+                    int y = cmd->y;
+                    switch (ctx->currentState.textBaseline) {
+                        case CanvasTextBaseLine::Top :
+                            finalY = y - m.fTop;
+                            break;
+
+                        case CanvasTextBaseLine::Middle:
+                            finalY = y - (m.fAscent + m.fDescent) * 0.5f;
+                            break;
+
+                        case CanvasTextBaseLine::Alphabetic:
+                            finalY = y;
+                            break;
+
+                        case CanvasTextBaseLine::Bottom:
+                            finalY = y - m.fBottom;
+                            break;
+
+                        case CanvasTextBaseLine::Hanging:
+                            finalY = y - m.fAscent;
+                            break;
+
+                        case CanvasTextBaseLine::Ideographic:
+                            finalY = y - m.fDescent;
+                            break;
+                        default: break;
+                    }
+                    float finalX = 0.f;
+                    switch (ctx->currentState.textAlign) {
+                        case CanvasTextAlignment::Left :
+                            finalX = x;
+                            break;
+                        case CanvasTextAlignment::Right :
+                            finalX = x - width;
+                            break;
+                        case CanvasTextAlignment::Center :
+                            finalX = x - width/2;
+                            break;
+                        case CanvasTextAlignment::Start :
+                            finalX = x;
+                            break;
+                        case CanvasTextAlignment::End :
+                            finalX = x - width;
+                            break;
+                        default: break;
+                    }
+                    
+                    if (width > cmd->maxWidth && cmd->maxWidth > -1) {
+                        float scale = cmd->maxWidth / width;
+                        (*ctx)()->save();
+                        (*ctx)()->translate(cmd->x, cmd->y);
+                        (*ctx)()->scale(scale, 1.0f);
+                        // if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
+                        //     SkPaint shColor = ctx->currentState.shadowBlurColor;
+                        //     auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
+                        //     shColor.setAlphaf(_af);
+                        //     (*ctx)()->drawString(txt, finalX+ctx->currentState.shadowBlurOffsetX, finalY+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
+                        // }
+                        (*ctx)()->drawString(cmd->text, finalX, finalY, ctx->currentState.font_current, selColor);
+                        (*ctx)()->restore();
+                    } else {
+                        (*ctx)()->drawString(cmd->text, finalX, finalY, ctx->currentState.font_current, selColor);
+                    }
+
+                    offset += sizeof(CanvasBatchCommands::FillText);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetGlobalAlpha: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetGlobalAlpha*>(batch + offset);
+                    ctx->currentState.globalAlpha = cmd->alpha;
+                    offset += sizeof(CanvasBatchCommands::SetGlobalAlpha);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetGlobalCompositeOperation: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetGlobalCompositeOperation*>(batch + offset);
+                    ctx->currentState.fillColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.strokeColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.shadowBlurColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.imageColor.setBlendMode(cmd->blendMode);
+                    offset += sizeof(CanvasBatchCommands::SetGlobalCompositeOperation);
+                    break;
+                }
+                case CanvasBatchOperationType::Resize: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Resize*>(batch + offset);
+                    nonapple(std::lock_guard<std::mutex> lock(ctx->owner->mutex));
+                    ctx->owner->resize(std::max(cmd->w, 1),std::max(cmd->h, 1));
+                    offset += sizeof(CanvasBatchCommands::Resize);
+                    break;
+                }
+                
+                
 
                 default: {
+                    std::cout << "unknown opcode: " << static_cast<int>(op) << "\n";
                     return;
                 }
             }
+        }
+        
+        if (commit) {
+            ctx->owner->commit();
         }
     }
     #pragma endregion

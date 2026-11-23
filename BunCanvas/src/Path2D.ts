@@ -3,6 +3,7 @@ import { lib } from "../internal/symbols.js";
 import { ptr, Pointer } from "bun:ffi"
 
 const p2dFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
+    console.log("path destroyed!")
     lib.symbols.path2d_destroy(ptr);
 });
 

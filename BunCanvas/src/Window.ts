@@ -11,6 +11,7 @@ import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 import { GLFW_CODE_MAP, GLFW_KEY_MAP, GLFW_KEY_MAP_SHIFT } from "../internal/window/glfwKeyMap.js";
 import { attachEventTarget } from "../internal/attachEventTarget.js";
+import { ptrs } from "../internal/pointers.js";
 
 
 // #region Init
@@ -443,7 +444,7 @@ export class Window extends EventTarget {
 	}
 
 	append(canvas : Canvas){
-		const canvasPtr = canvas._ptr
+		const canvasPtr = ptrs.get(canvas)
 		if (canvasPtr == undefined) {
 			console.error("Canvas was not found")
 			return

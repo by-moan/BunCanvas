@@ -53,11 +53,8 @@ enum class CanvasBatchOperationType : int32_t {
     // State Stack & Transforms
     Save,
     Restore,
-    Translate,
-    Rotate,
-    SetTransform,       // Accepts 6 floats (a, b, c, d, e, f) — DOMMatrix can be unpacked in JS
-    Transform,
-    ResetTransform,
+    UploadTransform,
+    UploadTransformNoArray,
 
     // Rectangles
     FillRect,
@@ -80,14 +77,19 @@ enum class CanvasBatchOperationType : int32_t {
     ClosePath,
     Rect,
     RoundRect,
+    RoundRectArray,
     Fill,               // Uses current path
     FillPath,           // Uses explicit Path2D*
     Stroke,             // Uses current path
     StrokePath,         // Uses explicit Path2D*
     Clip,
+    ClipPath,
 
     // Images & Pixel Buffers
     DrawImage_XYWH,
     DrawImage_SXYWH_DXYWH,
-    PutImageData
+    PutImageData,
+
+    // Canvas Size
+    Resize,
 };

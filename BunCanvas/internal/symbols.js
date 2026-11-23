@@ -120,7 +120,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_get_context2D: {
-		args: ["ptr", "ptr", "bool", "bool"],
+		args: ["ptr", "bool", "bool"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
@@ -328,7 +328,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_submit_batch: {
-		args: ["ptr", "ptr", "int"],
+		args: ["ptr", "ptr", "int", "bool"],
 		returns: "void",
 	},
 	canvas_destroy: {

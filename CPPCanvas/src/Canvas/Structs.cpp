@@ -1,4 +1,11 @@
 namespace CanvasBatchCommands {
+    struct alignas(8) Resize {
+        CanvasBatchOperationType op;
+        int32_t w;
+        int32_t h;
+    };
+    static_assert(sizeof(Resize) == 16);
+
     struct SetFont {
         CanvasBatchOperationType op;
         int32_t _pad;
@@ -15,7 +22,7 @@ namespace CanvasBatchCommands {
 
     struct SetFillStyleGradient {
         CanvasBatchOperationType op;
-        int32_t gradType; // GradientType
+        GradientType gradType;
         float* gradientArgs;
         int32_t stopsLength;
         int32_t _pad;
@@ -33,7 +40,7 @@ namespace CanvasBatchCommands {
 
     struct SetStrokeStyleGradient {
         CanvasBatchOperationType op;
-        int32_t gradType; // GradientType
+        GradientType gradType;
         float* gradientArgs;
         int32_t stopsLength;
         int32_t _pad;
@@ -42,17 +49,17 @@ namespace CanvasBatchCommands {
     };
     static_assert(sizeof(SetStrokeStyleGradient) == 40);
 
-    struct SetLineWidth {
+    struct alignas(8) SetLineWidth {
         CanvasBatchOperationType op;
         int32_t _pad;
-        double width;
+        float width;
     };
     static_assert(sizeof(SetLineWidth) == 16);
 
-    struct SetGlobalAlpha {
+    struct alignas(8) SetGlobalAlpha {
         CanvasBatchOperationType op;
         int32_t _pad;
-        double alpha;
+        float alpha;
     };
     static_assert(sizeof(SetGlobalAlpha) == 16);
 
@@ -77,7 +84,7 @@ namespace CanvasBatchCommands {
 
     struct SetGlobalCompositeOperation {
         CanvasBatchOperationType op;
-        int32_t blendMode; // SkBlendMode
+        SkBlendMode blendMode; // SkBlendMode
     };
     static_assert(sizeof(SetGlobalCompositeOperation) == 8);
 
@@ -125,13 +132,13 @@ namespace CanvasBatchCommands {
 
     struct SetTextBaseline {
         CanvasBatchOperationType op;
-        int32_t baseline; // CanvasTextBaseLine
+        CanvasTextBaseLine baseline; // CanvasTextBaseLine
     };
     static_assert(sizeof(SetTextBaseline) == 8);
 
     struct SetTextAlign {
         CanvasBatchOperationType op;
-        int32_t alignment; // CanvasTextAlignment
+        CanvasTextAlignment alignment; // CanvasTextAlignment
     };
     static_assert(sizeof(SetTextAlign) == 8);
 
@@ -177,6 +184,35 @@ namespace CanvasBatchCommands {
     };
     static_assert(sizeof(ResetTransform) == 8);
 
+    // C++: read the inline float[16] directly with SkM44::ColMajor
+    struct alignas(8) UploadTransform {
+        CanvasBatchOperationType op; // 4 bytes (+ 4 bytes alignment padding)
+        int32_t _pad;
+        double* matrix;
+    };
+    static_assert(sizeof(UploadTransform) == 16);
+    
+    struct UploadTransformNoArray {
+        CanvasBatchOperationType op; // 4 bytes (+ 4 bytes alignment padding)
+        float v0;
+        float v1;
+        float v2;
+        float v3;
+        float v4;
+        float v5;
+        float v6;
+        float v7;
+        float v8;
+        float v9;
+        float v10;
+        float v11;
+        float v12;
+        float v13;
+        float v14;
+        float v15;
+    };
+    static_assert(sizeof(UploadTransformNoArray) == 68);
+
     #pragma endregion
 
     #pragma region Rectangles
@@ -217,7 +253,7 @@ namespace CanvasBatchCommands {
 
     struct FillText {
         CanvasBatchOperationType op;
-        int32_t _pad;
+        int32_t strLen;
         const char* text;
         double x;
         double y;
@@ -237,7 +273,7 @@ namespace CanvasBatchCommands {
 
     #pragma region Paths
 
-    struct BeginPath {
+    struct alignas(8) BeginPath {
         CanvasBatchOperationType op;
         int32_t _pad;
     };
@@ -259,16 +295,27 @@ namespace CanvasBatchCommands {
     };
     static_assert(sizeof(LineTo) == 24);
 
-    struct Arc {
+    struct alignas(8) Arc {
         CanvasBatchOperationType op;
         int32_t _pad;
-        double x;
-        double y;
-        double radius;
-        double startAngle;
-        double sweepAngle;
+        float x;
+        float y;
+        float radius;
+        float startAngle;
+        float sweepAngle;
     };
-    static_assert(sizeof(Arc) == 48);
+    static_assert(sizeof(Arc) == 32);
+
+    struct ArcTo {
+        CanvasBatchOperationType op;
+        int32_t _pad;
+        double x1;
+        double y1;
+        double x2;
+        double y2;
+        double radius;
+    };
+    static_assert(sizeof(ArcTo) == 48);
 
     struct Ellipse {
         CanvasBatchOperationType op;
@@ -282,17 +329,6 @@ namespace CanvasBatchCommands {
         double endAngle;
     };
     static_assert(sizeof(Ellipse) == 64);
-
-    struct ArcTo {
-        CanvasBatchOperationType op;
-        int32_t _pad;
-        double x1;
-        double y1;
-        double x2;
-        double y2;
-        double radius;
-    };
-    static_assert(sizeof(ArcTo) == 48);
 
     struct BezierCurveTo {
         CanvasBatchOperationType op;
@@ -350,29 +386,24 @@ namespace CanvasBatchCommands {
         double y;
         double w;
         double h;
-        float* radii;
+        float a0;
+        float a1;
+        float a2;
+        float a3;
     };
-    static_assert(sizeof(RoundRectArray) == 48);
+    static_assert(sizeof(RoundRectArray) == 56);
 
-    struct FillPath {
+    struct PathOpWithPath {
         CanvasBatchOperationType op;
-        int32_t _pad;
+        int32_t hasPath;
         void* path2d; // Nullable Path2D*
     };
-    static_assert(sizeof(FillPath) == 16);
+    static_assert(sizeof(PathOpWithPath) == 16);
 
-    struct StrokePath {
+    struct alignas(8) PathOpWithoutPath {
         CanvasBatchOperationType op;
-        int32_t _pad;
-        void* path2d; // Nullable Path2D*
     };
-    static_assert(sizeof(StrokePath) == 16);
-
-    struct Clip {
-        CanvasBatchOperationType op;
-        int32_t _pad;
-    };
-    static_assert(sizeof(Clip) == 8);
+    static_assert(sizeof(PathOpWithoutPath) == 8);
 
     #pragma endregion
 

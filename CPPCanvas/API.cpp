@@ -283,8 +283,8 @@ targetPtr* validated(void* ptr){
     if (!ptr) return nullptr;
     targetPtr* obj = static_cast<targetPtr*>(ptr);
         
-    if (obj->magic != targetPtr::MAGIC)
-    return nullptr;
+    if (obj->magic != targetPtr::MAGIC) return nullptr;
+
     return obj;
 }
 

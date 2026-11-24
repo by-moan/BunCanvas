@@ -1,5 +1,5 @@
 import { lib,encoder, encodeCString } from "../internal/symbols.js";
-import { ptr, Pointer, JSCallback } from "bun:ffi"
+import { ptr, Pointer } from "bun:ffi"
 import { Image } from "./Image.js";
 import { ImageData } from "./ImageData.js";
 import { DOMMatrix, getInternalArray } from "../dom/DOMMatrix.js";
@@ -137,6 +137,7 @@ class Render2DState {
 	lineJoin : CanvasLineJoinArg = "miter";
 
 	constructor(other? : Render2DState){
+		//Delegating copy for DRY
 		if (other instanceof Render2DState) {
 			this.copyFrom(other)
 		}
@@ -147,7 +148,6 @@ class Render2DState {
 			this.lineWidth = other.lineWidth
 			this.globalAlpha = other.globalAlpha
 			getInternalArray(this.transform)!.set(getInternalArray(other.transform)!)
-			// this.transform = DOMMatrix.fromFloat64Array();
 			this.imageSmoothingQuality = other.imageSmoothingQuality
 			this.imageSmoothingEnabled = other.imageSmoothingEnabled
 			this.fillStyle = other.fillStyle
@@ -176,7 +176,7 @@ export class CanvasRenderingContext2D {
 	#byteOffset = 0;
 	#retained : any[] = [];
 
-	#flushHandle : NodeJS.Immediate | null = null;
+	#flushScheduled = false;
 	#flushBound = () => this.#flush(true);
 
 	#currentState : Render2DState = new Render2DState();
@@ -223,8 +223,6 @@ export class CanvasRenderingContext2D {
 
 			// Grow buffer for future frames if we hit the ceiling
 			if (this.#rawBuf.byteLength < CanvasRenderingContext2D.#MAX_BUF_SIZE) {
-				console.log("increase!")
-
 				this.#rawBuf = new ArrayBuffer(this.#rawBuf.byteLength * 2);
 				this.#i32 = new Int32Array(this.#rawBuf);
 				this.#f32 = new Float32Array(this.#rawBuf);
@@ -237,9 +235,8 @@ export class CanvasRenderingContext2D {
 	}
 
 	#flush(commit = false) {
-		if (this.#flushHandle !== null) {
-			clearImmediate(this.#flushHandle);
-			this.#flushHandle = null;
+		if (this.#flushScheduled) {
+			this.#flushScheduled = false;
 		}
 		if (this.#byteOffset === 0) return;
 
@@ -255,8 +252,8 @@ export class CanvasRenderingContext2D {
 	}
 
 	#scheduleFlush() {
-		if (this.#flushHandle === null) {
-			this.#flushHandle = setImmediate(this.#flushBound);
+		if (this.#flushScheduled === false) {
+			queueMicrotask(this.#flushBound);
 		}
 	}
 
@@ -328,11 +325,10 @@ export class CanvasRenderingContext2D {
 		path? : Path2D
 	){
 		this.#retained.push(path)
-		let _ptr = path?ptrs.get(path):null;
 		if (path instanceof Path2D) {
+			let _ptr = path?ptrs.get(path):null;
 			let off = this.#alloc(16);
 			this.#i32[off >> 2] = opIfPathPresent;
-			this.#i32[(off + 4) >> 2] = 1;
 			writePtrU64(this.#u32, (off + 8) >> 2, _ptr)
 		}else{
 			let off = this.#alloc(8);
@@ -428,9 +424,9 @@ export class CanvasRenderingContext2D {
 		const composite = CanvasBlendMode[operation]
 		if (composite) {
 			this.#currentState.compositeOperation = operation;
-			let off = this.#alloc(16);
+			let off = this.#alloc(8);
 			this.#i32[off >> 2] = CanvasBatchOperationType.SetGlobalCompositeOperation;
-			this.#f32[(off + 8) >> 2] = composite;
+			this.#f32[(off + 4) >> 2] = composite;
 			this.#scheduleFlush();
 		}
 	}
@@ -439,27 +435,42 @@ export class CanvasRenderingContext2D {
 	}
 
 	set filter(v : string) {
-		if (lib.symbols.canvas_set_filter(ptrs.get(this),encoder.encode(`${v}\0`))){
-			this.#currentState.filter = v;
-		}
+		const str = encodeCString(v)
+		let off = this.#alloc(16);
+		this.#i32[off >> 2] = CanvasBatchOperationType.SetFilter;
+		writePtrU64(this.#u32, (off + 8) >> 2, ptr(str))
+		this.#scheduleFlush();
+		// if (lib.symbols.canvas_set_filter(ptrs.get(this),encodeCString(v))){
+		// 	this.#currentState.filter = v;
+		// }
 	}
 	get filter() : string {
 		return this.#currentState.filter;
 	}
 
-	set imageSmoothingEnabled(v : boolean) {
-		if (lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)){
-			this.#currentState.imageSmoothingEnabled = v
-		}
+	set imageSmoothingEnabled(value : boolean) {
+		let off = this.#alloc(8);
+		this.#i32[off >> 2] = CanvasBatchOperationType.SetImageSmoothingEnabled;
+		this.#i32[(off + 4) >> 2] = value?1:0;
+		this.#currentState.imageSmoothingEnabled = value
+		this.#scheduleFlush();
+		// if (lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)){
+		// 	this.#currentState.imageSmoothingEnabled = v
+		// }
 	}
 	get imageSmoothingEnabled() : boolean {
 		return this.#currentState.imageSmoothingEnabled;
 	}
 
-	set imageSmoothingQuality(v : CanvasSmoothingQualityArg) {
-		let smQuality = CanvasSmoothingQuality[v];
-		if (lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),smQuality)) {
-			this.#currentState.imageSmoothingQuality = v;
+	set imageSmoothingQuality(quality : CanvasSmoothingQualityArg) {
+		let smQuality = CanvasSmoothingQuality[quality];
+		// if (lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),smQuality)) {
+		if (smQuality) {
+			let off = this.#alloc(8);
+			this.#i32[off >> 2] = CanvasBatchOperationType.SetImageSmoothingEnabled;
+			this.#i32[(off + 4) >> 2] = smQuality;
+			this.#scheduleFlush();
+			this.#currentState.imageSmoothingQuality = quality;
 		}
 	}
 	get imageSmoothingQuality() : string {
@@ -521,7 +532,11 @@ export class CanvasRenderingContext2D {
 	//#region Line Styles
 	set lineWidth(width : number) {
 		let w = width<1?1:width;
-		lib.symbols.canvas_set_stroke_width(ptrs.get(this),w)
+		// lib.symbols.canvas_set_stroke_width(ptrs.get(this),w)
+		let off = this.#alloc(16);
+		this.#i32[off >> 2] = CanvasBatchOperationType.SetLineWidth;
+		this.#f32[(off + 8) >> 2] = w;
+		this.#scheduleFlush();
 		this.#currentState.lineWidth = w
 	}
 	get lineWidth() : number {
@@ -530,7 +545,12 @@ export class CanvasRenderingContext2D {
 
 	set lineJoin(joinType : CanvasLineJoinArg){
 		let ljType = CanvasLineJoin[joinType];
-		if (lib.symbols.canvas_set_line_join(ptrs.get(this),ljType)) {
+		// if (lib.symbols.canvas_set_line_join(ptrs.get(this),ljType)) {
+		if (ljType) {
+			let off = this.#alloc(16);
+			this.#i32[off >> 2] = CanvasBatchOperationType.SetLineJoin;
+			this.#f32[(off + 8) >> 2] = ljType;
+			this.#scheduleFlush();
 			this.#currentState.lineJoin = joinType
 		}
 	}
@@ -543,9 +563,20 @@ export class CanvasRenderingContext2D {
 			this.#currentState.lineDashOffset = 0;
 			return
 		}
-		const arr = new Float32Array(this.#currentState.lineDash);
-		lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,v)
 		this.#currentState.lineDashOffset = v;
+		
+		const len = this.#currentState.lineDash.length;
+		let off = this.#alloc(12 + len * 4);
+		this.#i32[off >> 2] = CanvasBatchOperationType.SetLineDash;
+		this.#f32[(off + 4) >> 2] = this.#currentState.lineDashOffset;
+		this.#i32[(off + 8) >> 2] = len;
+
+		const base = (off + 12) >> 2;
+
+		for (let i = 0 ; i < len ; i++) {
+			this.#f32[base + i] = this.#currentState.lineDash[i];
+		}
+		this.#scheduleFlush();
 	}
 
 	setLineDash(lines : number[]){
@@ -556,9 +587,24 @@ export class CanvasRenderingContext2D {
 			}else {
 				_a = lines;
 			}
-			const arr = new Float32Array(_a);
-			if(arr.some(Number.isNaN)) return;
-			lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,this.#currentState.lineDashOffset)
+			// const arr = new Float32Array(_a);
+			if(_a.some(Number.isNaN)) return;
+			// lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,this.#currentState.lineDashOffset)
+			
+
+			const len = _a.length;
+			let off = this.#alloc(12 + len * 4);
+			this.#i32[off >> 2] = CanvasBatchOperationType.SetLineDash;
+			this.#f32[(off + 4) >> 2] = len;
+			this.#i32[(off + 8) >> 2] = len;
+
+			const base = (off + 12) >> 2;
+
+			for (let i = 0 ; i < len ; i++) {
+				this.#f32[base + i] = _a[i];
+			}
+			this.#scheduleFlush();
+
 			this.#currentState.lineDash = _a;
 			return;
 		}
@@ -791,6 +837,7 @@ export class CanvasRenderingContext2D {
 	}
 
 	fill(path? : Path2D){
+		if (this.#transformDirty) this.#uploadTransform()
 		this.#batchPathOperation(
 			CanvasBatchOperationType.FillPath,
 			CanvasBatchOperationType.Fill,
@@ -799,6 +846,7 @@ export class CanvasRenderingContext2D {
 	}
 
 	stroke(path? : Path2D){
+		if (this.#transformDirty) this.#uploadTransform()
 		this.#batchPathOperation(
 			CanvasBatchOperationType.StrokePath,
 			CanvasBatchOperationType.Stroke,
@@ -807,6 +855,7 @@ export class CanvasRenderingContext2D {
 	}
 
 	clip(path? : Path2D){
+		if (this.#transformDirty) this.#uploadTransform()
 		this.#batchPathOperation(
 			CanvasBatchOperationType.ClipPath,
 			CanvasBatchOperationType.Clip,
@@ -882,6 +931,7 @@ export class CanvasRenderingContext2D {
 		this.#f64[(off + 16) >> 3] = x;
 		this.#f64[(off + 24) >> 3] = y;
 		this.#f64[(off + 32) >> 3] = maxWidth;
+		this.#scheduleFlush();
 		// lib.symbols.canvas_stroke_text(ptrs.get(this),encoder.encode(`${text}\0`),x,y,maxWidth)
 	}
 
@@ -911,21 +961,56 @@ export class CanvasRenderingContext2D {
 	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) : void;
 	drawImage(img : Image | Canvas, sx : number, sy : number, sw : number, sh : number, dx : number, dy : number, dw : number, dh : number) : void;
 	drawImage(img : Image | Canvas, ...args : Array<number>) {
-		let _arr : number[] | Float32Array = args.length==2?[...args,img.width,img.height]:args;
-		const arr = new Float32Array(_arr)
-		const len = arr.length
-		if (img instanceof Image) {
-			if (this.#transformDirty) this.#uploadTransform()
-			lib.symbols.canvas_draw_image_imageType(ptrs.get(this),img.ptr,ptr(arr),len)
-			return;
-		}
-		if (img instanceof Canvas) {
-			if (this.#transformDirty) this.#uploadTransform()
-			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),ptr(arr),len)
-			return;
+		const len = args.length
+		if (len == 2 || len == 4 || len == 8) {
+			if (img instanceof Image) {
+				if (this.#transformDirty) this.#uploadTransform();
+				this.#retained.push(img);
+				let off = this.#alloc(48);
+				this.#i32[off >> 2] = CanvasBatchOperationType.DrawImage_ImageType;
+				this.#i32[(off + 4) >> 2] = len == 2 ? 4 : len;
+				writePtrU64(this.#u32, (off + 8) >> 2, ptrs.get(img))
+				this.#f32[(off + 16) >> 2] = args[0] ?? 0;
+				this.#f32[(off + 20) >> 2] = args[1] ?? 0;
+				this.#f32[(off + 24) >> 2] = len == 2 ? img.width : args[2] ?? 0;
+				this.#f32[(off + 28) >> 2] = len == 2 ? img.height : args[3] ?? 0;
+				this.#f32[(off + 32) >> 2] = args[4] ?? 0;
+				this.#f32[(off + 36) >> 2] = args[5] ?? 0;
+				this.#f32[(off + 40) >> 2] = args[6] ?? 0;
+				this.#f32[(off + 44) >> 2] = args[7] ?? 0;
+				this.#scheduleFlush();
+				// lib.symbols.canvas_draw_image_imageType(ptrs.get(this),img.ptr,ptr(arr),len)
+				return;
+			}
+			if (img instanceof Canvas) {
+				if (this.#transformDirty) this.#uploadTransform()
+				this.#retained.push(img);
+				// Flush the batched commands so what is drawn so far can be seen on the canvas where it is being drawn.
+				ctx2ds.get(img)!.#flush()
+				let off = this.#alloc(48);
+				this.#i32[off >> 2] = CanvasBatchOperationType.DrawImage_CanvasType;
+				this.#i32[(off + 4) >> 2] = len == 2 ? 4 : len;
+				writePtrU64(this.#u32, (off + 8) >> 2, ptrs.get(img))
+				this.#f32[(off + 16) >> 2] = args[0] ?? 0;
+				this.#f32[(off + 20) >> 2] = args[1] ?? 0;
+				this.#f32[(off + 24) >> 2] = len == 2 ? img.width : args[2] ?? 0;
+				this.#f32[(off + 28) >> 2] = len == 2 ? img.height : args[3] ?? 0;
+				this.#f32[(off + 32) >> 2] = args[4] ?? 0;
+				this.#f32[(off + 36) >> 2] = args[5] ?? 0;
+				this.#f32[(off + 40) >> 2] = args[6] ?? 0;
+				this.#f32[(off + 44) >> 2] = args[7] ?? 0;
+				this.#scheduleFlush();
+				// lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),ptr(arr),len)
+				return;
+			}
+		}else if (len + Number(!!img) < 3) {
+			throw new TypeError(`Failed to execute 'drawImage' on '${this.constructor.name}': 3 arguments required, but only ${len + Number(!!img)} present`)
+		}else {
+			throw new TypeError(`Failed to execute 'drawImage' on '${this.constructor.name}': Overload resolution failed.`)
 		}
 		
-		throw new TypeError("Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(Image or Canvas)'.")
+		
+		throw new TypeError(`Failed to execute 'drawImage' on '${this.constructor.name}': The provided value is not of type '(Image or Canvas)'.`)
 	}
 
 	getImageData(x: number, y: number, w: number, h: number): ImageData {
@@ -982,6 +1067,8 @@ export class CanvasRenderingContext2D {
 	}
 }
 
+const ctx2ds = new WeakMap<Canvas,CanvasRenderingContext2D>()
+
 export class Canvas {
 	#dim = new Float64Array(2);
 
@@ -1027,6 +1114,7 @@ export class Canvas {
 		if (contextType == "2d") {
 			if (this.#ctx) return this.#ctx
 			this.#ctx = new CanvasRenderingContext2D(ptrs.get(this),this, args, INTERNAL_TOKEN)
+			if(!ctx2ds.has(this)) ctx2ds.set(this,this.#ctx)
 			return this.#ctx
 		}
 	}

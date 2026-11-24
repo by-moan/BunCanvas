@@ -126,8 +126,8 @@ export enum CanvasBatchOperationType {
     ClipPath,
 
     // Images & Pixel Buffers
-    DrawImage_XYWH,
-    DrawImage_SXYWH_DXYWH,
+    DrawImage_ImageType,
+    DrawImage_CanvasType,
     PutImageData,
 
     // Canvas Size

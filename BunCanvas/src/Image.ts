@@ -120,10 +120,6 @@ export class Image {
 		return this.#src;
 	}
 
-    get ptr(){
-        return ptrs.get(this);
-    }
-
 	get width(){
 		return this.#width
 	}

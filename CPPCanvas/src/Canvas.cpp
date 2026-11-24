@@ -187,9 +187,8 @@ class BunCanvas {
     BunCanvasRenderingContext2D* rendering2D = nullptr;
     
     #ifndef __APPLE__
-    private:
-    GrBackendTexture workBackendTex;
     public:
+    GrBackendTexture workBackendTex;
     GrBackendTexture renderBackendTex;
     bool hasBackendTex = false;
     std::vector<RetiredTexture> retiredTextures;
@@ -459,6 +458,32 @@ void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, i
             img.get(),
             SkRect::MakeXYWH(d[0],d[1],d[2],d[3]),
             SkRect::MakeXYWH(d[4],d[5],d[6],d[7]),
+            ctx->currentState.sampling,
+            &(ctx->currentState.imageColor),
+            {}
+        );
+    }
+}
+
+void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img,
+    int argc, 
+    float x_sx,
+    float y_sy,
+    float w_sw,
+    float h_sh,
+    float dx,
+    float dy,
+    float dw,
+    float dh
+){
+    if (argc == 4) {
+        (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(x_sx,y_sy,w_sw,h_sh),ctx->currentState.sampling,&(ctx->currentState.imageColor));
+    }
+    if (argc == 8) {
+        (*ctx)()->drawImageRect(
+            img.get(),
+            SkRect::MakeXYWH(x_sx,y_sy,w_sw,h_sh),
+            SkRect::MakeXYWH(dx,dy,dw,dh),
             ctx->currentState.sampling,
             &(ctx->currentState.imageColor),
             {}
@@ -1960,7 +1985,7 @@ extern "C" {
                         continue;
                     };
 
-                    SkPaint selColor = (op == CanvasBatchOperationType::Fill)
+                    SkPaint selColor = (op == CanvasBatchOperationType::FillPath)
                         ? ctx->currentState.fillColor
                         : ctx->currentState.strokeColor;
                     
@@ -2144,17 +2169,181 @@ extern "C" {
                     offset += sizeof(CanvasBatchCommands::Resize);
                     break;
                 }
-                
-                
+
+                case CanvasBatchOperationType::SetFilter : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFilter*>(batch + offset);
+                    if (std::strcmp(cmd->filter, "none") == 0) {
+                        ctx->currentState.filters = nullptr;
+                        updateCanvasFilters(ctx->currentState);
+                    }
+
+                    auto filter = css::buildSkiaFilter(cmd->filter);
+                    if (!filter) {
+                        offset += sizeof(CanvasBatchCommands::SetFilter);
+                        continue;
+                    };
+
+                    ctx->currentState.filters = std::move(filter);
+                    updateCanvasFilters(ctx->currentState);
+                    offset += sizeof(CanvasBatchCommands::SetFilter);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetImageSmoothingEnabled : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetImageSmoothingEnabled*>(batch + offset);
+                    if (cmd->enabled){
+                        switch(ctx->currentState.samplingQuality) {
+                            case CanvasSmoothingQuality::Low: {
+                                ctx->currentState.sampling = SkFilterMode::kLinear;
+                            }
+                            case CanvasSmoothingQuality::Medium: {
+                                ctx->currentState.sampling = SkFilterMode::kLinear;
+                            }
+                            case CanvasSmoothingQuality::High: {
+                                ctx->currentState.sampling = SkCubicResampler::Mitchell();
+                            }
+                        }
+                    } else {
+                        ctx->currentState.sampling = SkFilterMode::kNearest;
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetImageSmoothingEnabled);
+                    break;
+                }
+                case CanvasBatchOperationType::SetImageSmoothingQuality : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetImageSmoothingQuality*>(batch + offset);
+                    switch(cmd->quality) {
+                        case CanvasSmoothingQuality::Low: {
+                            ctx->currentState.sampling = SkFilterMode::kLinear;
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                        case CanvasSmoothingQuality::Medium: {
+                            ctx->currentState.sampling = SkFilterMode::kLinear;
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                        case CanvasSmoothingQuality::High: {
+                            ctx->currentState.sampling = SkCubicResampler::Mitchell();
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetImageSmoothingQuality);
+                    break;
+                }
+                case CanvasBatchOperationType::DrawImage_CanvasType : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::DrawImage_CanvasType*>(batch + offset);
+                    BunCanvas *img = validated<BunCanvas>(cmd->canvas);
+                    #ifndef __APPLE__
+                    if (img->hasBackendTex) {
+                        // Use the work backend texture, it is going to be flushed to the render one anyway.
+                        auto _img = SkImages::BorrowTextureFrom(
+                            mainThreadCtx->context.get(),
+                            img->workBackendTex,
+                            kTopLeft_GrSurfaceOrigin,
+                            kN32_SkColorType,
+                            kPremul_SkAlphaType,
+                            nullptr
+                        );
+                        if (_img) {
+                            drawImage(ctx,_img,
+                                cmd->argc,
+                                cmd->x_sx,
+                                cmd->y_sy,
+                                cmd->w_sw,
+                                cmd->h_sh,
+                                cmd->dx,
+                                cmd->dy,
+                                cmd->dw,
+                                cmd->dh
+                            );
+                        }
+                    } else {
+                        auto _img = img->renderSurface->makeTemporaryImage();
+                        drawImage(ctx,_img,
+                            cmd->argc,
+                            cmd->x_sx,
+                            cmd->y_sy,
+                            cmd->w_sw,
+                            cmd->h_sh,
+                            cmd->dx,
+                            cmd->dy,
+                            cmd->dw,
+                            cmd->dh
+                        );
+                    }
+                    #else
+                    auto _img = img->surface->makeTemporaryImage();
+                    drawImage(ctx,_img,
+                        cmd->argc,
+                        cmd->x_sx,
+                        cmd->y_sy,
+                        cmd->w_sw,
+                        cmd->h_sh,
+                        cmd->dx,
+                        cmd->dy,
+                        cmd->dw,
+                        cmd->dh
+                    );
+                    #endif
+                    offset += sizeof(CanvasBatchCommands::DrawImage_CanvasType);
+                    break;
+                }
+                case CanvasBatchOperationType::DrawImage_ImageType : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::DrawImage_ImageType*>(batch + offset);
+                    ImageWrapper *img = validated<ImageWrapper>(cmd->image);
+                    
+                    if (img) {
+                        drawImage(ctx,img->image,
+                            cmd->argc,
+                            cmd->x_sx,
+                            cmd->y_sy,
+                            cmd->w_sw,
+                            cmd->h_sh,
+                            cmd->dx,
+                            cmd->dy,
+                            cmd->dw,
+                            cmd->dh
+                        );
+                    }
+                    offset += sizeof(CanvasBatchCommands::DrawImage_ImageType);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetLineDash : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineDash*>(batch + offset);
+                    auto arr = reinterpret_cast<const float*>(batch + offset + sizeof(CanvasBatchCommands::SetLineDash));
+
+                    if(cmd->len <= 0) {
+                        ctx->currentState.strokeColor.setPathEffect(nullptr);
+                    }else {
+                        ctx->currentState.lineDashEffect = SkDashPathEffect::Make(SkSpan<const SkScalar>(arr, cmd->len), cmd->lineDashOffset);
+                        ctx->currentState.strokeColor.setPathEffect(ctx->currentState.lineDashEffect);
+                    }
+                    
+                    offset += sizeof(CanvasBatchCommands::SetLineDash) + sizeof(float)*cmd->len;
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetLineWidth : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineWidth*>(batch + offset);
+                    ctx->currentState.strokeColor.setStrokeWidth(cmd->width);
+                    offset += sizeof(CanvasBatchCommands::SetLineWidth);
+                    break;
+                }
+                case CanvasBatchOperationType::SetLineJoin : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineJoin*>(batch + offset);
+                    ctx->currentState.strokeColor.setStrokeJoin(cmd->joinType);
+                    offset += sizeof(CanvasBatchCommands::SetLineJoin);
+                    break;
+                }
 
                 default: {
                     std::cout << "unknown opcode: " << static_cast<int>(op) << "\n";
-                    return;
+                    continue;
                 }
             }
         }
         
         if (commit) {
+
             ctx->owner->commit();
         }
     }

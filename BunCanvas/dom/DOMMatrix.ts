@@ -291,7 +291,7 @@ export class DOMMatrix {
         return copy;
     }
 
-    // --- Mutable Transformations ---
+    // Mutable Transformations
 
     multiplySelf(other?: DOMMatrixInit): this {
         const otherMatrix =
@@ -373,51 +373,63 @@ export class DOMMatrix {
             const radZ = rotZ * deg2rad;
             const sz = Math.sin(radZ);
             const cz = Math.cos(radZ);
-            this.#internal.set(
-                multipliedMatrices(
-                    this.#internal,
-                    new Float64Array([
-                        cz, sz, 0, 0,
-                        -sz, cz, 0, 0,
-                        0, 0, 1, 0,
-                        0, 0, 0, 1
-                    ])
-                )
-            );
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             cz, sz, 0, 0,
+            //             -sz, cz, 0, 0,
+            //             0, 0, 1, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[0] += cz;
+            this.#internal[1] += sz;
+            this.#internal[4] -= sz;
+            this.#internal[5] += cz;
         }
 
         if (rotY !== 0) {
             const radY = rotY * deg2rad;
             const sy = Math.sin(radY);
             const cy = Math.cos(radY);
-            this.#internal.set(
-                multipliedMatrices(
-                    this.#internal,
-                    new Float64Array([
-                        cy, 0, -sy, 0,
-                        0, 1, 0, 0,
-                        sy, 0, cy, 0,
-                        0, 0, 0, 1
-                    ])
-                )
-            );
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             cy, 0, -sy, 0,
+            //             0, 1, 0, 0,
+            //             sy, 0, cy, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[0] += cy;
+            this.#internal[2] -= sy;
+            this.#internal[8] += sy;
+            this.#internal[10] += cy;
         }
 
         if (rotX !== 0) {
             const radX = rotX * deg2rad;
             const sx = Math.sin(radX);
             const cx = Math.cos(radX);
-            this.#internal.set(
-                multipliedMatrices(
-                    this.#internal,
-                    new Float64Array([
-                        1, 0, 0, 0,
-                        0, cx, sx, 0,
-                        0, -sx, cx, 0,
-                        0, 0, 0, 1
-                    ])
-                )
-            );
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             1, 0, 0, 0,
+            //             0, cx, sx, 0,
+            //             0, -sx, cx, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[5] += cx;
+            this.#internal[6] += sx;
+            this.#internal[9] -= sx;
+            this.#internal[10] += cx;
         }
 
         if (rotX !== 0 || rotY !== 0) {
@@ -443,14 +455,26 @@ export class DOMMatrix {
         const t = 1 - c;
 
         // Column-major Rodrigues' rotation matrix
-        const r = new Float64Array([
-            t * x * x + c,     t * x * y + s * z, t * x * z - s * y, 0,
-            t * x * y - s * z, t * y * y + c,     t * y * z + s * x, 0,
-            t * x * z + s * y, t * y * z - s * x, t * z * z + c,     0,
-            0,                 0,                 0,                 1
-        ]);
+        // const r = new Float64Array([
+        //     t * x * x + c,     t * x * y + s * z, t * x * z - s * y, 0,
+        //     t * x * y - s * z, t * y * y + c,     t * y * z + s * x, 0,
+        //     t * x * z + s * y, t * y * z - s * x, t * z * z + c,     0,
+        //     0,                 0,                 0,                 1
+        // ]);
 
-        this.#internal.set(multipliedMatrices(this.#internal, r));
+        // this.#internal.set(multipliedMatrices(this.#internal, r));
+
+        this.#internal[0] += t * x * x + c
+        this.#internal[1] += t * x * y + s * z
+        this.#internal[2] += t * x * z - s * y
+
+        this.#internal[4] += t * x * y - s * z
+        this.#internal[5] += t * y * y + c
+        this.#internal[6] += t * y * z + s * x
+
+        this.#internal[8] += t * x * z + s * y
+        this.#internal[9] += t * y * z - s * x
+        this.#internal[10] += t * z * z + c
 
         if (x !== 0 || y !== 0) {
             this.#is2D = false;
@@ -469,33 +493,35 @@ export class DOMMatrix {
 
     skewXSelf(sx = 0): this {
         const t = Math.tan((sx * Math.PI) / 180);
-        this.#internal.set(
-            multipliedMatrices(
-                this.#internal,
-                new Float64Array([
-                    1, 0, 0, 0,
-                    t, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            )
-        );
+        // this.#internal.set(
+        //     multipliedMatrices(
+        //         this.#internal,
+        //         new Float64Array([
+        //             1, 0, 0, 0,
+        //             t, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        this.#internal[4] += t;
         return this;
     }
 
     skewYSelf(sy = 0): this {
         const t = Math.tan((sy * Math.PI) / 180);
-        this.#internal.set(
-            multipliedMatrices(
-                this.#internal,
-                new Float64Array([
-                    1, t, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            )
-        );
+        // this.#internal.set(
+        //     multipliedMatrices(
+        //         this.#internal,
+        //         new Float64Array([
+        //             1, t, 0, 0,
+        //             0, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        this.#internal[1] += t
         return this;
     }
 
@@ -612,33 +638,35 @@ export class DOMMatrix {
 
     flipX(): DOMMatrix {
         const copy = this.#clone();
-        copy.#internal.set(
-            multipliedMatrices(
-                copy.#internal,
-                new Float64Array([
-                    -1, 0, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            )
-        );
+        // copy.#internal.set(
+        //     multipliedMatrices(
+        //         copy.#internal,
+        //         new Float64Array([
+        //             -1, 0, 0, 0,
+        //             0, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        copy.#internal[0]*=-1
         return copy;
     }
 
     flipY(): DOMMatrix {
         const copy = this.#clone();
-        copy.#internal.set(
-            multipliedMatrices(
-                copy.#internal,
-                new Float64Array([
-                    1, 0, 0, 0,
-                    0, -1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            )
-        );
+        // copy.#internal.set(
+        //     multipliedMatrices(
+        //         copy.#internal,
+        //         new Float64Array([
+        //             1, 0, 0, 0,
+        //             0, -1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        copy.#internal[5]*=-1
         return copy;
     }
 
@@ -1078,17 +1106,19 @@ export class DOMMatrix {
                     }
                     const tx = Math.tan((ax * Math.PI) / 180);
                     const ty = Math.tan((ay * Math.PI) / 180);
-                    temp.#internal.set(
-                        multipliedMatrices(
-                            temp.#internal,
-                            new Float64Array([
-                                1, ty, 0, 0,
-                                tx, 1, 0, 0,
-                                0, 0, 1, 0,
-                                0, 0, 0, 1
-                            ])
-                        )
-                    );
+                    // temp.#internal.set(
+                    //     multipliedMatrices(
+                    //         temp.#internal,
+                    //         new Float64Array([
+                    //             1, ty, 0, 0,
+                    //             tx, 1, 0, 0,
+                    //             0, 0, 1, 0,
+                    //             0, 0, 0, 1
+                    //         ])
+                    //     )
+                    // );
+                    temp.#internal[2] += ty;
+                    temp.#internal[4] += tx;
                     break;
                 }
 
@@ -1129,17 +1159,18 @@ export class DOMMatrix {
                         this.#throwParseOrConstructError(caller, rawInput);
                     }
                     const m34 = d === 0 ? -Infinity : -1 / d;
-                    temp.#internal.set(
-                        multipliedMatrices(
-                            temp.#internal,
-                            new Float64Array([
-                                1, 0, 0, 0,
-                                0, 1, 0, 0,
-                                0, 0, 1, m34,
-                                0, 0, 0, 1
-                            ])
-                        )
-                    );
+                    // temp.#internal.set(
+                    //     multipliedMatrices(
+                    //         temp.#internal,
+                    //         new Float64Array([
+                    //             1, 0, 0, 0,
+                    //             0, 1, 0, 0,
+                    //             0, 0, 1, m34,
+                    //             0, 0, 0, 1
+                    //         ])
+                    //     )
+                    // );
+                    temp.#internal[11] += m34;
                     temp.#is2D = false;
                     break;
                 }

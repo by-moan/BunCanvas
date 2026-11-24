@@ -65,7 +65,7 @@ namespace CanvasBatchCommands {
 
     struct SetImageSmoothingQuality {
         CanvasBatchOperationType op;
-        int32_t quality; // CanvasSmoothingQuality
+        CanvasSmoothingQuality quality; // CanvasSmoothingQuality
     };
     static_assert(sizeof(SetImageSmoothingQuality) == 8);
 
@@ -116,19 +116,19 @@ namespace CanvasBatchCommands {
     };
     static_assert(sizeof(SetShadowOffsetY) == 16);
 
-    struct SetLineJoin {
+    struct alignas(8) SetLineJoin {
         CanvasBatchOperationType op;
-        int32_t joinType; // SkPaint::Join
+        int32_t _pad;
+        SkPaint::Join joinType; // SkPaint::Join
     };
-    static_assert(sizeof(SetLineJoin) == 8);
+    static_assert(sizeof(SetLineJoin) == 16);
 
     struct SetLineDash {
         CanvasBatchOperationType op;
+        float lineDashOffset;
         int32_t len;
-        float* pts;
-        double offset;
     };
-    static_assert(sizeof(SetLineDash) == 24);
+    static_assert(sizeof(SetLineDash) == 12);
 
     struct SetTextBaseline {
         CanvasBatchOperationType op;
@@ -413,17 +413,31 @@ namespace CanvasBatchCommands {
         CanvasBatchOperationType op;
         int32_t argc;
         void* image;       // ImageWrapper*
-        float* dimensions;
+        float x_sx;
+        float y_sy;
+        float w_sw;
+        float h_sh;
+        float dx;
+        float dy;
+        float dw;
+        float dh;
     };
-    static_assert(sizeof(DrawImage_ImageType) == 24);
+    static_assert(sizeof(DrawImage_ImageType) == 48);
 
     struct DrawImage_CanvasType {
         CanvasBatchOperationType op;
         int32_t argc;
         void* canvas;      // BunCanvas*
-        float* dimensions;
+        float x_sx;
+        float y_sy;
+        float w_sw;
+        float h_sh;
+        float dx;
+        float dy;
+        float dw;
+        float dh;
     };
-    static_assert(sizeof(DrawImage_CanvasType) == 24);
+    static_assert(sizeof(DrawImage_CanvasType) == 48);
 
     struct PutImageData {
         CanvasBatchOperationType op;

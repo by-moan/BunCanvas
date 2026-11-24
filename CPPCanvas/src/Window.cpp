@@ -149,6 +149,24 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mDownViewer[0] = true;
         mDownViewer[1] = mMoveViewer[1];
         mDownViewer[2] = mMoveViewer[2];
+        switch (button) {
+            case GLFW_MOUSE_BUTTON_LEFT: {
+                mDownViewer[3] = 0;
+                break;
+            }
+            case GLFW_MOUSE_BUTTON_MIDDLE: {
+                mDownViewer[3] = 1;
+                break;
+            }
+            case GLFW_MOUSE_BUTTON_RIGHT: {
+                mDownViewer[3] = 2;
+                break;
+            }
+            default: {
+                mDownViewer[3] = button;
+                break;
+            }
+        }
         mDownViewer[4] = mClickViewer[4];
         mDownViewer[5] = kDownViewer[3];
         mDownViewer[6] = kDownViewer[4];

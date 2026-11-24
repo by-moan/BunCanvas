@@ -1,7 +1,7 @@
 import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D } from "./BunCanvas";
 
 
-const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
+const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:0});
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);
@@ -10,6 +10,14 @@ window.onresize = (evt)=>{
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
 }
+
+window.oncontextmenu = (evt) => {
+    console.log(evt.button)
+}
+
+window.addEventListener("blur", ()=>{
+    console.log("blurred")
+})
 
 const ctx = canvas.getContext('2d', {desynchronized:true});
 
@@ -117,21 +125,24 @@ class Ball {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // // // Glow & Color
+        // Glow & Color
         ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(0,0, Ball.radius, 0, Math.PI * 2);
-        ctx.fill();
+        // ctx.beginPath();
+
+        ctx.fill(Ball.BallPath);
+        
         // Highlight arc for depth
-        ctx.fillStyle = '#ffffff66';
-        ctx.beginPath();
-        ctx.arc(-Ball.radius*.3,-Ball.radius*.3, Ball.radius * 0.35, 0, Math.PI * 2);
-        // console.log(this.x-Ball.radius*.3,this.y-Ball.radius*.3, Ball.radius * 0.35, 0, Math.PI * 2)
-        ctx.fill();
+        // ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fill(Ball.BallShinePath);
         
         ctx.restore();
     }
 }
+
+Ball.BallPath.arc(0,0, Ball.radius, 0, Math.PI * 2)
+Ball.BallShinePath.arc(-Ball.radius*.3,-Ball.radius*.3, Ball.radius * 0.35, 0, Math.PI * 2)
+
 // State variables
 const balls = [];
 let isMouseDown = false;
@@ -270,7 +281,7 @@ function drawCanvasHUD(ctx) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(16, 16, 210, 80, [2,4,6,8]);
+    ctx.roundRect(16, 16, 210, 80, 8);
     ctx.fill();
     ctx.stroke();
     
@@ -311,10 +322,10 @@ function step(now) {
     lastFrameTime = now;
     
     // Handle Continuous Spawning while Mouse Down
-    if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
-        spawnBall(mouseX, mouseY);
-        lastSpawnTime = now;
-    }
+    // if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
+    //     spawnBall(mouseX, mouseY);
+    //     lastSpawnTime = now;
+    // }
     
     // Sub-step physics solver for stability
     const subDt = dt / PHYSICS.subSteps;
@@ -349,7 +360,7 @@ function step(now) {
 }
 
 // Seed initial balls
-for (let i = 0; i < 1000; i++) {
+for (let i = 0; i < 1500; i++) {
     const rx = 100 + Math.random() * (window.innerWidth - 200);
     const ry = 50 + Math.random() * (window.innerHeight / 2);
     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));

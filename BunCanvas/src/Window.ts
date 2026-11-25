@@ -317,9 +317,7 @@ export class Window extends WindowEventTarget {
 				nativePath: dlPath 
 			});
 
-			let pendingFrame = false;
 			let shuttingDown = false;
-			let lastFrame = performance.now();
 
 			// Removed 'async' wrapper to prevent promise allocation overhead
 			render_thread.onmessage = (msg) => {
@@ -338,8 +336,13 @@ export class Window extends WindowEventTarget {
 					lib.symbols.create_window(width, height, titleBuf);
 				}
 			}
+
+			let pendingFrame = false;
+			let lastFrame = performance.now();
+
 			const loop = () => {
-				lib.symbols.signal_frame_ready();
+				// lib.symbols.signal_frame_ready();
+				this.#processEvents();
 
 				const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
 				const now = performance.now();
@@ -361,10 +364,9 @@ export class Window extends WindowEventTarget {
 								framesToProcess[i](now);
 							}
 						}
-						lib.symbols.canvas_flush_gpu();
 					}
+						lib.symbols.canvas_flush_gpu();
 				}
-				this.#processEvents();
 				setImmediate(loop);
 			};
 

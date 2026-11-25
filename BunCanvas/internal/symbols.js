@@ -75,10 +75,6 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
-	signal_frame_ready:{
-		args: [],
-		returns: "void",
-	},
 	set_vsync: {
 		args: ["bool"],
 		returns: "void",

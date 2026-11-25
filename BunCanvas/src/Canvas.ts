@@ -346,7 +346,6 @@ export class CanvasRenderingContext2D {
 	}
 
 	restore(){
-		if (!this.#savedState) return
 		this.#currentState?.copyFrom(this.#savedState)
 		let off = this.#alloc(8);
 		this.#i32[off >> 2] = CanvasBatchOperationType.Restore;

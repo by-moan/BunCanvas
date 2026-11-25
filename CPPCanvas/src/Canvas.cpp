@@ -430,19 +430,19 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
             VK_QUEUE_FAMILY_IGNORED
         );
 
-    for (auto* element : canvases) {
-        std::lock_guard<std::mutex> lock(element->mutex);
-        #ifdef __APPLE__
-        if (element->surface) {
-            mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
-        }
-        #else
-        if (element->hasBackendTex && element->renderSurface) {
-            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
-        }
-        #endif
+    // for (auto* element : canvases) {
+    //     std::lock_guard<std::mutex> lock(element->mutex);
+    //     #ifdef __APPLE__
+    //     if (element->surface) {
+    //         mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
+    //     }
+    //     #else
+    //     if (element->hasBackendTex && element->renderSurface) {
+    //         mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
+    //     }
+    //     #endif
         
-    }
+    // }
 
     std::unique_lock<std::mutex> lock(sharedQueueMtx, std::defer_lock);
     if (mainQueue == renderQueue) lock.lock();

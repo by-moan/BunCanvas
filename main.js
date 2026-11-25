@@ -11,14 +11,6 @@ window.onresize = (evt)=>{
     canvas.height = window.innerHeight
 }
 
-window.oncontextmenu = (evt) => {
-    console.log(evt.button)
-}
-
-window.addEventListener("blur", ()=>{
-    console.log("blurred")
-})
-
 const ctx = canvas.getContext('2d', {desynchronized:true});
 
 // Forward native canvas events to canvas/window callback properties
@@ -125,16 +117,16 @@ class Ball {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // Glow & Color
+        // // Glow & Color
         ctx.fillStyle = this.color;
-        // ctx.beginPath();
+        // // ctx.beginPath();
 
         ctx.fill(Ball.BallPath);
         
-        // Highlight arc for depth
-        // ctx.beginPath();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.fill(Ball.BallShinePath);
+        // // Highlight arc for depth
+        // // ctx.beginPath();
+        // ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        // ctx.fill(Ball.BallShinePath);
         
         ctx.restore();
     }
@@ -360,7 +352,7 @@ function step(now) {
 }
 
 // Seed initial balls
-for (let i = 0; i < 1500; i++) {
+for (let i = 0; i < 1000; i++) {
     const rx = 100 + Math.random() * (window.innerWidth - 200);
     const ry = 50 + Math.random() * (window.innerHeight / 2);
     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));

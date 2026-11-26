@@ -116,7 +116,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_get_context2D: {
-		args: ["ptr", "bool", "bool"],
+		args: ["int", "int", "bool", "bool", "bool", "bool"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {

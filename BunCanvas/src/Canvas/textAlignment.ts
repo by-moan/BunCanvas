@@ -1,4 +1,4 @@
-import { CanvasTextAlignmentEnum } from "../native/enums";
+import { CanvasTextAlignmentEnum } from "../../internal/native/enums";
 
 
 export const CanvasTextAlignment = {

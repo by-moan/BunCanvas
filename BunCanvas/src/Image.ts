@@ -1,154 +1,189 @@
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
-import { lib,encoder } from "../internal/symbols.js";
-import { ptr } from "bun:ffi"
+import { Pointer, ptr } from "bun:ffi";
+import { lib, encoder } from "../internal/symbols.js";
 import { ptrs } from "../internal/pointers.js";
-import { attachEventTarget } from "../internal/attachEventTarget.js";
+import { setHandler } from "../internal/Event/setEventHandler.js";
 
-const fRegistry = new FinalizationRegistry((ptr: any)=>{
-    lib.symbols.image_destroy(ptr)
+const fRegistry = new FinalizationRegistry((pointer: bigint | Pointer | null) => {
+	lib.symbols.image_destroy(pointer);
 });
 
-function computePath(url: string) : string {
-	const hash = createHash("sha256")
-		.update(url)
-		.digest("hex")
-		.slice(0, 16);
+const URL_REGEX = /^https?:\/\/(?:www\.)?[^\s/$.?#].[^\s]*$/i;
 
-	const parsed = new URL(url);
-	const filename = basename(parsed.pathname) || "index";
-
-    return join(tmpdir(), `${hash}-${filename}`);
+function computeTempPath(url: string): string {
+	const hash = createHash("sha256").update(url).digest("hex").slice(0, 16);
+	const { pathname } = new URL(url);
+	const filename = basename(pathname) || "index";
+	return join(tmpdir(), `${hash}-${filename}`);
 }
 
-function fetchToTemp(url: string): Promise<string>;
-function fetchToTemp(url: string, precomputedPath : string | undefined): Promise<string>;
-function fetchToTemp(url: string, precomputedPath? : string): Promise<string> {
-    return (async () => {
-        let path : string = precomputedPath ?? computePath(url);
-
-		//Tried using Promise<Response> as type, but it still errors
-		// So.... cheers ¯\_(ツ)_/¯
-        const response : Response = await fetch(url);
-        if (!response.ok || !response.body) {
-            throw new Error(`HTTP ${response.status}: ${url}`);
-        }
-		const buf = await response.arrayBuffer();
-		// console.log(buf)
-        await Bun.write(path, buf);
-
-        return path;
-    })();
+async function fetchToTemp(url: string, targetPath = computeTempPath(url)): Promise<string> {
+	const response = await fetch(url);
+	if (!response.ok || !response.body) {
+		throw new Error(`HTTP ${response.status}: ${url}`);
+	}
+	await Bun.write(targetPath, await response.arrayBuffer());
+	return targetPath;
 }
 
-const urlRegex = /^https?:\/\/(?:www\.)?[^\s/$.?#].[^\s]*$/;
+export class Image extends EventTarget {
+	#loadHandler: ((evt: Event) => unknown) | null = null;
+	#errorHandler: ((evt: Event) => unknown) | null = null;
 
-export class Image {
-	#queue : any = null;
+	#src = "";
+	#naturalWidth = 0;
+	#naturalHeight = 0;
+	#width: number | null = null;
+	#height: number | null = null;
+	#complete = true; // true initially when src is empty/unset
+	#loadId = 0;
+	#pendingDecode: Promise<void> | null = null;
 
-	#width : number = 0;
-	#setWidth = false
-	#height : number = 0;
-	#setHeight = false
+	constructor(width?: number, height?: number) {
+		super();
+		const pointer = lib.symbols.image_create();
+		ptrs.set(this, pointer);
+		fRegistry.register(this, pointer);
 
-	#src : string = "";
-	constructor() {
-		let ptr = lib.symbols.image_create();
-		ptrs.set(this,ptr)
-		fRegistry.register(this,ptr)
-	}
-	
-	onload: ((this: Image, evt: Event) => any) | null = null;
-	onerror: ((this: Image, evt: Event) => any) | null = null;
-	
-	set src(path: string){
-		this.#src = path;
-		if (urlRegex.test(path)) {
-			const weakThis = new WeakRef(this);
-			const precomp = computePath(path)
-			const iptr = ptrs.get(this);
-			lib.symbols.image_set_src(iptr, encoder.encode(`${precomp}\0`), true)
-			fetchToTemp(path,precomp).then(() => {
-				const tArr = new Int32Array(2)
-				const self = weakThis.deref();
-				if (!self) {
-					return
-				};
-				if (lib.symbols.image_load(iptr,ptr(tArr))) {
-					this.#width = !this.#setWidth?tArr[0]:this.#width;
-					this.#height = !this.#setHeight?tArr[1]:this.#height;
-					self.onload?.call(self, attachEventTarget(new Event("load", {}),self));
-				} else {
-					self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
-				}
-				
-			}).catch((ex) => {
-				const self = weakThis.deref();
-				if (!self) return;
-				self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
-			}).finally(()=>{});
-			return;
-		}else {
-			const weakThis = new WeakRef(this);
-			lib.symbols.image_set_src(ptrs.get(this), encoder.encode(`${path}\0`), false)
-			let tm = setTimeout(() => {
-				const self = weakThis.deref()
-				
-				if (!self) {
-					clearTimeout(tm)
-					return;
-				}
-				const _ptr = ptrs.get(self);
-				const tArr = new Int32Array(2)
-				if (lib.symbols.image_load(_ptr,ptr(tArr))) {
-					this.#width = !this.#setWidth?tArr[0]:this.#width;
-					this.#height = !this.#setHeight?tArr[1]:this.#height;
-					self.onload?.call(self, attachEventTarget(new Event("error", {}),self));
-				} else {
-					self.onerror?.call(self, attachEventTarget(new Event("error", {}),self));
-				}
-				clearTimeout(tm);
-			}, 0);
-		}
-
-		// Local file path handling (unchanged)
-		
+		if (width !== undefined) this.width = width;
+		if (height !== undefined) this.height = height;
 	}
 
-	get src(){
+	get onload() {
+		return this.#loadHandler;
+	}
+	set onload(fn: ((evt: Event) => unknown) | null) {
+		this.#loadHandler = setHandler(this, "load", this.#loadHandler, fn);
+	}
+
+	get onerror() {
+		return this.#errorHandler;
+	}
+	set onerror(fn: ((evt: Event) => unknown) | null) {
+		this.#errorHandler = setHandler(this, "error", this.#errorHandler, fn);
+	}
+
+	get src(): string {
 		return this.#src;
 	}
 
-	get width(){
-		return this.#width
-	}
-	get height(){
-		return this.#height
+	set src(value: string) {
+		this.#src = value;
+		const currentLoadId = ++this.#loadId;
+
+		// setting src to empty string resets state without firing error
+		if (!value) {
+			this.#naturalWidth = 0;
+			this.#naturalHeight = 0;
+			this.#complete = true;
+			this.#pendingDecode = null;
+			return;
+		}
+
+		this.#complete = false;
+		const isRemote = URL_REGEX.test(value);
+		const localPath = isRemote ? computeTempPath(value) : value;
+		const nativePtr = ptrs.get(this);
+
+		lib.symbols.image_set_src(nativePtr, encoder.encode(`${localPath}\0`), isRemote);
+
+		// Avoid capturing `this` directly in async closures so WeakRef can collect if abandoned
+		const weakSelf = new WeakRef(this);
+
+		const loadTask = (async () => {
+			try {
+				if (isRemote) {
+					await fetchToTemp(value, localPath);
+				} else {
+					// Defer local load to next microtask/macrotask so event listeners attached
+					// synchronously right after `img.src = ...` are guaranteed to fire.
+					await new Promise<void>((resolve) => setTimeout(resolve, 0));
+				}
+
+				const self = weakSelf.deref();
+				if (!self || self.#loadId !== currentLoadId) return;
+
+				self.#finalizeLoad(nativePtr);
+			} catch {
+				const self = weakSelf.deref();
+				if (!self || self.#loadId !== currentLoadId) return;
+
+				self.#failLoad();
+			}
+		})();
+
+		this.#pendingDecode = loadTask.then(() => {
+			if (!this.#complete || (this.#naturalWidth === 0 && this.#naturalHeight === 0)) {
+				throw new DOMException("The source image cannot be decoded.", "EncodingError");
+			}
+		});
+		// Prevent unhandled rejection warnings if decode() isn't called
+		this.#pendingDecode.catch(() => {});
 	}
 
-	set width(v : number){
-		this.#setWidth = true
-		this.#width = v
-	}
-	set height(v : number){
-		this.#setHeight = true
-		this.#height = v
-	}
-}
+	// Shared native FFI load & event dispatch logic.
+	#finalizeLoad(nativePtr: bigint | Pointer | null): void {
+		const dimensions = new Int32Array(2);
+		const success = Boolean(lib.symbols.image_load(nativePtr, ptr(dimensions)));
 
-{
-	const proto = Image.prototype;
-	
-	for (const key of Object.getOwnPropertyNames(proto)) {
-		const desc = Object.getOwnPropertyDescriptor(proto, key);
-		if (key == "constructor"){
-			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
-			continue
+		if (success) {
+			this.#naturalWidth = dimensions[0];
+			this.#naturalHeight = dimensions[1];
+			this.#complete = true;
+			this.dispatchEvent(new Event("load"));
+		} else {
+			this.#failLoad();
 		}
-		if (typeof desc?.value === "function") {
-			desc.value.toString = () =>
-				`function ${key}() { [native code] }`;
+	}
+
+	#failLoad(): void {
+		this.#naturalWidth = 0;
+		this.#naturalHeight = 0;
+		this.#complete = true; // Spec: complete becomes true even when image fails to load
+		this.dispatchEvent(new Event("error"));
+	}
+
+	// --- HTMLImageElement Spec Properties & Methods ---
+
+	get complete(): boolean {
+		return this.#complete;
+	}
+
+	get naturalWidth(): number {
+		return this.#naturalWidth;
+	}
+
+	get naturalHeight(): number {
+		return this.#naturalHeight;
+	}
+
+	get width(): number {
+		return this.#width ?? this.#naturalWidth;
+	}
+
+	set width(value: number) {
+		this.#width = Math.max(0, Math.floor(Number(value) || 0));
+	}
+
+	get height(): number {
+		return this.#height ?? this.#naturalHeight;
+	}
+
+	set height(value: number) {
+		this.#height = Math.max(0, Math.floor(Number(value) || 0));
+	}
+
+	decode(): Promise<void> {
+		if (!this.#src) {
+			return Promise.reject(new DOMException("Invalid image source.", "EncodingError"));
 		}
+		if (this.#pendingDecode) {
+			return this.#pendingDecode;
+		}
+		return this.#naturalWidth > 0 || this.#naturalHeight > 0
+			? Promise.resolve()
+			: Promise.reject(new DOMException("The source image cannot be decoded.", "EncodingError"));
 	}
 }

@@ -1,3 +1,4 @@
+
 if (!process.versions.bun) {
     throw new Error('BunCanvas only supports Bun! Other runtimes like Node or Deno are unsupported.')
 }
@@ -12,7 +13,10 @@ export { MouseEvent } from "./src/MouseEvent";
 export { WheelEvent } from "./src/WheelEvent";
 export { KeyboardEvent } from "./src/KeyboardEvent";
 
-export { Canvas, CanvasRenderingContext2D, CanvasGradient } from "./src/Canvas";
+export { CanvasGradient } from "./src/Canvas/canvasGradient";
+export { CanvasRenderingContext2D } from "./src/Canvas/RenderingContexts/RenderingContext2D";
+
+export { Canvas } from "./src/Canvas";
 
 export { DOMMatrix } from "./dom/DOMMatrix";
 export { Path2D } from "./src/Path2D";

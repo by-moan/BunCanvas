@@ -11,7 +11,9 @@ window.onresize = (evt)=>{
     canvas.height = window.innerHeight
 }
 
-const ctx = canvas.getContext('2d', {desynchronized:true});
+const ctx = canvas.getContext('2d', {pipeline:"batched"});
+
+console.log(ctx.constructor.name)
 
 // Forward native canvas events to canvas/window callback properties
 if (canvas) {
@@ -125,8 +127,8 @@ class Ball {
         
         // // Highlight arc for depth
         // // ctx.beginPath();
-        // ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        // ctx.fill(Ball.BallShinePath);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fill(Ball.BallShinePath);
         
         ctx.restore();
     }

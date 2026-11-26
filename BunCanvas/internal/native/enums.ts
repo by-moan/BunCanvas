@@ -36,6 +36,12 @@ export enum SkBlendMode {
     kLastMode          = kLuminosity, //!< last valid value
 };
 
+export enum GradientType {
+    Linear,
+    Radial,
+    Conic
+};
+
 export enum CanvasTextBaseLineEnum {
     Top,
     Hanging,

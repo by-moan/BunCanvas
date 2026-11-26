@@ -10,11 +10,9 @@ import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 import { GLFW_CODE_MAP, GLFW_KEY_MAP, GLFW_KEY_MAP_SHIFT } from "../internal/window/glfwKeyMap.js";
-import { attachEventTarget } from "../internal/attachEventTarget.js";
 import { ptrs } from "../internal/pointers.js";
-import { setHandler } from "../internal/Event/setEventHandler.js";
-import { IWindowEventTarget, WindowEventListenerNames, WindowEventTarget } from "../internal/Event/WindowEventTarget.js";
-
+import { WindowEventListenerNames, WindowEventTarget } from "../internal/Event/WindowEventTarget.js";
+import { ctx2ds } from "./Canvas/RenderingContexts/RenderingContext2D.js";
 
 // #region Init
 let requestedFrames : ((arg?: number)=>void)[] = []
@@ -419,12 +417,15 @@ export class Window extends WindowEventTarget {
 	}
 
 	append(canvas : Canvas){
-		const canvasPtr = ptrs.get(canvas)
-		if (canvasPtr == undefined) {
-			console.error("Canvas was not found")
-			return
-		}
-		lib.symbols.canvas_append(canvasPtr)
+		setImmediate(()=>{
+			const ctx2d = ctx2ds.get(canvas);
+			const canvasPtr = ptrs.get(ctx2d!)
+			if (canvasPtr == undefined) {
+				console.error("Canvas was not found")
+				return
+			}
+			lib.symbols.canvas_append(canvasPtr)
+		})
 	}
 
 	requestAnimationFrame(callback :(cb : any)=>void) : void {

@@ -282,7 +282,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
             targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         }
         #else
-        targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         #endif
     }
 }

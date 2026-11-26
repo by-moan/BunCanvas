@@ -348,6 +348,7 @@ static const std::string RasterCanvasUseGPUSpecifiedWarn = "[WARN] Raster layer 
 class BunCanvasSurfaceProvider {
     bool useGPU = true;
     public:
+    bool isImmediate;
     sk_sp<SkSurface> workSurface;
     sk_sp<SkSurface> renderSurface;
     std::mutex mutex;
@@ -355,7 +356,6 @@ class BunCanvasSurfaceProvider {
     
     #ifndef __APPLE__
     public:
-    bool isImmediate;
     GrBackendTexture workBackendTex;
     GrBackendTexture renderBackendTex;
     bool hasBackendTex = false;
@@ -370,9 +370,11 @@ class BunCanvasSurfaceProvider {
         // nonapple(std::lock_guard lock(mutex, std::defer_lock));
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+            workSurface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+            renderSurface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
         }else {
-            surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+            workSurface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+            renderSurface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         }
         #else
 
@@ -445,6 +447,23 @@ class BunCanvasSurfaceProvider {
     }
 
     void flushSurfacesForRead(){
+        #ifdef __APPLE__
+        if (renderThreadContext->context) {
+            // Transition new backend textures to SHADER_READ_ONLY_OPTIMAL before releasing mutex
+            skgpu::MutableTextureState readState =
+                skgpu::MutableTextureStates::MakeVulkan(
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_QUEUE_FAMILY_IGNORED
+                );
+            if (workSurface) {
+                renderThreadContext->context->flush(workSurface.get(), GrFlushInfo{}, &readState);
+            }
+            if (renderSurface) {
+                renderThreadContext->context->flush(renderSurface.get(), GrFlushInfo{}, &readState);
+            }
+            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
+        }
+        #else
         if (hasBackendTex && mainThreadCtx && mainThreadCtx->context) {
             // Transition new backend textures to SHADER_READ_ONLY_OPTIMAL before releasing mutex
             skgpu::MutableTextureState readState =
@@ -460,26 +479,22 @@ class BunCanvasSurfaceProvider {
             }
             mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
         }
+        #endif
+        
     }
     
     // Returns image that was drawn before resizing.
     sk_sp<SkImage> resize(int w, int h) {
         sk_sp<SkImage> tmp;
         #ifdef __APPLE__
-        if (surface) {
-            tmp = surface->makeImageSnapshot();
+        if (workSurface) {
+            tmp = workSurface->makeImageSnapshot();
         }
         workSurface.reset();
         renderSurface.reset();
 
         initSurfaces(w, h);
 
-        if (surface) {
-            surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-        }
-        if (ctxType == CanvasContextType::Rendering2D) {
-            rendering2D->reset(surface, std::move(tmp));
-        }
         #else
         if (gpuContextReady && useGPU && !retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
             for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
@@ -629,8 +644,8 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
         std::lock_guard<std::mutex> lock(element->mutex);
         if (element->isImmediate) element->commit();
         #ifdef __APPLE__
-        if (element->surface) {
-            mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
+        if (element->renderSurface) {
+            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
         }
         #else
         if (element->hasBackendTex && element->renderSurface) {
@@ -1230,7 +1245,7 @@ extern "C" {
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
-                img->renderBackendTex,
+                img->workBackendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
@@ -1257,8 +1272,8 @@ extern "C" {
             drawImage(obj,_img,dimensions,argc);
         }
         #else
-        auto _img = img->surface->makeTemporaryImage();
-        drawImage(obj,_img,dimensions,argc);
+        auto _img = img->workSurface->makeTemporaryImage();
+        if (_img)drawImage(obj,_img,dimensions,argc);
         #endif
     }
     
@@ -1299,7 +1314,7 @@ extern "C" {
             if (gpuContextReady && obj->hasBackendTex) {
                 auto img = SkImages::BorrowTextureFrom(
                     mainThreadCtx->context.get(),
-                    obj->renderBackendTex,
+                    obj->workBackendTex,
                     kTopLeft_GrSurfaceOrigin,
                     kN32_SkColorType,
                     kPremul_SkAlphaType,
@@ -1321,21 +1336,21 @@ extern "C" {
                 }
             }
             #else
-            auto img = obj->surface->makeImageSnapshot();
+            auto img = obj->workSurface->makeImageSnapshot();
                 
-                if (img) {
-                    // canvas->drawImage(img, 0, 0);
-                    return img->readPixels(
-                        dstInfo, 
-                        out_buffer, 
-                        rowBytes, 
-                        x, 
-                        y, 
-                        SkImage::CachingHint::kDisallow_CachingHint
-                    );
-                }else {
-                    return false;
-                }
+            if (img) {
+                // canvas->drawImage(img, 0, 0);
+                return img->readPixels(
+                    dstInfo, 
+                    out_buffer, 
+                    rowBytes, 
+                    x, 
+                    y, 
+                    SkImage::CachingHint::kDisallow_CachingHint
+                );
+            }else {
+                return false;
+            }
             #endif
             return (*obj)()->getSurface()->makeTemporaryImage()->readPixels(
                 dstInfo, 
@@ -2478,7 +2493,7 @@ extern "C" {
                         );
                     }
                     #else
-                    auto _img = img->surface->makeTemporaryImage();
+                    auto _img = img->workSurface->makeTemporaryImage();
                     drawImage(ctx,_img,
                         cmd->argc,
                         cmd->x_sx,

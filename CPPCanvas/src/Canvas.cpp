@@ -2042,6 +2042,10 @@ extern "C" {
                 if (gpuContextReady && ctx->hasBackendTex && ctx->workSurface) {
                     mainThreadCtx->context->flush(ctx->workSurface.get());
                 }
+                #else
+                if (ctx->workSurface) {
+                    renderThreadContext->context->flush(ctx->workSurface.get());
+                }
                 #endif
             }
 

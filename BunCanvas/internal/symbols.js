@@ -83,6 +83,10 @@ export const lib = dlopen(dlPath, {
 		args: ["int","int", "cstring"],
 		returns: "void",
 	},
+	setup_render_thread: {
+		args: ["int","int","cstring","ptr","bool"],
+		returns: "void",
+	},
 	window_set_fullscreen: {
 		args: ["bool"],
 		returns: "void",

@@ -44,6 +44,10 @@
 #ifndef __APPLE__
 #define nonapple(code) code
 #else
+#include <objc/objc.h>
+#include <objc/message.h>
+extern "C" void* objc_autoreleasePoolPush(void);
+extern "C" void objc_autoreleasePoolPop(void*);
 #define _Float64_t double
 #define nonapple(code)
 #endif

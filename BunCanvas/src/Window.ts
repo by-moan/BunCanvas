@@ -370,15 +370,8 @@ export class Window extends WindowEventTarget {
 
 			loop()
 		}else /* MACOS JS LOOP */ {
-			let aaplLib = dlopen(dlPath, {
-				setup_render_thread: {
-					args: ["int", "int", "cstring", "ptr", "bool"],
-					returns: "void",
-				}
-			});
-
 			const titleBuf = encoder.encode(`${title}\0`);
-			aaplLib.symbols.setup_render_thread(width, height, titleBuf, 0, vsync);
+			lib.symbols.setup_render_thread(width, height, titleBuf, 0, vsync);
 			lib.symbols.create_window(width, height, titleBuf);
 
 			const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
@@ -408,10 +401,9 @@ export class Window extends WindowEventTarget {
 
 					lib.symbols.update_window();
 				}
-				setImmediate(loop);
 			};
 
-			loop();
+			setInterval(loop,0);
 		}
 		
 	}
@@ -451,7 +443,7 @@ export class Window extends WindowEventTarget {
 
 let rAf;
 rAf = function requestAnimationFrame(callback :(cb : any)=>void) : void {
-	setImmediate(()=>{requestedFrames.push(callback);})
+	requestedFrames.push(callback);
 }
 rAf.toString = () =>
 	`function requestAnimationFrame() { [native code] }`;

@@ -64,9 +64,9 @@ export class Canvas {
 			if (this.#ctx) return this.#ctx
 			
 			if (!args || !args?.pipeline || args?.pipeline == "batched"){
-				this.#ctx = new CanvasBatchedRenderingContext2D(this.#dim[0],this.#dim[0],this, args, INTERNAL_TOKEN)
+				this.#ctx = new CanvasBatchedRenderingContext2D(this.#dim[0],this.#dim[1],this, args, INTERNAL_TOKEN)
 			}else if (args?.pipeline == "immediate") {
-				this.#ctx = new CanvasImmediateRenderingContext2D(this.#dim[0],this.#dim[0],this, args, INTERNAL_TOKEN)
+				this.#ctx = new CanvasImmediateRenderingContext2D(this.#dim[0],this.#dim[1],this, args, INTERNAL_TOKEN)
 			}else {
 				throw new SyntaxError(`Failed to execute 'getContext' on '${this.constructor.name}': unknown pipeline: ${args?.pipeline}`)
 			}

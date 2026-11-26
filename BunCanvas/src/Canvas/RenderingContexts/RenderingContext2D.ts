@@ -354,9 +354,6 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 	}
 
 	#flush(commit = false) {
-		if (this.#flushScheduled) {
-			this.#flushScheduled = false;
-		}
 		if (this.#byteOffset === 0) return;
 		lib.symbols.canvas_submit_batch(
 			ptrs.get(this),
@@ -367,11 +364,13 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 
 		this.#byteOffset = 0;
 		this.#retained.length = 0;
+		this.#flushScheduled = false;
 	}
 
 	#scheduleFlush() {
 		if (this.#flushScheduled === false) {
 			queueMicrotask(this.#flushBound);
+			this.#flushScheduled = true;
 		}
 	}
 

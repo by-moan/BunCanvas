@@ -103,21 +103,18 @@ GLFWmonitor* getCurrentMonitor(GLFWwindow* window) {
 void window_resize_callback(GLFWwindow* window, int w, int h) {
     if (w <= 0 || h <= 0) return;
 
-    {
-        std::lock_guard<std::mutex> lock(renderMutex);
-        width = w;
-        height = h;
-        if (renderThreadContext && renderThreadContext->context) {
-            renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
-        }
-        clearSwapchainSurfaces();
-        VK::recreateSwapchain(width, height, currentVsync);
-        rebuildSwapchainSurfaces();
-
-        wPropertiesViewer[0] = true;
-        wPropertiesViewer[1] = width;
-        wPropertiesViewer[2] = height;
+    width = w;
+    height = h;
+    if (renderThreadContext && renderThreadContext->context) {
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kYes);
     }
+    clearSwapchainSurfaces();
+    VK::recreateSwapchain(width, height, currentVsync);
+    rebuildSwapchainSurfaces();
+
+    wPropertiesViewer[0] = true;
+    wPropertiesViewer[1] = width;
+    wPropertiesViewer[2] = height;
 
     present_composited_frame();
 }
@@ -152,6 +149,24 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         mDownViewer[0] = true;
         mDownViewer[1] = mMoveViewer[1];
         mDownViewer[2] = mMoveViewer[2];
+        switch (button) {
+            case GLFW_MOUSE_BUTTON_LEFT: {
+                mDownViewer[3] = 0;
+                break;
+            }
+            case GLFW_MOUSE_BUTTON_MIDDLE: {
+                mDownViewer[3] = 1;
+                break;
+            }
+            case GLFW_MOUSE_BUTTON_RIGHT: {
+                mDownViewer[3] = 2;
+                break;
+            }
+            default: {
+                mDownViewer[3] = button;
+                break;
+            }
+        }
         mDownViewer[4] = mClickViewer[4];
         mDownViewer[5] = kDownViewer[3];
         mDownViewer[6] = kDownViewer[4];
@@ -237,9 +252,9 @@ void window_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) 
 }
 void window_focus_callback(GLFWwindow* window, int focused) {
     if (focused) {
-        wFocusBlurViewer[0] = true;
+        wPropertiesViewer[4] = true;
     }else {
-        wFocusBlurViewer[1] = true;
+        wPropertiesViewer[5] = true;
     }
 }
 
@@ -250,7 +265,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
         if (element->hasBackendTex) {
             auto img = SkImages::BorrowTextureFrom(
                 renderThreadContext->context.get(),
-                element->backendTex,
+                element->renderBackendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
@@ -264,7 +279,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
                 );
             }
         } else {
-            targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+            targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         }
         #else
         targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
@@ -382,7 +397,7 @@ extern "C" {
                 VK::recreateSwapchain(width, height, currentVsync);
                 rebuildSwapchainSurfaces();
             }
-
+            onrefresh(0);
             present_composited_frame();
             frameReady = false;
         }

@@ -1,1008 +1,1296 @@
-import { ptr } from "bun:ffi"
+import { ptr } from "bun:ffi";
+
+export interface DOMMatrix2DInit {
+    a?: number;
+    b?: number;
+    c?: number;
+    d?: number;
+    e?: number;
+    f?: number;
+    m11?: number;
+    m12?: number;
+    m21?: number;
+    m22?: number;
+    m41?: number;
+    m42?: number;
+}
+
+export interface DOMMatrixInit extends DOMMatrix2DInit {
+    m13?: number;
+    m14?: number;
+    m23?: number;
+    m24?: number;
+    m31?: number;
+    m32?: number;
+    m33?: number;
+    m34?: number;
+    m43?: number;
+    m44?: number;
+    is2D?: boolean;
+}
+
+export interface DOMPointInit {
+    x?: number;
+    y?: number;
+    z?: number;
+    w?: number;
+}
 
 function isMatrixArray(
     value: unknown
 ): value is number[] | Float32Array | Float64Array {
-    //value == undefined because it accepts empty values. So a default constructor without arguments is accepted 
-    return value == undefined || Array.isArray(value) ||
-        (ArrayBuffer.isView(value) && !(value instanceof DataView));
+    return (
+        Array.isArray(value) ||
+        (ArrayBuffer.isView(value) && !(value instanceof DataView))
+    );
 }
 
-export function multipliedMatrices(a : Float64Array | Float32Array, b : Float64Array | Float32Array) {
-        // returns a * b
-    const out = new Float64Array(16);
-    out[0]  = a[0]*b[0]  + a[1]*b[4]  + a[2]*b[8]  + a[3]*b[12];
-    out[1]  = a[0]*b[1]  + a[1]*b[5]  + a[2]*b[9]  + a[3]*b[13];
-    out[2]  = a[0]*b[2]  + a[1]*b[6]  + a[2]*b[10] + a[3]*b[14];
-    out[3]  = a[0]*b[3]  + a[1]*b[7]  + a[2]*b[11] + a[3]*b[15];
+/**
+ * Column-major 4x4 matrix multiplication: returns a * b
+ * Index mapping (column-major):
+ *  0: m11,  4: m21,  8: m31, 12: m41
+ *  1: m12,  5: m22,  9: m32, 13: m42
+ *  2: m13,  6: m23, 10: m33, 14: m43
+ *  3: m14,  7: m24, 11: m34, 15: m44
+ */
+export function multipliedMatrices(
+    a: Float64Array | Float32Array,
+    b: Float64Array | Float32Array
+): Float64Array | number[] {
+    const out = [];
 
-    out[4]  = a[4]*b[0]  + a[5]*b[4]  + a[6]*b[8]  + a[7]*b[12];
-    out[5]  = a[4]*b[1]  + a[5]*b[5]  + a[6]*b[9]  + a[7]*b[13];
-    out[6]  = a[4]*b[2]  + a[5]*b[6]  + a[6]*b[10] + a[7]*b[14];
-    out[7]  = a[4]*b[3]  + a[5]*b[7]  + a[6]*b[11] + a[7]*b[15];
+    const a00 = a[0], a01 = a[4], a02 = a[8],  a03 = a[12];
+    const a10 = a[1], a11 = a[5], a12 = a[9],  a13 = a[13];
+    const a20 = a[2], a21 = a[6], a22 = a[10], a23 = a[14];
+    const a30 = a[3], a31 = a[7], a32 = a[11], a33 = a[15];
 
-    out[8]  = a[8]*b[0]  + a[9]*b[4]  + a[10]*b[8] + a[11]*b[12];
-    out[9]  = a[8]*b[1]  + a[9]*b[5]  + a[10]*b[9] + a[11]*b[13];
-    out[10] = a[8]*b[2]  + a[9]*b[6]  + a[10]*b[10]+ a[11]*b[14];
-    out[11] = a[8]*b[3]  + a[9]*b[7]  + a[10]*b[11]+ a[11]*b[15];
+    const b00 = b[0], b01 = b[4], b02 = b[8],  b03 = b[12];
+    const b10 = b[1], b11 = b[5], b12 = b[9],  b13 = b[13];
+    const b20 = b[2], b21 = b[6], b22 = b[10], b23 = b[14];
+    const b30 = b[3], b31 = b[7], b32 = b[11], b33 = b[15];
 
-    out[12] = a[12]*b[0] + a[13]*b[4] + a[14]*b[8] + a[15]*b[12];
-    out[13] = a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13];
-    out[14] = a[12]*b[2] + a[13]*b[6] + a[14]*b[10]+ a[15]*b[14];
-    out[15] = a[12]*b[3] + a[13]*b[7] + a[14]*b[11]+ a[15]*b[15];
+    out[0]  = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
+    out[1]  = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
+    out[2]  = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
+    out[3]  = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
+
+    out[4]  = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
+    out[5]  = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
+    out[6]  = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
+    out[7]  = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
+
+    out[8]  = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
+    out[9]  = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
+    out[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
+    out[11] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
+
+    out[12] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
+    out[13] = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
+    out[14] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
+    out[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
 
     return out;
 }
 
-function throwParseErrorDMatrix(fName : string, pString : string) {
-    throw new SyntaxError(`Failed to execute '${fName}' on 'DOMMatrix': Failed to parse '${pString}'.`)
+function throwParseErrorDMatrix(fName: string, pString: string): never {
+    throw new SyntaxError(
+        `Failed to execute '${fName}' on 'DOMMatrix': Failed to parse '${pString}'.`
+    );
+}
+
+const CSS_NUMBER_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+const CSS_DIM_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)([a-z%]+)$/i;
+
+const f64Arrays = new WeakMap<DOMMatrix,Float64Array>();
+
+export function getInternalArray(dMtrx : DOMMatrix) : Float64Array | undefined {
+    return f64Arrays.get(dMtrx)
 }
 
 export class DOMMatrix {
-        #internal = new Float64Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])
-        #isIdentity = true;
-        #computeIdentity() {
-            this.#isIdentity = this.#internal[0]  == 1 && this.#internal[1]  == 0 && this.#internal[2]  == 0 && this.#internal[3]  == 0 &&
-            this.#internal[4]  == 0 && this.#internal[5]  == 1 && this.#internal[6]  == 0 && this.#internal[7]  == 0 &&
-            this.#internal[8]  == 0 && this.#internal[9]  == 0 && this.#internal[10] == 1 && this.#internal[11] == 0 &&
-            this.#internal[12] == 0 && this.#internal[13] == 0 && this.#internal[14] == 0 && this.#internal[15] == 1
+    // Column-major 4x4 identity matrix
+    #internal = new Float64Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    ]);
+    #is2D = true;
+
+    get is2D(): boolean {
+        return this.#is2D;
+    }
+
+    get isIdentity(): boolean {
+        const m = this.#internal;
+        return (
+            m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 0 &&
+            m[4] === 0 && m[5] === 1 && m[6] === 0 && m[7] === 0 &&
+            m[8] === 0 && m[9] === 0 && m[10] === 1 && m[11] === 0 &&
+            m[12] === 0 && m[13] === 0 && m[14] === 0 && m[15] === 1
+        );
+    }
+
+    // 2D Aliases
+    get a(): number { return this.#internal[0]; }
+    set a(v: number) { this.#internal[0] = Number(v); }
+
+    get b(): number { return this.#internal[1]; }
+    set b(v: number) { this.#internal[1] = Number(v); }
+
+    get c(): number { return this.#internal[4]; }
+    set c(v: number) { this.#internal[4] = Number(v); }
+
+    get d(): number { return this.#internal[5]; }
+    set d(v: number) { this.#internal[5] = Number(v); }
+
+    get e(): number { return this.#internal[12]; }
+    set e(v: number) { this.#internal[12] = Number(v); }
+
+    get f(): number { return this.#internal[13]; }
+    set f(v: number) { this.#internal[13] = Number(v); }
+
+    // Column 1
+    get m11(): number { return this.#internal[0]; }
+    set m11(v: number) { this.#internal[0] = Number(v); }
+
+    get m12(): number { return this.#internal[1]; }
+    set m12(v: number) { this.#internal[1] = Number(v); }
+
+    get m13(): number { return this.#internal[2]; }
+    set m13(v: number) {
+        const val = Number(v);
+        this.#internal[2] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    get m14(): number { return this.#internal[3]; }
+    set m14(v: number) {
+        const val = Number(v);
+        this.#internal[3] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    // Column 2
+    get m21(): number { return this.#internal[4]; }
+    set m21(v: number) { this.#internal[4] = Number(v); }
+
+    get m22(): number { return this.#internal[5]; }
+    set m22(v: number) { this.#internal[5] = Number(v); }
+
+    get m23(): number { return this.#internal[6]; }
+    set m23(v: number) {
+        const val = Number(v);
+        this.#internal[6] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    get m24(): number { return this.#internal[7]; }
+    set m24(v: number) {
+        const val = Number(v);
+        this.#internal[7] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    // Column 3
+    get m31(): number { return this.#internal[8]; }
+    set m31(v: number) {
+        const val = Number(v);
+        this.#internal[8] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    get m32(): number { return this.#internal[9]; }
+    set m32(v: number) {
+        const val = Number(v);
+        this.#internal[9] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    get m33(): number { return this.#internal[10]; }
+    set m33(v: number) {
+        const val = Number(v);
+        this.#internal[10] = val;
+        if (val !== 1) this.#is2D = false;
+    }
+
+    get m34(): number { return this.#internal[11]; }
+    set m34(v: number) {
+        const val = Number(v);
+        this.#internal[11] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    // Column 4
+    get m41(): number { return this.#internal[12]; }
+    set m41(v: number) { this.#internal[12] = Number(v); }
+
+    get m42(): number { return this.#internal[13]; }
+    set m42(v: number) { this.#internal[13] = Number(v); }
+
+    get m43(): number { return this.#internal[14]; }
+    set m43(v: number) {
+        const val = Number(v);
+        this.#internal[14] = val;
+        if (val !== 0) this.#is2D = false;
+    }
+
+    get m44(): number { return this.#internal[15]; }
+    set m44(v: number) {
+        const val = Number(v);
+        this.#internal[15] = val;
+        if (val !== 1) this.#is2D = false;
+    }
+
+    constructor();
+    constructor(init: string | number[] | Float32Array | Float64Array);
+    constructor(init?: string | number[] | Float32Array | Float64Array) {
+        f64Arrays.set(this,this.#internal)
+        if (init === undefined) {
+            return;
         }
 
-        get a() : number{
-            return this.m11;
-            // return this.m11;
-        }
-        set a(v: any){
-            this.m11 = v
-        }
-        get b() : number{
-            return this.m12;
-        }
-        set b(v: any){
-            this.m12 = v
-        }
-        get c() : number{
-            return this.m21;
-        }
-        set c(v: any){
-            this.m21 = v
-        }
-        get d() : number{
-            return this.m22;
-        }
-        set d(v: any){
-            this.m22 = v
-        }
-        get e() : number{
-            return this.m41;
-        }
-        set e(v : any){
-            this.m41 = v
-        }
-        get f() : number{
-            return this.m42;
-        }
-        set f(v : any){
-            this.m42 = v
-        }
-        is2D = true;
-        get isIdentity() : boolean {
-            return this.#isIdentity
-        }
-        get m11() : number{
-            return this.#internal[0];
-        }
-        set m11(v : any){
-            this.#internal[0] = v
-            if (!this.#isIdentity) {
-                if (v == 1.0)this.#computeIdentity();
-            } else {
-                if (v != 1.0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m12() : number{
-            return this.#internal[4];
-        }
-        set m12(v : any){
-            this.#internal[4] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m13() : number{
-            return this.#internal[8];
-        }
-        set m13(v : any){
-            this.#internal[8] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m14() : number{
-            return this.#internal[12];
-        }
-        set m14(v : any){
-            this.#internal[12] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
+        if (typeof init === "string") {
+            this.#parseAndApplyTransformList(init, "constructor");
+            return;
         }
 
-        get m21() : number{
-            return this.#internal[1];
-        }
-        set m21(v : any){
-            this.#internal[1] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m22() : number{
-            return this.#internal[5];
-        }
-        set m22(v : any){
-            this.#internal[5] = v
-            if (!this.#isIdentity) {
-                if (v == 1.0)this.#computeIdentity();
-            } else {
-                if (v != 1.0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m23() : number{
-            return this.#internal[9];
-        }
-        set m23(v : any){
-            this.#internal[9] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m24() : number{
-            return this.#internal[13];
-        }
-        set m24(v : any){
-            this.#internal[13] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-
-        get m31() : number{
-            return this.#internal[2];
-        }
-        set m31(v : any){
-            this.#internal[2] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m32() : number{
-            return this.#internal[6];
-        }
-        set m32(v : any){
-            this.#internal[6] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m33() : number{
-            return this.#internal[10];
-        }
-        set m33(v : any){
-            this.#internal[10] = v
-            if (!this.#isIdentity) {
-                if (v == 1.0)this.#computeIdentity();
-            } else {
-                if (v != 1.0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m34() : number{
-            return this.#internal[14];
-        }
-        set m34(v : any){
-            this.#internal[14] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-
-        get m41() : number{
-            return this.#internal[3];
-        }
-        set m41(v : any){
-            this.#internal[3] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m42() : number{
-            return this.#internal[7];
-        }
-        set m42(v : any){
-            this.#internal[7] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m43() : number{
-            return this.#internal[11];
-        }
-        set m43(v : any){
-            this.#internal[11] = v
-            if (!this.#isIdentity) {
-                if (v == 0)this.#computeIdentity();
-            } else {
-                if (v != 0)
-                    this.#isIdentity = false;
-            }
-        }
-        get m44() : number{
-            return this.#internal[15];
-        }
-        set m44(v : any){
-            this.#internal[15] = v
-            if (!this.#isIdentity) {
-                if (v == 1.0)this.#computeIdentity();
-            } else {
-                if (v != 1.0)
-                    this.#isIdentity = false;
-            }
-        }
-
-        multiplySelf(other : DOMMatrix) {
-            const a = this.#internal;
-            const b = other.#internal;
-
-            this.#internal.set(multipliedMatrices(a,b));
-
-            this.is2D &&= other.is2D;
-
-            return this;
-        }
-
-        preMultiplySelf(other : DOMMatrix) {
-            const a = this.#internal;
-            const b = other.#internal;
-
-            this.#internal.set(multipliedMatrices(b,a));
-
-            this.is2D &&= other.is2D;
-
-            return this;
-        }
-
-        translateSelf(tx = 0, ty = 0, tz = 0) {
-            const t = new Float64Array([
-                1, 0, 0, tx,
-                0, 1, 0, ty,
-                0, 0, 1, tz,
-                0, 0, 0, 1
-            ]);
-
-            this.#internal.set(multipliedMatrices(this.#internal, t));
-
-            if (tz !== 0)
-                this.is2D = false;
-
-            return this;
-        }
-
-        scaleSelf(
-            scaleX = 1,
-            scaleY = scaleX,
-            scaleZ = 1,
-            originX = 0,
-            originY = 0,
-            originZ = 0
-        ) {
-            if (originX || originY || originZ)
-                this.translateSelf(originX, originY, originZ);
-
-            const s = new Float64Array([
-                scaleX, 0,      0,      0,
-                0,      scaleY, 0,      0,
-                0,      0,      scaleZ, 0,
-                0,      0,      0,      1
-            ]);
-
-            this.#internal.set(multipliedMatrices(this.#internal, s));
-
-            if (originX || originY || originZ)
-                this.translateSelf(-originX, -originY, -originZ);
-
-            if (scaleZ !== 1 || originZ !== 0)
-                this.is2D = false;
-
-            return this;
-        }
-
-        scale3dSelf(scale : number, originX = 0, originY = 0, originZ = 0) {
-            return this.scaleSelf(
-                scale,
-                scale,
-                scale,
-                originX,
-                originY,
-                originZ
+        if (!isMatrixArray(init)) {
+            throw new SyntaxError(
+                `Failed to construct 'DOMMatrix': Failed to parse '${init}'.`
             );
         }
-        
-        rotateSelf(rotZ : number) : DOMMatrix;
-        rotateSelf(rotX : number, rotY : number) : DOMMatrix;
-        rotateSelf(rotX : number, rotY: number, rotZ: number) : DOMMatrix;
-        // rotateSelf(rotX = 0, rotY, rotZ) {
-        rotateSelf(...args: number[]) {
-            if (args[1] === undefined && args[2] === undefined) {
-                args[2] = args[0];
-                args[0] = 0;
-                args[1] = 0;
-            } else {
-                args[1] ??= 0;
-                args[2] ??= 0;
+
+        const len = init.length;
+        if (len !== 6 && len !== 16) {
+            throw new TypeError(
+                `Failed to construct 'DOMMatrix': The sequence must contain 6 elements for a 2D matrix or 16 elements for a 3D matrix.`
+            );
+        }
+
+        if (len === 6) {
+            this.#internal[0] = init[0];
+            this.#internal[1] = init[1];
+            this.#internal[4] = init[2];
+            this.#internal[5] = init[3];
+            this.#internal[12] = init[4];
+            this.#internal[13] = init[5];
+            this.#is2D = true;
+        } else {
+            for (let i = 0; i < 16; i++) {
+                this.#internal[i] = init[i];
             }
-        
-            const rx = args[0] * Math.PI / 180;
-            const ry = args[1] * Math.PI / 180;
-            const rz = args[2] * Math.PI / 180;
-            const sx = Math.sin(rx), cx = Math.cos(rx);
-            const sy = Math.sin(ry), cy = Math.cos(ry);
-            const sz = Math.sin(rz), cz = Math.cos(rz);
-        
-            if (args[2] !== 0) {
-                this.#internal.set(multipliedMatrices(
-                    this.#internal,
-                    new Float64Array([
-                        cz, -sz, 0, 0,
-                        sz,  cz, 0, 0,
-                        0,   0, 1, 0,
-                        0,   0, 0, 1
-                    ])
-                ));
-            }
-        
-            if (args[1] !== 0) {
-                this.#internal.set(multipliedMatrices(
-                    new Float64Array([
-                        cy, 0, sy, 0,
-                        0, 1,  0, 0,
-                        -sy, 0, cy, 0,
-                        0, 0,  0, 1
-                    ]),
-                    this.#internal
-                ));
-            }
-        
-            if (args[0] !== 0) {
-                this.#internal.set(multipliedMatrices(
-                    new Float64Array([
-                        1,  0,   0, 0,
-                        0, cx, -sx, 0,
-                        0, sx,  cx, 0,
-                        0,  0,   0, 1
-                    ]),
-                    this.#internal
-                ));
-            }
-        
-            if (args[0] !== 0 || args[1] !== 0)
-                this.is2D = false;
-        
+            this.#is2D = false;
+        }
+    }
+
+    #clone(): DOMMatrix {
+        const copy = new DOMMatrix();
+        copy.#internal.set(this.#internal);
+        copy.#is2D = this.#is2D;
+        return copy;
+    }
+
+    // Mutable Transformations
+
+    multiplySelf(other?: DOMMatrixInit): this {
+        const otherMatrix =
+            other instanceof DOMMatrix ? other : DOMMatrix.fromMatrix(other);
+        this.#internal.set(
+            multipliedMatrices(this.#internal, otherMatrix.#internal)
+        );
+        if (!otherMatrix.is2D) {
+            this.#is2D = false;
+        }
+        return this;
+    }
+
+    preMultiplySelf(other?: DOMMatrixInit): this {
+        const otherMatrix =
+            other instanceof DOMMatrix ? other : DOMMatrix.fromMatrix(other);
+        this.#internal.set(
+            multipliedMatrices(otherMatrix.#internal, this.#internal)
+        );
+        if (!otherMatrix.is2D) {
+            this.#is2D = false;
+        }
+        return this;
+    }
+
+    translateSelf(tx = 0, ty = 0, tz = 0): this {
+        this.#internal[12]+=tx
+        this.#internal[13]+=ty
+        this.#internal[14]+=tz
+        if (tz !== 0) {
+            this.#is2D = false;
+        }
+        return this;
+    }
+
+    scaleSelf(
+        scaleX = 1,
+        scaleY = scaleX,
+        scaleZ = 1,
+        originX = 0,
+        originY = 0,
+        originZ = 0
+    ): this {
+        if (originX !== 0 || originY !== 0 || originZ !== 0) {
+            this.translateSelf(originX, originY, originZ);
+        }
+        this.#internal[0] += scaleX;
+        this.#internal[5] += scaleY;
+        this.#internal[10] += scaleZ;
+
+        if (originX !== 0 || originY !== 0 || originZ !== 0) {
+            this.translateSelf(-originX, -originY, -originZ);
+        }
+
+        if (scaleZ !== 1 || originZ !== 0) {
+            this.#is2D = false;
+        }
+        return this;
+    }
+
+    scale3dSelf(scale = 1, originX = 0, originY = 0, originZ = 0): this {
+        return this.scaleSelf(scale, scale, scale, originX, originY, originZ);
+    }
+
+    rotateSelf(rotX = 0, rotY?: number, rotZ?: number): this {
+        if (rotY === undefined && rotZ === undefined) {
+            rotZ = rotX;
+            rotX = 0;
+            rotY = 0;
+        } else {
+            rotY ??= 0;
+            rotZ ??= 0;
+        }
+
+        const deg2rad = Math.PI / 180;
+
+        // Spec order: post-multiply Rz, then post-multiply Ry, then post-multiply Rx
+        if (rotZ !== 0) {
+            const radZ = rotZ * deg2rad;
+            const sz = Math.sin(radZ);
+            const cz = Math.cos(radZ);
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             cz, sz, 0, 0,
+            //             -sz, cz, 0, 0,
+            //             0, 0, 1, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[0] += cz;
+            this.#internal[1] += sz;
+            this.#internal[4] -= sz;
+            this.#internal[5] += cz;
+        }
+
+        if (rotY !== 0) {
+            const radY = rotY * deg2rad;
+            const sy = Math.sin(radY);
+            const cy = Math.cos(radY);
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             cy, 0, -sy, 0,
+            //             0, 1, 0, 0,
+            //             sy, 0, cy, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[0] += cy;
+            this.#internal[2] -= sy;
+            this.#internal[8] += sy;
+            this.#internal[10] += cy;
+        }
+
+        if (rotX !== 0) {
+            const radX = rotX * deg2rad;
+            const sx = Math.sin(radX);
+            const cx = Math.cos(radX);
+            // this.#internal.set(
+            //     multipliedMatrices(
+            //         this.#internal,
+            //         new Float64Array([
+            //             1, 0, 0, 0,
+            //             0, cx, sx, 0,
+            //             0, -sx, cx, 0,
+            //             0, 0, 0, 1
+            //         ])
+            //     )
+            // );
+            this.#internal[5] += cx;
+            this.#internal[6] += sx;
+            this.#internal[9] -= sx;
+            this.#internal[10] += cx;
+        }
+
+        if (rotX !== 0 || rotY !== 0) {
+            this.#is2D = false;
+        }
+
+        return this;
+    }
+
+    rotateAxisAngleSelf(x = 0, y = 0, z = 1, angle = 0): this {
+        const length = Math.hypot(x, y, z);
+        if (length === 0) {
             return this;
         }
 
-        rotateAxisAngleSelf(x = 0, y = 0, z = 1, angle = 0) {
-            const length = Math.hypot(x, y, z);
+        x /= length;
+        y /= length;
+        z /= length;
 
-            if (length === 0)
-                return this;
+        const rad = (angle * Math.PI) / 180;
+        const s = Math.sin(rad);
+        const c = Math.cos(rad);
+        const t = 1 - c;
 
-            x /= length;
-            y /= length;
-            z /= length;
+        // Column-major Rodrigues' rotation matrix
+        // const r = new Float64Array([
+        //     t * x * x + c,     t * x * y + s * z, t * x * z - s * y, 0,
+        //     t * x * y - s * z, t * y * y + c,     t * y * z + s * x, 0,
+        //     t * x * z + s * y, t * y * z - s * x, t * z * z + c,     0,
+        //     0,                 0,                 0,                 1
+        // ]);
 
-            const rad = angle * Math.PI / 180;
+        // this.#internal.set(multipliedMatrices(this.#internal, r));
 
-            const s = Math.sin(rad);
-            const c = Math.cos(rad);
-            const t = 1 - c;
+        this.#internal[0] += t * x * x + c
+        this.#internal[1] += t * x * y + s * z
+        this.#internal[2] += t * x * z - s * y
 
-            const r = new Float64Array([
-                t*x*x + c,      t*x*y - s*z,    t*x*z + s*y,    0,
-                t*x*y + s*z,    t*y*y + c,      t*y*z - s*x,    0,
-                t*x*z - s*y,    t*y*z + s*x,    t*z*z + c,      0,
-                0,              0,              0,              1
-            ]);
+        this.#internal[4] += t * x * y - s * z
+        this.#internal[5] += t * y * y + c
+        this.#internal[6] += t * y * z + s * x
 
-            this.#internal.set(multipliedMatrices(this.#internal, r));
+        this.#internal[8] += t * x * z + s * y
+        this.#internal[9] += t * y * z - s * x
+        this.#internal[10] += t * z * z + c
 
-            if (x !== 0 || y !== 0)
-                this.is2D = false;
+        if (x !== 0 || y !== 0) {
+            this.#is2D = false;
+        }
 
+        return this;
+    }
+
+    rotateFromVectorSelf(x = 0, y = 0): this {
+        if (x === 0 && y === 0) {
             return this;
         }
-        rotateFromVectorSelf(x = 0, y = 0) {
-            if (x === 0 && y === 0)
-                return this;
+        const angle = (Math.atan2(y, x) * 180) / Math.PI;
+        return this.rotateSelf(0, 0, angle);
+    }
 
-            const angle = Math.atan2(y, x) * 180 / Math.PI;
+    skewXSelf(sx = 0): this {
+        const t = Math.tan((sx * Math.PI) / 180);
+        // this.#internal.set(
+        //     multipliedMatrices(
+        //         this.#internal,
+        //         new Float64Array([
+        //             1, 0, 0, 0,
+        //             t, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        this.#internal[4] += t;
+        return this;
+    }
 
-            return this.rotateSelf(angle);
-        }
+    skewYSelf(sy = 0): this {
+        const t = Math.tan((sy * Math.PI) / 180);
+        // this.#internal.set(
+        //     multipliedMatrices(
+        //         this.#internal,
+        //         new Float64Array([
+        //             1, t, 0, 0,
+        //             0, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        this.#internal[1] += t
+        return this;
+    }
 
-        skewXSelf(sx = 0) {
-            const t = Math.tan(sx * Math.PI / 180);
+    invertSelf(): this {
+        const m = this.#internal;
+        const m00 = m[0],  m01 = m[4],  m02 = m[8],  m03 = m[12];
+        const m10 = m[1],  m11 = m[5],  m12 = m[9],  m13 = m[13];
+        const m20 = m[2],  m21 = m[6],  m22 = m[10], m23 = m[14];
+        const m30 = m[3],  m31 = m[7],  m32 = m[11], m33 = m[15];
 
-            this.#internal.set(multipliedMatrices(
-                this.#internal,
-                new Float64Array([
-                    1, t, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            ));
+        const b00 = m00 * m11 - m10 * m01;
+        const b01 = m00 * m21 - m20 * m01;
+        const b02 = m00 * m31 - m30 * m01;
+        const b03 = m10 * m21 - m20 * m11;
+        const b04 = m10 * m31 - m30 * m11;
+        const b05 = m20 * m31 - m30 * m21;
+        const b06 = m02 * m13 - m12 * m03;
+        const b07 = m02 * m23 - m22 * m03;
+        const b08 = m02 * m33 - m32 * m03;
+        const b09 = m12 * m23 - m22 * m13;
+        const b10 = m12 * m33 - m32 * m13;
+        const b11 = m22 * m33 - m32 * m23;
 
+        const det =
+            b00 * b11 - b01 * b10 + b02 * b09 +
+            b03 * b08 - b04 * b07 + b05 * b06;
+
+        if (!det || !Number.isFinite(det)) {
+            this.#internal.fill(NaN);
+            this.#is2D = false;
             return this;
         }
 
-        skewYSelf(sy = 0) {
-            const t = Math.tan(sy * Math.PI / 180);
+        const invDet = 1.0 / det;
 
-            this.#internal.set(multipliedMatrices(
-                this.#internal,
-                new Float64Array([
-                    1, 0, 0, 0,
-                    t, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1
-                ])
-            ));
+        m[0]  = (m11 * b11 - m21 * b10 + m31 * b09) * invDet;
+        m[1]  = (m20 * b10 - m10 * b11 - m30 * b09) * invDet;
+        m[2]  = (m13 * b05 - m23 * b04 + m33 * b03) * invDet;
+        m[3]  = (m22 * b04 - m12 * b05 - m32 * b03) * invDet;
 
-            return this;
-        }
-        #parseTransformList(value: string) {
-            const transforms = [];
+        m[4]  = (m21 * b08 - m01 * b11 - m31 * b07) * invDet;
+        m[5]  = (m00 * b11 - m20 * b08 + m30 * b07) * invDet;
+        m[6]  = (m23 * b02 - m03 * b05 - m33 * b01) * invDet;
+        m[7]  = (m02 * b05 - m22 * b02 + m32 * b01) * invDet;
 
-            let i = 0;
+        m[8]  = (m01 * b10 - m11 * b08 + m31 * b06) * invDet;
+        m[9]  = (m10 * b08 - m00 * b10 - m30 * b06) * invDet;
+        m[10] = (m03 * b04 - m13 * b02 + m33 * b00) * invDet;
+        m[11] = (m12 * b02 - m02 * b04 - m32 * b00) * invDet;
 
-            while (i < value.length) {
-                while (/\s/.test(value[i])) i++;
+        m[12] = (m11 * b07 - m01 * b09 - m21 * b06) * invDet;
+        m[13] = (m00 * b09 - m10 * b07 + m20 * b06) * invDet;
+        m[14] = (m13 * b01 - m03 * b03 - m23 * b00) * invDet;
+        m[15] = (m02 * b03 - m12 * b01 + m22 * b00) * invDet;
 
-                if (i >= value.length)
-                    break;
+        return this;
+    }
 
-                const nameStart = i;
+    // --- Immutable Transformations ---
 
-                while (/[A-Za-z0-9]/.test(value[i]))
-                    i++;
+    translate(tx = 0, ty = 0, tz = 0): DOMMatrix {
+        return this.#clone().translateSelf(tx, ty, tz);
+    }
 
-                const name = value.substring(nameStart, i);
+    scale(
+        scaleX = 1,
+        scaleY = scaleX,
+        scaleZ = 1,
+        originX = 0,
+        originY = 0,
+        originZ = 0
+    ): DOMMatrix {
+        return this.#clone().scaleSelf(
+            scaleX,
+            scaleY,
+            scaleZ,
+            originX,
+            originY,
+            originZ
+        );
+    }
 
-                while (/\s/.test(value[i])) i++;
+    scale3d(scale = 1, originX = 0, originY = 0, originZ = 0): DOMMatrix {
+        return this.#clone().scale3dSelf(scale, originX, originY, originZ);
+    }
 
-                if (value[i] !== "(")
-                    return "error";
+    scaleNonUniform(scaleX = 1, scaleY = 1): DOMMatrix {
+        return this.#clone().scaleSelf(scaleX, scaleY, 1, 0, 0, 0);
+    }
 
+    rotate(rotX = 0, rotY?: number, rotZ?: number): DOMMatrix {
+        return this.#clone().rotateSelf(rotX, rotY, rotZ);
+    }
+
+    rotateAxisAngle(x = 0, y = 0, z = 1, angle = 0): DOMMatrix {
+        return this.#clone().rotateAxisAngleSelf(x, y, z, angle);
+    }
+
+    rotateFromVector(x = 0, y = 0): DOMMatrix {
+        return this.#clone().rotateFromVectorSelf(x, y);
+    }
+
+    skewX(sx = 0): DOMMatrix {
+        return this.#clone().skewXSelf(sx);
+    }
+
+    skewY(sy = 0): DOMMatrix {
+        return this.#clone().skewYSelf(sy);
+    }
+
+    multiply(other?: DOMMatrixInit): DOMMatrix {
+        return this.#clone().multiplySelf(other);
+    }
+
+    flipX(): DOMMatrix {
+        const copy = this.#clone();
+        // copy.#internal.set(
+        //     multipliedMatrices(
+        //         copy.#internal,
+        //         new Float64Array([
+        //             -1, 0, 0, 0,
+        //             0, 1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        copy.#internal[0]*=-1
+        return copy;
+    }
+
+    flipY(): DOMMatrix {
+        const copy = this.#clone();
+        // copy.#internal.set(
+        //     multipliedMatrices(
+        //         copy.#internal,
+        //         new Float64Array([
+        //             1, 0, 0, 0,
+        //             0, -1, 0, 0,
+        //             0, 0, 1, 0,
+        //             0, 0, 0, 1
+        //         ])
+        //     )
+        // );
+        copy.#internal[5]*=-1
+        return copy;
+    }
+
+    inverse(): DOMMatrix {
+        return this.#clone().invertSelf();
+    }
+
+    transformPoint(point?: DOMPointInit): { x: number; y: number; z: number; w: number } {
+        const x = point?.x ?? 0;
+        const y = point?.y ?? 0;
+        const z = point?.z ?? 0;
+        const w = point?.w ?? 1;
+        const m = this.#internal;
+
+        return {
+            x: m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+            y: m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+            z: m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+            w: m[3] * x + m[7] * y + m[11] * z + m[15] * w
+        };
+    }
+
+    toFloat32Array(): Float32Array {
+        return new Float32Array(this.#internal);
+    }
+
+    toFloat64Array(): Float64Array {
+        return new Float64Array(this.#internal);
+    }
+
+    toJSON() {
+        return {
+            a: this.a,
+            b: this.b,
+            c: this.c,
+            d: this.d,
+            e: this.e,
+            f: this.f,
+            m11: this.m11,
+            m12: this.m12,
+            m13: this.m13,
+            m14: this.m14,
+            m21: this.m21,
+            m22: this.m22,
+            m23: this.m23,
+            m24: this.m24,
+            m31: this.m31,
+            m32: this.m32,
+            m33: this.m33,
+            m34: this.m34,
+            m41: this.m41,
+            m42: this.m42,
+            m43: this.m43,
+            m44: this.m44,
+            is2D: this.is2D,
+            isIdentity: this.isIdentity
+        };
+    }
+
+    // --- CSS Transform Parsing ---
+
+    #parseTransformList(value: string) {
+        const transforms: { name: string; args: string }[] = [];
+        let i = 0;
+
+        while (i < value.length) {
+            while (/\s/.test(value[i])) i++;
+            if (i >= value.length) break;
+
+            const nameStart = i;
+            while (/[A-Za-z0-9-]/.test(value[i])) i++;
+            const name = value.substring(nameStart, i);
+
+            if (!name || value[i] !== "(") {
+                return "error";
+            }
+
+            i++; // skip '('
+            let depth = 1;
+            const argsStart = i;
+
+            while (i < value.length && depth > 0) {
+                if (value[i] === "(") depth++;
+                else if (value[i] === ")") depth--;
                 i++;
-
-                let depth = 1;
-                const argsStart = i;
-
-                while (i < value.length && depth > 0) {
-                    if (value[i] === "(")
-                        depth++;
-                    else if (value[i] === ")")
-                        depth--;
-
-                    i++;
-                }
-
-                if (depth !== 0)
-                    return "error";
-
-                transforms.push({
-                    name,
-                    args: value.substring(argsStart, i - 1)
-                });
             }
 
-            return transforms;
+            if (depth !== 0) return "error";
+
+            transforms.push({
+                name,
+                args: value.substring(argsStart, i - 1)
+            });
         }
 
-        #splitArguments(args: string) {
-            const result = [];
+        return transforms;
+    }
 
-            let current = "";
-            let depth = 0;
+    #splitArguments(args: string): string[] | null {
+        const trimmed = args.trim();
+        if (!trimmed) return [];
 
-            for (const c of args) {
-                if (c === "(") depth++;
-                if (c === ")") depth--;
-
-                if ((c === "," || /\s/.test(c)) && depth === 0) {
-                    if (current.length) {
-                        result.push(current);
-                        current = "";
-                    }
-                    continue;
-                }
-
-                current += c;
-            }
-
-            if (current.length)
-                result.push(current);
-
-            return result;
+        // Reject leading, trailing, or consecutive commas
+        if (trimmed.startsWith(",") || trimmed.endsWith(",") || /,\s*,/.test(trimmed)) {
+            return null;
         }
 
+        return trimmed.split(/\s*,\s*/);
+    }
 
-        #parseAngle(value: string) {
-            if (value.endsWith("deg"))
-                return Number.parseFloat(value);
+    #parseNumber(value: string): number | null {
+        if (!CSS_NUMBER_RE.test(value)) return null;
+        const n = Number.parseFloat(value);
+        return Number.isFinite(n) ? n : null;
+    }
 
-            if (value.endsWith("rad"))
-                return Number.parseFloat(value) * 180 / Math.PI;
-
-            if (value.endsWith("grad"))
-                return Number.parseFloat(value) * 0.9;
-
-            if (value.endsWith("turn"))
-                return Number.parseFloat(value) * 360;
-
-            return Number.parseFloat(value);
+    #parseAngle(value: string): number | null {
+        if (CSS_NUMBER_RE.test(value)) {
+            const n = Number.parseFloat(value);
+            return n === 0 ? 0 : null; // Only unitless 0 is valid for CSS <angle>
         }
 
-        #parseLength(value: string) : number | null {
-            if (!value) return null
-            const rootFontSize = 16.0;
-            const parentFontSize = 16.0;
-            const exSize = 8.0;
-            const chSize = 8.0;
-        
-            if (value.endsWith("px")) return Number.parseFloat(value);
-            if (value.endsWith("pt")) return Number.parseFloat(value) * 1.3333333730697632;
-            if (value.endsWith("pc")) return Number.parseFloat(value) * 16.0;
-            if (value.endsWith("in")) return Number.parseFloat(value) * 96.0;
-            if (value.endsWith("cm")) return Number.parseFloat(value) * 37.79527559055118;
-            if (value.endsWith("mm")) return Number.parseFloat(value) * 3.7795275590551185;
-            if (value.endsWith("q"))  return Number.parseFloat(value) * 0.9448818897637796;
-            if (value.endsWith("em")) return Number.parseFloat(value) * parentFontSize;
-            if (value.endsWith("rem")) return Number.parseFloat(value) * rootFontSize;
-            if (value.endsWith("ex")) return Number.parseFloat(value) * exSize;
-            if (value.endsWith("ch")) return Number.parseFloat(value) * chSize;
-            if (value.endsWith("%"))  return Number.parseFloat(value) * parentFontSize / 100.0;
-            if (value.endsWith("px")){
-                return Number.parseFloat(value);
-            } else if (value.endsWith("pt")){
-                return Number.parseFloat(value)*1.3333333730697632;
-            }
-            return null
+        const match = CSS_DIM_RE.exec(value);
+        if (!match) return null;
+
+        const num = Number.parseFloat(match[1]);
+        if (!Number.isFinite(num)) return null;
+
+        switch (match[2].toLowerCase()) {
+            case "deg":  return num;
+            case "rad":  return (num * 180) / Math.PI;
+            case "grad": return num * 0.9;
+            case "turn": return num * 360;
+            default:     return null;
+        }
+    }
+
+    #parseLength(value: string): number | null {
+        if (!value) return null;
+
+        if (CSS_NUMBER_RE.test(value)) {
+            const n = Number.parseFloat(value);
+            return n === 0 ? 0 : null; // Only unitless 0 is valid for CSS <length>
         }
 
-        setMatrixValue(value: string) {
-            value = value.trim();
+        const match = CSS_DIM_RE.exec(value);
+        if (!match) return null;
 
-            if (value.length === 0)
-                throw new DOMException("Invalid transform.", "SyntaxError");
+        const num = Number.parseFloat(match[1]);
+        if (!Number.isFinite(num)) return null;
 
-            // this.identity();
+        const rootFontSize = 16.0;
+        const parentFontSize = 16.0;
+        const exSize = 8.0;
+        const chSize = 8.0;
 
-            const transforms = this.#parseTransformList(value);
+        switch (match[2].toLowerCase()) {
+            case "px":  return num;
+            case "pt":  return num * (96 / 72);
+            case "pc":  return num * 16.0;
+            case "in":  return num * 96.0;
+            case "cm":  return num * (96 / 2.54);
+            case "mm":  return num * (96 / 25.4);
+            case "q":   return num * (96 / 101.6);
+            case "em":  return num * parentFontSize;
+            case "rem": return num * rootFontSize;
+            case "ex":  return num * exSize;
+            case "ch":  return num * chSize;
+            default:    return null; // Percentages are not allowed in DOMMatrix syntax
+        }
+    }
 
-            if (transforms == "error") {
-                throwParseErrorDMatrix("setMatrixValue",value)
-                return;
-            }
+    #throwParseOrConstructError(caller: "setMatrixValue" | "constructor", raw: string): never {
+        if (caller === "constructor") {
+            throw new SyntaxError(
+                `Failed to construct 'DOMMatrix': Failed to parse '${raw}'.`
+            );
+        }
+        throwParseErrorDMatrix("setMatrixValue", raw);
+    }
 
-            for (const transform of transforms) {
+    #parseAndApplyTransformList(
+        rawInput: string,
+        caller: "setMatrixValue" | "constructor"
+    ): this {
+        const value = rawInput.trim();
 
-                const args = this.#splitArguments(transform.args);
-
-                switch (transform.name) {
-                    case "matrix": {
-                        if (args.length !== 6)
-                            throw new DOMException("matrix() requires 6 arguments.", "SyntaxError");
-
-                        let a = Number.parseFloat(args[0])
-                        let b = Number.parseFloat(args[1])
-                        let c = Number.parseFloat(args[2])
-                        let d = Number.parseFloat(args[3])
-
-                        if (isNaN(a) || isNaN(b) || isNaN(c) || isNaN(d)) throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.a = a;
-                        this.b = b;
-                        this.c = c;
-                        this.d = d;
-                        this.e = this.#parseLength(args[4]);
-                        this.f = this.#parseLength(args[5]);
-
-                        this.is2D = true;
-                        break;
-                    }
-                    case "matrix3d": {
-                        if (args.length !== 16)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        for (let i = 0; i < 16; i++)
-                            this.#internal[i] = Number.parseFloat(args[i]);
-
-                        this.is2D = false;
-                        break;
-                    }
-                    case "translate": {
-                        if (args.length < 1 || args.length > 2)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        let lx = this.#parseLength(args[0])
-                        let ly = this.#parseLength(args[1])
-                        if (!lx){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-
-                        const tx = lx;
-                        const ty = args.length === 2 ? ly??0 : 0;
-                        
-                        this.translateSelf(tx, ty);
-                        break;
-                    }
-
-                    case "translateX": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        let l = this.#parseLength(args[0])
-                        if (!l){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-                        this.translateSelf(l, 0);
-                        break;
-                    }
-
-                    case "translateY": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        let l = this.#parseLength(args[0])
-                        if (!l){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-                        this.translateSelf(0, l);
-                        break;
-                    }
-
-                    case "translateZ": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        let l = this.#parseLength(args[0])
-                        if (!l){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-                        this.translateSelf(0, 0, l);
-                        break;
-                    }
-
-                    case "translate3d": {
-                        if (args.length !== 3)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        let la = this.#parseLength(args[0])
-                        let lb = this.#parseLength(args[0])
-                        let lc = this.#parseLength(args[0])
-                        if (!la || !lb || !lc){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-
-                        this.translateSelf(
-                            la,
-                            lb,
-                            lc
-                        );
-
-                        break;
-                    }
-
-                    case "scale": {
-                        if (args.length < 1 || args.length > 2)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        const sx = Number.parseFloat(args[0]);
-                        const sy = args.length === 2 ? Number.parseFloat(args[1]) : sx;
-
-                        this.scaleSelf(sx, sy);
-                        break;
-                    }
-
-                    case "scaleX": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.scaleSelf(Number.parseFloat(args[0]), 1);
-                        break;
-                    }
-
-                    case "scaleY": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.scaleSelf(1, Number.parseFloat(args[0]));
-                        break;
-                    }
-
-                    case "scaleZ": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.scaleSelf(1, 1, Number.parseFloat(args[0]));
-                        break;
-                    }
-
-                    case "scale3d": {
-                        if (args.length !== 3)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.scale3dSelf(
-                            Number.parseFloat(args[0]),
-                            Number.parseFloat(args[1]),
-                            Number.parseFloat(args[2])
-                        );
-
-                        break;
-                    }
-
-                    case "rotate": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.rotateSelf(this.#parseAngle(args[0]));
-                        break;
-                    }
-
-                    case "rotateX": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.rotateSelf(this.#parseAngle(args[0]), 0, 0);
-                        break;
-                    }
-
-                    case "rotateY": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.rotateSelf(0, this.#parseAngle(args[0]), 0);
-                        break;
-                    }
-
-                    case "rotateZ": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.rotateSelf(0, 0, this.#parseAngle(args[0]));
-                        break;
-                    }
-
-                    case "rotate3d": {
-                        if (args.length !== 4)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.rotateAxisAngleSelf(
-                            Number.parseFloat(args[0]),
-                            Number.parseFloat(args[1]),
-                            Number.parseFloat(args[2]),
-                            this.#parseAngle(args[3])
-                        );
-
-                        break;
-                    }
-
-                    case "skew": {
-                        if (args.length < 1 || args.length > 2)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.skewXSelf(this.#parseAngle(args[0]));
-
-                        if (args.length === 2)
-                            this.skewYSelf(this.#parseAngle(args[1]));
-
-                        break;
-                    }
-
-                    case "skewX": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.skewXSelf(this.#parseAngle(args[0]));
-                        break;
-                    }
-
-                    case "skewY": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        this.skewYSelf(this.#parseAngle(args[0]));
-                        break;
-                    }
-
-                    case "perspective": {
-                        if (args.length !== 1)
-                            throwParseErrorDMatrix("setMatrixValue",value)
-
-                        const d = this.#parseLength(args[0]);
-
-                        if (d === 0 || !d){
-                            throwParseErrorDMatrix("setMatrixValue",value)
-                            return;
-                        }
-
-                        this.#internal.set(multipliedMatrices(
-                            this.#internal,
-                            new Float64Array([
-                                1, 0, 0,      0,
-                                0, 1, 0,      0,
-                                0, 0, 1, -1 / d,
-                                0, 0, 0,      1
-                            ])
-                        ));
-
-                        this.is2D = false;
-                        break;
-                    }
-
-                    default:
-                        throwParseErrorDMatrix("setMatrixValue",value)
-                }
-            }
-
+        // Spec: empty string or "none" resets to 2D identity matrix
+        if (value === "" || value.toLowerCase() === "none") {
+            this.#internal.set([
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ]);
+            this.#is2D = true;
             return this;
         }
 
-        toString(){
-            return this.is2D?
-            //If 2d
-            `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`
-            :
-            `matrix3d(${this.m11}, ${this.m12}, ${this.m13}, ${this.m14}, ${this.m21}, ${this.m22}, ${this.m23}, ${this.m24}, ${this.m31}, ${this.m32}, ${this.m33}, ${this.m34}, ${this.m41}, ${this.m42}, ${this.m43}, ${this.m44})`
+        const transforms = this.#parseTransformList(value);
+        if (transforms === "error" || transforms.length === 0) {
+            this.#throwParseOrConstructError(caller, rawInput);
         }
 
-        constructor();
-        constructor(matrix : Array<number> | ArrayBufferLike | ArrayLike<number>);
-        constructor(...args : any){
-            if (!isMatrixArray(args[0])) throw new SyntaxError(`Failed to construct 'DOMMatrix': Failed to parse '${args[0]}'.`);
-            //If no args are passed (default constructor), then 
-            if (args[0]) {
-                const len = args[0].length;
-                if (len != 6 && len != 16) throw new TypeError(`Failed to construct 'DOMMatrix': The sequence must contain 6 elements for a 2D matrix or 16 elements for a 3D matrix.`) 
-                let matrix = args[0];
-                if (len == 6) {
-                    this.a = matrix[0]
-                    this.b = matrix[1]
-                    this.c = matrix[2]
-                    this.d = matrix[3]
-                    this.e = matrix[4]
-                    this.f = matrix[5]
-                }else {
-                    let index = 0;
-                    for (const item of matrix){
-                        this.#internal[index] = item;
-                        index++;
+        // Work on a temporary matrix so partial transforms don't mutate `this` on syntax errors
+        const temp = new DOMMatrix();
+
+        for (const transform of transforms) {
+            const args = this.#splitArguments(transform.args);
+            if (!args) {
+                this.#throwParseOrConstructError(caller, rawInput);
+            }
+
+            switch (transform.name.toLowerCase()) {
+                case "matrix": {
+                    if (args.length !== 6) {
+                        this.#throwParseOrConstructError(caller, rawInput);
                     }
+                    const nums = args.map((arg) => this.#parseNumber(arg));
+                    if (nums.some((n) => n === null)) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const [a, b, c, d, e, f] = nums as number[];
+                    temp.multiplySelf(new DOMMatrix([a, b, c, d, e, f]));
+                    break;
                 }
-                this.#isIdentity = matrix[0]  == 1 && matrix[1]  == 0 && matrix[2]  == 0 && matrix[3]  == 0 &&
-                matrix[4]  == 0 && matrix[5]  == 1 && matrix[6]  == 0 && matrix[7]  == 0 &&
-                matrix[8]  == 0 && matrix[9]  == 0 && matrix[10] == 1 && matrix[11] == 0 &&
-                matrix[12] == 0 && matrix[13] == 0 && matrix[14] == 0 && matrix[15] == 1;
-                // this.a = this.m11
-                // this.b = this.m21
-                // this.c = this.m12
-                // this.d = this.m22
-                // this.e = this.m41
-                // this.f = this.m42
+
+                case "matrix3d": {
+                    if (args.length !== 16) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const nums = args.map((arg) => this.#parseNumber(arg));
+                    if (nums.some((n) => n === null)) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.multiplySelf(new DOMMatrix(nums as number[]));
+                    break;
+                }
+
+                case "translate": {
+                    if (args.length < 1 || args.length > 2) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const tx = this.#parseLength(args[0]);
+                    const ty = args.length === 2 ? this.#parseLength(args[1]) : 0;
+                    if (tx === null || ty === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.translateSelf(tx, ty, 0);
+                    break;
+                }
+
+                case "translatex": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const tx = this.#parseLength(args[0]);
+                    if (tx === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.translateSelf(tx, 0, 0);
+                    break;
+                }
+
+                case "translatey": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const ty = this.#parseLength(args[0]);
+                    if (ty === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.translateSelf(0, ty, 0);
+                    break;
+                }
+
+                case "translatez": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const tz = this.#parseLength(args[0]);
+                    if (tz === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.translateSelf(0, 0, tz);
+                    break;
+                }
+
+                case "translate3d": {
+                    if (args.length !== 3) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const tx = this.#parseLength(args[0]);
+                    const ty = this.#parseLength(args[1]);
+                    const tz = this.#parseLength(args[2]);
+                    if (tx === null || ty === null || tz === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.translateSelf(tx, ty, tz);
+                    break;
+                }
+
+                case "scale": {
+                    if (args.length < 1 || args.length > 2) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const sx = this.#parseNumber(args[0]);
+                    const sy = args.length === 2 ? this.#parseNumber(args[1]) : sx;
+                    if (sx === null || sy === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.scaleSelf(sx, sy, 1);
+                    break;
+                }
+
+                case "scalex": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const sx = this.#parseNumber(args[0]);
+                    if (sx === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.scaleSelf(sx, 1, 1);
+                    break;
+                }
+
+                case "scaley": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const sy = this.#parseNumber(args[0]);
+                    if (sy === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.scaleSelf(1, sy, 1);
+                    break;
+                }
+
+                case "scalez": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const sz = this.#parseNumber(args[0]);
+                    if (sz === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.scaleSelf(1, 1, sz);
+                    break;
+                }
+
+                case "scale3d": {
+                    if (args.length !== 3) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const sx = this.#parseNumber(args[0]);
+                    const sy = this.#parseNumber(args[1]);
+                    const sz = this.#parseNumber(args[2]);
+                    if (sx === null || sy === null || sz === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.scaleSelf(sx, sy, sz);
+                    break;
+                }
+
+                case "rotate": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const angle = this.#parseAngle(args[0]);
+                    if (angle === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.rotateSelf(0, 0, angle);
+                    break;
+                }
+
+                case "rotatex": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const angle = this.#parseAngle(args[0]);
+                    if (angle === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.rotateSelf(angle, 0, 0);
+                    break;
+                }
+
+                case "rotatey": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const angle = this.#parseAngle(args[0]);
+                    if (angle === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.rotateSelf(0, angle, 0);
+                    break;
+                }
+
+                case "rotatez": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const angle = this.#parseAngle(args[0]);
+                    if (angle === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.rotateSelf(0, 0, angle);
+                    break;
+                }
+
+                case "rotate3d": {
+                    if (args.length !== 4) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const x = this.#parseNumber(args[0]);
+                    const y = this.#parseNumber(args[1]);
+                    const z = this.#parseNumber(args[2]);
+                    const angle = this.#parseAngle(args[3]);
+                    if (x === null || y === null || z === null || angle === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.rotateAxisAngleSelf(x, y, z, angle);
+                    break;
+                }
+
+                case "skew": {
+                    if (args.length < 1 || args.length > 2) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const ax = this.#parseAngle(args[0]);
+                    const ay = args.length === 2 ? this.#parseAngle(args[1]) : 0;
+                    if (ax === null || ay === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const tx = Math.tan((ax * Math.PI) / 180);
+                    const ty = Math.tan((ay * Math.PI) / 180);
+                    // temp.#internal.set(
+                    //     multipliedMatrices(
+                    //         temp.#internal,
+                    //         new Float64Array([
+                    //             1, ty, 0, 0,
+                    //             tx, 1, 0, 0,
+                    //             0, 0, 1, 0,
+                    //             0, 0, 0, 1
+                    //         ])
+                    //     )
+                    // );
+                    temp.#internal[2] += ty;
+                    temp.#internal[4] += tx;
+                    break;
+                }
+
+                case "skewx": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const ax = this.#parseAngle(args[0]);
+                    if (ax === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.skewXSelf(ax);
+                    break;
+                }
+
+                case "skewy": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const ay = this.#parseAngle(args[0]);
+                    if (ay === null) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    temp.skewYSelf(ay);
+                    break;
+                }
+
+                case "perspective": {
+                    if (args.length !== 1) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    if (args[0].toLowerCase() === "none") {
+                        break;
+                    }
+                    const d = this.#parseLength(args[0]);
+                    // CSS perspective length cannot be negative
+                    if (d === null || d < 0) {
+                        this.#throwParseOrConstructError(caller, rawInput);
+                    }
+                    const m34 = d === 0 ? -Infinity : -1 / d;
+                    // temp.#internal.set(
+                    //     multipliedMatrices(
+                    //         temp.#internal,
+                    //         new Float64Array([
+                    //             1, 0, 0, 0,
+                    //             0, 1, 0, 0,
+                    //             0, 0, 1, m34,
+                    //             0, 0, 0, 1
+                    //         ])
+                    //     )
+                    // );
+                    temp.#internal[11] += m34;
+                    temp.#is2D = false;
+                    break;
+                }
+
+                default:
+                    this.#throwParseOrConstructError(caller, rawInput);
             }
         }
 
-        get ptr(){
-            return ptr(this.#internal)
-        }
-
-        static fromFloat32Array(arr : Float32Array) : DOMMatrix | void {
-            if (arr instanceof Float32Array) return new DOMMatrix(arr);
-            throw new TypeError(`Failed to execute 'fromFloat32Array' on 'DOMMatrix': parameter 1 is not of type 'Float32Array'.`)
-        }
-        static fromFloat64Array(arr : Float64Array) : DOMMatrix | void {
-            if (arr instanceof Float64Array) return new DOMMatrix(arr);
-            throw new TypeError(`Failed to execute 'fromFloat64Array' on 'DOMMatrix': parameter 1 is not of type 'Float64Array'.`)
-        }
-        static fromMatrix(arr : any) : DOMMatrix {
-            if (!arr) return new DOMMatrix();
-            if (
-                arr.a != arr.m11 ||
-                arr.b != arr.m21 ||
-                arr.c != arr.m12 ||
-                arr.d != arr.m22 ||
-                arr.e != arr.m41 ||
-                arr.f != arr.m42
-            ) throw new TypeError(`Failed to execute 'fromMatrix' on 'DOMMatrix': Property mismatch on matrix initialization.`)
-            let a = arr.a ?? undefined;
-            let b = arr.b ?? undefined;
-            let c = arr.c ?? undefined;
-            let d = arr.d ?? undefined;
-            let e = arr.e ?? undefined;
-            let f = arr.f ?? undefined;
-            let m11 = arr.m11 ?? a ?? 1;
-            let m12 = arr.m12 ?? b ?? 0;
-            let m13 = arr.m13 ?? 0;
-            let m14 = arr.m14 ?? 0;
-            let m21 = arr.m21 ?? c ?? 0;
-            let m22 = arr.m22 ?? d ?? 1;
-            let m23 = arr.m23 ?? 0;
-            let m24 = arr.m24 ?? 0;
-            let m31 = arr.m31 ?? 0;
-            let m32 = arr.m32 ?? 0;
-            let m33 = arr.m33 ?? 1;
-            let m34 = arr.m34 ?? 0;
-            let m41 = arr.m41 ?? e ?? 0;
-            let m42 = arr.m42 ?? f ?? 0;
-            let m43 = arr.m43 ?? 0;
-            let m44 = arr.m44 ?? 1;
-
-            return new DOMMatrix([m11,m12,m13,m14,m21,m22,m23,m24,m31,m32,m33,m34,m41,m42,m43,m44])
-        }
+        this.#internal.set(temp.#internal);
+        this.#is2D = temp.#is2D;
+        return this;
     }
 
-    const proto = DOMMatrix.prototype;
-        
-    for (const key of Object.getOwnPropertyNames(proto)) {
-        const desc = Object.getOwnPropertyDescriptor(proto, key);
-        if (key == "constructor"){
-            desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
-            continue
+    setMatrixValue(value: string): this {
+        return this.#parseAndApplyTransformList(String(value), "setMatrixValue");
+    }
+
+    toString(): string {
+        for (let i = 0; i < 16; i++) {
+            if (!Number.isFinite(this.#internal[i])) {
+                throw new DOMException(
+                    "Failed to execute 'toString' on 'DOMMatrix': Matrix contains non-finite values.",
+                    "InvalidStateError"
+                );
+            }
         }
-        if (typeof desc?.value === "function") {
+
+        return this.is2D
+            ? `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`
+            : `matrix3d(${this.m11}, ${this.m12}, ${this.m13}, ${this.m14}, ${this.m21}, ${this.m22}, ${this.m23}, ${this.m24}, ${this.m31}, ${this.m32}, ${this.m33}, ${this.m34}, ${this.m41}, ${this.m42}, ${this.m43}, ${this.m44})`;
+    }
+
+    static fromFloat32Array(arr: Float32Array): DOMMatrix {
+        if (arr instanceof Float32Array) return new DOMMatrix(arr);
+        throw new TypeError(
+            `Failed to execute 'fromFloat32Array' on 'DOMMatrix': parameter 1 is not of type 'Float32Array'.`
+        );
+    }
+
+    static fromFloat64Array(arr: Float64Array): DOMMatrix {
+        if (arr instanceof Float64Array) return new DOMMatrix(arr);
+        throw new TypeError(
+            `Failed to execute 'fromFloat64Array' on 'DOMMatrix': parameter 1 is not of type 'Float64Array'.`
+        );
+    }
+
+    static fromMatrix(other?: DOMMatrixInit): DOMMatrix {
+        if (!other) return new DOMMatrix();
+
+        // Spec validation: a/m11, b/m12, c/m21, d/m22, e/m41, f/m42 must match if both are provided
+        if (
+            (other.a !== undefined && other.m11 !== undefined && other.a !== other.m11) ||
+            (other.b !== undefined && other.m12 !== undefined && other.b !== other.m12) ||
+            (other.c !== undefined && other.m21 !== undefined && other.c !== other.m21) ||
+            (other.d !== undefined && other.m22 !== undefined && other.d !== other.m22) ||
+            (other.e !== undefined && other.m41 !== undefined && other.e !== other.m41) ||
+            (other.f !== undefined && other.m42 !== undefined && other.f !== other.m42)
+        ) {
+            throw new TypeError(
+                `Failed to execute 'fromMatrix' on 'DOMMatrix': Property mismatch on matrix initialization.`
+            );
+        }
+
+        const m11 = other.m11 ?? other.a ?? 1;
+        const m12 = other.m12 ?? other.b ?? 0;
+        const m13 = other.m13 ?? 0;
+        const m14 = other.m14 ?? 0;
+        const m21 = other.m21 ?? other.c ?? 0;
+        const m22 = other.m22 ?? other.d ?? 1;
+        const m23 = other.m23 ?? 0;
+        const m24 = other.m24 ?? 0;
+        const m31 = other.m31 ?? 0;
+        const m32 = other.m32 ?? 0;
+        const m33 = other.m33 ?? 1;
+        const m34 = other.m34 ?? 0;
+        const m41 = other.m41 ?? other.e ?? 0;
+        const m42 = other.m42 ?? other.f ?? 0;
+        const m43 = other.m43 ?? 0;
+        const m44 = other.m44 ?? 1;
+
+        const has3DComponents =
+            m13 !== 0 || m14 !== 0 ||
+            m23 !== 0 || m24 !== 0 ||
+            m31 !== 0 || m32 !== 0 || m33 !== 1 || m34 !== 0 ||
+            m43 !== 0 || m44 !== 1;
+
+        if (other.is2D === true && has3DComponents) {
+            throw new TypeError(
+                `Failed to execute 'fromMatrix' on 'DOMMatrix': Property mismatch on matrix initialization.`
+            );
+        }
+
+        const is2D = other.is2D !== undefined ? other.is2D : !has3DComponents;
+
+        if (is2D) {
+            return new DOMMatrix([m11, m12, m21, m22, m41, m42]);
+        }
+
+        return new DOMMatrix([
+            m11, m12, m13, m14,
+            m21, m22, m23, m24,
+            m31, m32, m33, m34,
+            m41, m42, m43, m44
+        ]);
+    }
+}
+
+const proto = DOMMatrix.prototype;
+
+for (const key of Object.getOwnPropertyNames(proto)) {
+    const desc = Object.getOwnPropertyDescriptor(proto, key);
+    if (key === "constructor") {
+        if (desc) {
             desc.value.toString = () =>
-                `function ${key}() { [native code] }`;
+                `function ${proto.constructor.name}() { [native code] }`;
         }
+        continue;
     }
+    if (typeof desc?.value === "function") {
+        desc.value.toString = () => `function ${key}() { [native code] }`;
+    }
+}

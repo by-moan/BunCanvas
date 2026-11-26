@@ -1,4 +1,4 @@
-import { CanvasLineJoinEnum } from "../native/enums";
+import { CanvasLineJoinEnum } from "../../internal/native/enums";
 
 export const CanvasLineJoin = {
     "round": CanvasLineJoinEnum.kRound_Join,

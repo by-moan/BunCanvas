@@ -1,6 +1,6 @@
 class Path2D {
-    SkPathBuilder builder;
     public:
+    SkPathBuilder builder;
     static constexpr uint64_t MAGIC = 0x0430F69F;
     uint64_t magic = MAGIC;
 
@@ -227,6 +227,9 @@ class Path2D {
         SkRRect rRect;
         rRect.setRectRadii(rect, radiiV);
         builder.addRRect(rRect);
+
+        delete radii;
+        delete[] radiiV;
     }
 
     void close() {

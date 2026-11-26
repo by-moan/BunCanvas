@@ -553,14 +553,29 @@ class BunCanvasSurfaceProvider {
         // }
         if (hadOldTex) {
             if (oldWorkTex.isValid()) {
-                retiredTextures.push_back({oldWorkTex, 0});
+                retiredTextures.push_back({oldWorkTex, 1});
             }
             if (oldRenderTex.isValid()) {
-                retiredTextures.push_back({oldRenderTex, 0});
+                retiredTextures.push_back({oldRenderTex, 1});
             }
         }
         #endif
         return std::move(tmp);
+    }
+
+    // In BunCanvasSurfaceProvider: add a helper called after GPU sync
+    void drainRetiredTextures(bool forceAll = false) {
+    #ifndef __APPLE__
+        if (!gpuContextReady || retiredTextures.empty() || !mainThreadCtx || !mainThreadCtx->context) return;
+        for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
+            if (forceAll || --it->framesLeft <= 0) {
+                mainThreadCtx->context->deleteBackendTexture(it->tex);
+                it = retiredTextures.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    #endif
     }
     
     void commit(){
@@ -618,6 +633,7 @@ class BunCanvasRenderingContext2D : public BunCanvasSurfaceProvider {
                 SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
                 currentState.sampling
             );
+
         }
 
         font_cache.setFont("10px sans-serif", currentState.font_current);
@@ -639,25 +655,25 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             VK_QUEUE_FAMILY_IGNORED
         );
+    std::unique_lock<std::mutex> lock(sharedQueueMtx, std::defer_lock);
+    if (mainQueue == renderQueue) lock.lock();
+    mainCtx->flushAndSubmit(GrSyncCpu::kYes);
 
     for (auto* element : canvases) {
         std::lock_guard<std::mutex> lock(element->mutex);
         if (element->isImmediate) element->commit();
-        #ifdef __APPLE__
-        if (element->renderSurface) {
-            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
-        }
-        #else
-        if (element->hasBackendTex && element->renderSurface) {
-            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
-        }
-        #endif
+        element->drainRetiredTextures(false);
+        // #ifdef __APPLE__
+        // if (element->renderSurface) {
+        //     mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
+        // }
+        // #else
+        // if (element->hasBackendTex && element->renderSurface) {
+        //     mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
+        // }
+        // #endif
         
     }
-
-    std::unique_lock<std::mutex> lock(sharedQueueMtx, std::defer_lock);
-    if (mainQueue == renderQueue) lock.lock();
-    mainCtx->flushAndSubmit(GrSyncCpu::kYes);
 }
 
 void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, int argc){
@@ -2040,10 +2056,12 @@ extern "C" {
 
                 #ifndef __APPLE__
                 if (gpuContextReady && ctx->hasBackendTex && ctx->workSurface) {
+                    mainThreadCtx->context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
                     mainThreadCtx->context->flush(ctx->workSurface.get());
                 }
                 #else
-                if (ctx->workSurface) {
+                if (ctx->workSurface && renderThreadContext && renderThreadContext->context) {
+                    renderThreadContext->context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
                     renderThreadContext->context->flush(ctx->workSurface.get());
                 }
                 #endif

@@ -11,7 +11,7 @@ window.onresize = (evt)=>{
     canvas.height = window.innerHeight
 }
 
-const ctx = canvas.getContext('2d', {pipeline:"batched"});
+const ctx = canvas.getContext('2d', {pipeline:"immediate"});
 
 console.log(ctx.constructor.name)
 

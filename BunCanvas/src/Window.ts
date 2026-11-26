@@ -389,6 +389,7 @@ export class Window extends WindowEventTarget {
 
 				if (frameInterval === 0 || delta >= frameInterval) {
 					lastFrameTime = frameInterval > 0 ? now - (delta % frameInterval) : now;
+					lib.symbols.update_window();
 
 					this.#processEvents();
 					if (requestedFrames.length > 0) {
@@ -399,11 +400,11 @@ export class Window extends WindowEventTarget {
 						}
 					}
 
-					lib.symbols.update_window();
 				}
+				setImmediate(loop)
 			};
 
-			setInterval(loop,0);
+			setImmediate(loop);
 		}
 		
 	}

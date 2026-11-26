@@ -1,4 +1,5 @@
-static std::unordered_map<std::string_view, SkColor4f> colorCache{{
+
+static std::unordered_map<std::string, SkColor4f, TransparentStringHash, std::equal_to<>> colorCache{{
     {"aliceblue",SkColor4f{0.9411765f, 0.9725490f, 1.0000000f, 1.0f}},
     {"antiquewhite",SkColor4f{0.9803922f, 0.9215686f, 0.8431373f, 1.0f}},
     {"aqua",SkColor4f{0.0000000f, 1.0000000f, 1.0000000f, 1.0f}},

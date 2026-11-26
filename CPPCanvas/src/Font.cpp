@@ -1,25 +1,12 @@
-std::unordered_map<std::string, sk_sp<SkTypeface>> fontRegistry;
-
-// Transparent hash for fast lookup without string construction
-struct StringHash {
+struct TransparentStringHash {
     using is_transparent = void;
     size_t operator()(std::string_view sv) const noexcept {
-        // FNV-1a hash
-        size_t hash = 14695981039346656037ull;
-        for (char c : sv) {
-            hash ^= static_cast<size_t>(static_cast<uint8_t>(c));
-            hash *= 1099511628211ull;
-        }
-        return hash;
+        return std::hash<std::string_view>{}(sv);
     }
 };
 
-struct StringEq {
-    using is_transparent = void;
-    bool operator()(std::string_view a, std::string_view b) const noexcept {
-        return a == b;
-    }
-};
+
+std::unordered_map<std::string, sk_sp<SkTypeface>, TransparentStringHash, std::equal_to<>> fontRegistry;
 
 class CanvasFontCache {
 public:
@@ -30,7 +17,7 @@ public:
 
 private:
     // Primary cache with transparent hash for fast lookup
-    std::unordered_map<std::string, CachedFont, StringHash, StringEq> cache_;
+    std::unordered_map<std::string, CachedFont, TransparentStringHash, std::equal_to<>> cache_;
     
     // Typeface cache: family name -> typeface
     std::unordered_map<std::string, sk_sp<SkTypeface>> typeface_cache_;

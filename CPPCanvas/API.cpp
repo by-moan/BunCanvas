@@ -286,7 +286,7 @@ targetPtr* validated(void* ptr){
 
 
 #include "src/Font.cpp"
-#include "src/KeywordColors.h"
+#include "src/KeywordColors.cpp"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"
 #include "src/Image.cpp"

@@ -677,6 +677,7 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
 }
 
 void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, int argc){
+    
     if (argc == 4) {
         (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(d[0], d[1], d[2], d[3]),ctx->currentState.sampling,&(ctx->currentState.imageColor));
     }
@@ -1289,7 +1290,7 @@ extern "C" {
         }
         #else
         auto _img = img->workSurface->makeTemporaryImage();
-        if (_img)drawImage(obj,_img,dimensions,argc);
+        if (_img) drawImage(obj,_img,dimensions,argc);
         #endif
     }
     
@@ -1939,10 +1940,10 @@ extern "C" {
         );
         (*ctx)()->resetMatrix();
         (*ctx)()->setMatrix(SkM44{
-            (float)mtx[0],  (float)mtx[1],  (float)mtx[2],  (float)mtx[3],
-            (float)mtx[4],  (float)mtx[5],  (float)mtx[6],  (float)mtx[7],
-            (float)mtx[8],  (float)mtx[9],  (float)mtx[10], (float)mtx[11],
-            (float)mtx[12], (float)mtx[13], (float)mtx[14], (float)mtx[15]
+            (float)mtx[0],  (float)mtx[4],  (float)mtx[8],  (float)mtx[12],
+            (float)mtx[1],  (float)mtx[5],  (float)mtx[9],  (float)mtx[13],
+            (float)mtx[2],  (float)mtx[6],  (float)mtx[10], (float)mtx[14],
+            (float)mtx[3], (float)mtx[7], (float)mtx[11], (float)mtx[15]
         });
 
         // SkImageFilters::Compose
@@ -2061,7 +2062,7 @@ extern "C" {
                 }
                 #else
                 if (ctx->workSurface && renderThreadContext && renderThreadContext->context) {
-                    renderThreadContext->context->purgeUnlockedResources(GrPurgeResourceOptions::kScratchResourcesOnly);
+                    renderThreadContext->context->purgeUnlockedResources(GrPurgeResourceOptions::kAllResources);
                     renderThreadContext->context->flush(ctx->workSurface.get());
                 }
                 #endif

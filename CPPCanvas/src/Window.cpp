@@ -491,22 +491,10 @@ extern "C" {
             glfwPollEvents();
 
             if (renderThreadContext && renderThreadContext->context) {
-                // One-time sane budget (~256 MB, matches Skia's default). 64 was BYTES,
-                // which purged every texture/atlas after each flush and caused the
-                // progressive FPS collapse on MoltenVK.
-                static bool cacheLimitSet = false;
-                if (!cacheLimitSet) {
-                    renderThreadContext->context->setResourceCacheLimit(256 * 1024 * 1024);
-                    cacheLimitSet = true;
-                }
-
                 for (auto* element : canvases) {
                     std::lock_guard<std::mutex> cLock(element->mutex);
                     if (element->isImmediate) element->commit();
                 }
-                // Only purge rarely (e.g. after resize / context loss), never per frame:
-                // renderThreadContext->context->purgeUnlockedResources(
-                //     GrPurgeResourceOptions::kScratchResourcesOnly);
             }
 
             present_composited_frame();

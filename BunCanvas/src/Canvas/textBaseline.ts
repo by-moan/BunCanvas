@@ -1,4 +1,4 @@
-import { CanvasTextBaseLineEnum } from "../native/enums";
+import { CanvasTextBaseLineEnum } from "../../internal/native/enums";
 
 export const CanvasTextBaseline = {
     "top": CanvasTextBaseLineEnum.Top,

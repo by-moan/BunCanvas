@@ -1,4 +1,4 @@
-import { CanvasSmoothingQualityEnum } from "../native/enums";
+import { CanvasSmoothingQualityEnum } from "../../internal/native/enums";
 
 export const CanvasSmoothingQuality = {
     "low": CanvasSmoothingQualityEnum.Low,

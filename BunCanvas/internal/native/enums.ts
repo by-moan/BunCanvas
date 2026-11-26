@@ -36,6 +36,12 @@ export enum SkBlendMode {
     kLastMode          = kLuminosity, //!< last valid value
 };
 
+export enum GradientType {
+    Linear,
+    Radial,
+    Conic
+};
+
 export enum CanvasTextBaseLineEnum {
     Top,
     Hanging,
@@ -65,4 +71,71 @@ export enum CanvasSmoothingQualityEnum {
     Low,
     Medium,
     High,
+};
+
+export enum CanvasBatchOperationType {
+    // State & Style Setters
+    SetFont = 1,
+    SetFillStyleColor,
+    SetFillStyleGradient,
+    SetStrokeStyleColor,
+    SetStrokeStyleGradient,
+    SetLineWidth,
+    SetGlobalAlpha,
+    SetImageSmoothingQuality,
+    SetImageSmoothingEnabled,
+    SetFilter,
+    SetGlobalCompositeOperation,
+    SetShadowBlur,
+    SetShadowColor,
+    SetShadowOffsetX,
+    SetShadowOffsetY,
+    SetLineJoin,
+    SetLineDash,
+    SetLineDashOffset,
+    SetTextBaseline,
+    SetTextAlign,
+
+    // State Stack & Transforms
+    Save,
+    Restore,
+    UploadTransform,
+    UploadTransformNoArray,
+
+    // Rectangles
+    FillRect,
+    StrokeRect,
+    ClearRect,
+
+    // Text
+    FillText,
+    StrokeText,
+
+    // Paths
+    BeginPath,
+    MoveTo,
+    LineTo,
+    Arc,
+    Ellipse,
+    ArcTo,
+    BezierCurveTo,
+    QuadraticCurveTo,
+    ClosePath,
+    Rect,
+    RoundRect,
+    RoundRectArray,
+    Fill,               // Uses current path
+    FillPath,           // Uses explicit Path2D*
+    Stroke,             // Uses current path
+    StrokePath,         // Uses explicit Path2D*
+    Clip,
+    ClipPath,
+
+    // Images & Pixel Buffers
+    DrawImage_ImageType,
+    DrawImage_CanvasType,
+    PutImageData,
+
+    // Canvas Size
+    Resize
 };

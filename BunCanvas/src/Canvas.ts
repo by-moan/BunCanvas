@@ -1,642 +1,56 @@
-import { lib,encoder, encodeCString } from "../internal/symbols.js";
-import { ptr, Pointer, JSCallback } from "bun:ffi"
-import { Image } from "./Image.js";
-import { ImageData } from "./ImageData.js";
-import { DOMMatrix } from "../dom/DOMMatrix.js";
-import { TextMetrics } from "./TextMetrics.js";
-import { Path2D } from "./Path2D.js";
-import { isValidColor } from "../internal/colorCheck.js";
-import { INTERNAL_TOKEN, throwIllegalConstructor } from "../internal/ConstructEnforcer.js";
-import { CanvasBlendMode, CanvasBlendModeArg } from "../internal/canvas/blendModes.js";
-import { CanvasTextAlignment, CanvasTextAlignmentArg } from "../internal/canvas/textAlignment.js";
-import { CanvasTextBaseline, CanvasTextBaselineArg } from "../internal/canvas/textBaseline.js";
-import { CanvasLineJoin, CanvasLineJoinArg } from "../internal/canvas/lineJoin.js";
-import { CanvasSmoothingQuality, CanvasSmoothingQualityArg } from "../internal/canvas/smoothingQuality.js";
-import { ptrs } from "../internal/pointers.js";
+import { lib } from "../internal/symbols.js";
+import { INTERNAL_TOKEN } from "../internal/ConstructEnforcer.js";
+import { CanvasBatchedRenderingContext2D, CanvasImmediateRenderingContext2D, CanvasRenderingContext2D, ctx2ds } from "./Canvas/RenderingContexts/RenderingContext2D.js";
 
 
 const canvasFinalizationRegistry = new FinalizationRegistry((ptr: any)=>{
     lib.symbols.canvas_destroy(ptr);
 });
 
-enum GradientType {
-    Linear,
-    Radial,
-    Conic
-};
 
 
-export class CanvasGradient {
-	type : GradientType;
-	points = new Float32Array(6);
-	offsets: number[] = [];
-    colors: Uint8Array[] = [];
 
-
-	/*Linear
-		points[0] p0.x
-		points[1] p0.y
-		points[2] p1.x
-		points[3] p1.y
-	*/
-    
-    /*Radial
-		points[0] c0.x
-		points[1] c0.y
-		points[2] c1.x
-		points[3] c1.y
-		points[4] r0
-		points[5] r1
-	*/
-    
-    /*Conic
-		points[0] center.x
-		points[1] center.y
-		points[2] angle
-	*/
-	
-	constructor(token: {}, type : GradientType, a : number, x1 : number, y1 : number);
-	constructor(token: {}, type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number);
-	constructor(token: {}, type : GradientType, x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number);
-	constructor(...args : any[]){
-		if (args[0] !== INTERNAL_TOKEN) throwIllegalConstructor(this)
-		this.type = args[1]
-		switch (this.type) {
-			case GradientType.Linear: {
-				this.points[0] = args[2]
-				this.points[1] = args[3]
-				this.points[2] = args[4]
-				this.points[3] = args[5]
-				break;
-			}
-			case GradientType.Radial: {
-				this.points[0] = args[2]
-				this.points[1] = args[3]
-				this.points[2] = args[4]
-				this.points[3] = args[5]
-				this.points[4] = args[6]
-				this.points[5] = args[7]
-				break;
-			}
-			case GradientType.Conic: {
-				this.points[0] = args[2]
-				this.points[1] = args[3]
-				this.points[2] = args[4]
-				break;
-			}
-		}   
-	}
-
-	addColorStop(offset : number, color : string) {
-		if (offset < 0 || offset > 1) throw new RangeError(`Failed to execute 'addColorStop' on 'CanvasGradient': The provided value (${offset}) is outside the range (0.0, 1.0).`)
-		if (!isValidColor(color)) throw new SyntaxError(`Failed to execute 'addColorStop' on 'CanvasGradient': The value provided ('${color}') could not be parsed as a color.`)
-		
-		// Maintain sorted order on insertion
-        const idx = this.offsets.findIndex(o => o > offset);
-        const insertIdx = idx === -1 ? this.offsets.length : idx;
-
-        this.offsets.splice(insertIdx, 0, offset);
-        this.colors.splice(insertIdx, 0, encodeCString(color));
-	}
-};
-
-{
-	const proto = CanvasGradient.prototype;
-	
-	for (const key of Object.getOwnPropertyNames(proto)) {
-		const desc = Object.getOwnPropertyDescriptor(proto, key);
-		if (key == "constructor"){
-			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
-			continue
-		}
-		if (typeof desc?.value === "function") {
-			desc.value.toString = () =>
-				`function ${key}() { [native code] }`;
-		}
-	}
-}
-
-
-class Render2DState {
-	lineWidth = 0;
-	globalAlpha = 1;
-	imageSmoothingQuality : CanvasSmoothingQualityArg = "low";
-	imageSmoothingEnabled : boolean = true;
-	fillStyle : string | CanvasGradient = "#000000";
-	strokeStyle : string | CanvasGradient = "#000000";
-	compositeOperation : CanvasBlendModeArg = "source-over";
-	filter : string = "none";
-	fontCss : string = "10px sans-serif";
-	textBaseline : CanvasTextBaselineArg = "alphabetic";
-	textAlign : CanvasTextAlignmentArg = "start";
-	lineDash : number[] = []
-	lineDashOffset : number = 0;
-	lineJoin : CanvasLineJoinArg = "miter";
-
-	constructor(other? : Render2DState){
-		if (other instanceof Render2DState) {
-			this.lineWidth = other.lineWidth
-			this.globalAlpha = other.globalAlpha
-			this.imageSmoothingQuality = other.imageSmoothingQuality
-			this.imageSmoothingEnabled = other.imageSmoothingEnabled
-			this.fillStyle = other.fillStyle
-			this.strokeStyle = other.strokeStyle
-			this.compositeOperation = other.compositeOperation
-			this.filter = other.filter
-			this.fontCss = other.fontCss
-			this.textBaseline = other.textBaseline
-			this.textAlign = other.textAlign
-			this.lineDash = other.lineDash
-			this.lineDashOffset = other.lineDashOffset
-			this.lineJoin = other.lineJoin
-		}
-	}
-
-	copyFrom(other : Render2DState){
-		if (other instanceof Render2DState) {
-			this.lineWidth = other.lineWidth
-			this.globalAlpha = other.globalAlpha
-			this.imageSmoothingQuality = other.imageSmoothingQuality
-			this.imageSmoothingEnabled = other.imageSmoothingEnabled
-			this.fillStyle = other.fillStyle
-			this.strokeStyle = other.strokeStyle
-			this.compositeOperation = other.compositeOperation
-			this.filter = other.filter
-			this.fontCss = other.fontCss
-			this.textBaseline = other.textBaseline
-			this.textAlign = other.textAlign
-			this.lineDash = other.lineDash
-			this.lineDashOffset = other.lineDashOffset
-			this.lineJoin = other.lineJoin
-		}
-	}
-}
-
-export class CanvasRenderingContext2D {
-	#currentState : Render2DState = new Render2DState();
-	#savedState : Render2DState = new Render2DState();
-	#owner : Canvas;
-
-	#reset(){
-		this.#currentState = new Render2DState();
-	}
-
-	#setStyleGradient(style: CanvasGradient, isStroke: boolean): boolean {
-		const count = style.colors.length;
-		const ptrArray = new BigUint64Array(count);
-		
-		for (let i = 0; i < count; i++) {
-			ptrArray[i] = BigInt(ptr(style.colors[i]));
-		}
-
-		const offsetBuffer = new Float32Array(style.offsets);
-		const nativeFn = isStroke 
-			? lib.symbols.canvas_set_stroke_style_gradient 
-			: lib.symbols.canvas_set_fill_style_gradient;
-
-		return nativeFn(
-			ptrs.get(this),
-			style.type,
-			ptr(style.points),
-			count,
-			ptr(ptrArray),
-			ptr(offsetBuffer)
-		);
-	}
-
-	get canvas() : Canvas {
-		return this.#owner
-	}
-	
-	set font(css: string) {
-		// The native side will parse the CSS string, resolve a typeface and cache it.
-		const normalized = css.trim().toLowerCase()
-		if (lib.symbols.canvas_set_font(ptrs.get(this), encoder.encode(`${normalized}\0`))) {
-			this.#currentState.fontCss = normalized;
-		}
-	}
-	get font(): string { 
-		return this.#currentState.fontCss;
-	}
-	
-	set fillStyle(style : string | CanvasGradient) {
-		if (style == this.#currentState.fillStyle) return;
-		let res = false;
-		if (typeof style === "string") {
-			res = lib.symbols.canvas_set_fill_style(ptrs.get(this),encodeCString(style))
-		} else if (style instanceof CanvasGradient) {
-			res = this.#setStyleGradient(style, false);
-		}
-		if (res) this.#currentState.fillStyle = style;
-	}
-	get fillStyle(){
-		return this.#currentState.fillStyle
-	}
-	set strokeStyle(style : string | CanvasGradient) {
-		if (style == this.#currentState.strokeStyle) return;
-		let res = false;
-		if (typeof style === "string") {
-			res = lib.symbols.canvas_set_stroke_style(ptrs.get(this),encodeCString(style.trim()))
-		} else if (style instanceof CanvasGradient) {
-			res = this.#setStyleGradient(style, true);
-		}
-
-		if (res) this.#currentState.strokeStyle = style;
-	}
-	get strokeStyle(){
-		return this.#currentState.strokeStyle
-	}
-	set lineWidth(width : number) {
-		let w = width<1?1:width;
-		lib.symbols.canvas_set_stroke_width(ptrs.get(this),w)
-		this.#currentState.lineWidth = w
-	}
-	get lineWidth() : number {
-		return this.#currentState.lineWidth
-	}
-	
-	set globalAlpha(a : number) {
-		this.#currentState.globalAlpha = lib.symbols.canvas_set_global_alpha(ptrs.get(this),a)
-	}
-	
-	get globalAlpha() {
-		return this.#currentState.globalAlpha
-	}
-
-	set imageSmoothingQuality(v : CanvasSmoothingQualityArg) {
-		let smQuality = CanvasSmoothingQuality[v];
-		if (lib.symbols.canvas_set_image_smoothing_quality(ptrs.get(this),smQuality)) {
-			this.#currentState.imageSmoothingQuality = v;
-		}
-	}
-	
-	get imageSmoothingQuality() : string {
-		return this.#currentState.imageSmoothingQuality;
-	}
-
-	set imageSmoothingEnabled(v : boolean) {
-		if (lib.symbols.canvas_set_image_smoothing_enabled(ptrs.get(this),v)){
-			this.#currentState.imageSmoothingEnabled = v
-		}
-	}
-	
-	get imageSmoothingEnabled() : boolean {
-		return this.#currentState.imageSmoothingEnabled;
-	}
-
-	set filter(v : string) {
-		if (lib.symbols.canvas_set_filter(ptrs.get(this),encoder.encode(`${v}\0`))){
-			this.#currentState.filter = v;
-		}
-	}
-	
-	get filter() : string {
-		return this.#currentState.filter;
-	}
-
-	set globalCompositeOperation(operation : CanvasBlendModeArg) {
-		const composite = CanvasBlendMode[operation]
-		if (!composite) return;
-		if(lib.symbols.canvas_set_composite_operation(ptrs.get(this),composite)) {
-			this.#currentState.compositeOperation = operation;
-		}
-	}
-	
-	get globalCompositeOperation() : string {
-		return this.#currentState.compositeOperation as string
-	}
-	
-	fillRect(x : number,y : number,w : number,h : number){
-		lib.symbols.canvas_fill_rect(ptrs.get(this),x,y,w,h)
-	}
-	strokeRect(x : number,y : number,w : number,h : number){
-		lib.symbols.canvas_stroke_rect(ptrs.get(this),x,y,w,h)
-	}
-	clearRect(x : number, y : number, w : number, h : number){
-		lib.symbols.canvas_clear_rect(ptrs.get(this),x,y,w,h)
-	}
-	fillText(text:string,x:number,y:number, maxWidth = -1){
-		lib.symbols.canvas_fill_text(ptrs.get(this),encoder.encode(`${text}\0`),x,y,maxWidth)
-	}
-	strokeText(text:string,x:number,y:number, maxWidth = -1){
-		lib.symbols.canvas_stroke_text(ptrs.get(this),encoder.encode(`${text}\0`),x,y,maxWidth)
-	}
-	beginPath(){
-		lib.symbols.canvas_path_begin(ptrs.get(this))
-	}
-	moveTo(x : number,y : number){
-		lib.symbols.canvas_path_move_to(ptrs.get(this),x,y)
-	}
-	lineTo(x : number,y : number){
-		lib.symbols.canvas_path_line_to(ptrs.get(this),x,y)
-	}
-	arc(x : number, y : number, radius : number, startAngle : number, endAngle : number){
-		lib.symbols.canvas_path_arc(ptrs.get(this),x, y, radius, startAngle, endAngle)
-	}
-	ellipse(x : number, y : number, radiusX : number, radiusY : number, rotation : number, startAngle : number, endAngle : number, counterclockwise : boolean = false){
-		lib.symbols.canvas_path_ellipse(ptrs.get(this),x, y, radiusX, radiusY, rotation, startAngle, endAngle, counterclockwise)
-	}
-	arcTo(x1 : number, y1 : number, x2 : number, y2 : number, radius : number){
-		lib.symbols.canvas_path_arc_to(ptrs.get(this),x1, y1, x2, y2, radius)
-	}
-	bezierCurveTo(cp1x : number, cp1y : number, cp2x : number, cp2y : number, x : number, y : number){
-		lib.symbols.canvas_path_bezier_to(ptrs.get(this),cp1x, cp1y, cp2x, cp2y, x, y)
-	}
-	quadraticCurveTo(cpx : number, cpy : number, x : number, y : number){
-		lib.symbols.canvas_path_quad_to(ptrs.get(this),cpx,cpy, x, y)
-	}
-	closePath(){
-		lib.symbols.canvas_path_close(ptrs.get(this))
-	}
-	rect(x : number, y : number, width : number, height : number){
-		lib.symbols.canvas_path_rect(ptrs.get(this),x,y,width,height)
-	}
-	roundRect(x : number, y : number, width : number, height : number, radii: any){
-		if (radii.constructor.name.toLowerCase().includes("array")){
-			const arr = new Float32Array(radii);
-			if(arr.some(Number.isNaN)) return;
-			const len =arr.length;
-			lib.symbols.canvas_path_roundrect_array(ptrs.get(this),x,y,width,height,ptr(arr), len)
-			return;
-		}else {
-			lib.symbols.canvas_path_roundrect(ptrs.get(this),x,y,width,height,radii)
-		}
-	}
-	fill(path? : Path2D){
-		let _ptr = path?ptrs.get(path):null;
-		lib.symbols.canvas_path_fill(ptrs.get(this), _ptr)
-	}
-	stroke(path : Path2D){
-		let _ptr = path?ptrs.get(path):null;
-		lib.symbols.canvas_path_stroke(ptrs.get(this), _ptr)
-	}
-	set shadowBlur(blur : number){
-		lib.symbols.canvas_set_shadow_blur(ptrs.get(this),blur)
-	}
-	set shadowColor(col : string){
-		lib.symbols.canvas_set_shadow_color(ptrs.get(this),encoder.encode(`${col}\0`))
-	}
-	set shadowOffsetX(x : number){
-		lib.symbols.canvas_set_shadow_offsetX(ptrs.get(this),x)
-	}
-	set shadowOffsetY(y : number){
-		lib.symbols.canvas_set_shadow_offsetY(ptrs.get(this),y)
-	}
-	set lineJoin(joinType : CanvasLineJoinArg){
-		let ljType = CanvasLineJoin[joinType];
-		if (lib.symbols.canvas_set_line_join(ptrs.get(this),ljType)) {
-			this.#currentState.lineJoin = joinType
-		}
-	}
-	get lineJoin() : string{
-		return this.#currentState.lineJoin
-	}
-	
-	drawImage(img : Image | Canvas, x : number, y : number, w : number,h : number) : void;
-	drawImage(img : Image | Canvas, sx : number, sy : number, sw : number, sh : number, dx : number, dy : number, dw : number, dh : number) : void;
-	drawImage(img : Image | Canvas, ...args : Array<number>) {
-		let _arr : number[] | Float32Array = args.length==2?[...args,img.width,img.height]:args;
-		const arr = new Float32Array(_arr)
-		const len = arr.length
-		if (img instanceof Image) {
-			lib.symbols.canvas_draw_image_imageType(ptrs.get(this),img.ptr,ptr(arr),len)
-			return;
-		}
-		if (img instanceof Canvas) {
-			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),ptr(arr),len)
-			return;
-		}
-		
-		throw new TypeError("Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(Image or Canvas)'.")
-	}
-	getImageData(x: number, y: number, w: number, h: number): ImageData {
-		const arr = new Uint8ClampedArray(w * h * 4);
-		lib.symbols.canvas_get_image_data(ptrs.get(this), x, y, w, h, ptr(arr));
-		return new ImageData(arr, w, h);
-	}
-	putImageData(
-		data: ImageData,
-		dx: number,
-		dy: number,
-		dirtyX = 0,
-		dirtyY = 0,
-		dirtyWidth = data.width,
-		dirtyHeight = data.height
-	) {
-		if (!(data instanceof ImageData)) {
-			throw new TypeError(
-				"Failed to execute 'putImageData' on 'CanvasRenderingContext2D': " +
-				"parameter 1 is not of type 'ImageData'"
-			);
-		}
-
-		lib.symbols.canvas_put_image_data(
-			ptrs.get(this),
-			dx,
-			dy,
-			data.width,
-			data.height,
-			dirtyX,
-			dirtyY,
-			dirtyWidth,
-			dirtyHeight,
-			ptr(data.data)
-		);
-	}
-	save(){
-		this.#savedState?.copyFrom(this.#currentState)
-		lib.symbols.canvas_save(ptrs.get(this))
-	}
-	restore(){
-		if (!this.#savedState) return
-		this.#currentState?.copyFrom(this.#savedState)
-		lib.symbols.canvas_restore(ptrs.get(this))
-	}
-	translate(x : number,y : number){
-		lib.symbols.canvas_translate(ptrs.get(this),x,y)
-	}
-	rotate(deg : number){
-		lib.symbols.canvas_rotate(ptrs.get(this),deg)
-	}
-	createConicGradient(a : number, x1 : number, y1 : number) : CanvasGradient;
-	createConicGradient(...args : [number,number,number]) : CanvasGradient {
-		if (args.length < 3) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 3 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Conic, ...args);
-	}
-	createLinearGradient(x1 : number, y1 : number, x2 : number, y2 : number) : CanvasGradient;
-	createLinearGradient(...args : [number,number,number,number]) : CanvasGradient {
-		if (args.length < 4) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 4 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Linear, ...args);
-	}
-	createRadialGradient(x1 : number, y1 : number, x2 : number, y2 : number, r0 : number, r1 : number) : CanvasGradient;
-	createRadialGradient(...args : [number,number,number,number,number,number]) : CanvasGradient {
-		if (args.length < 6) throw new TypeError(`Failed to execute 'createLinearGradient' on 'CanvasRenderingContext2D': 6 arguments required, but only ${args.length} present.`)
-		return new CanvasGradient(INTERNAL_TOKEN,GradientType.Radial, ...args);
-	}
-	getTransform() : DOMMatrix {
-		let arr = new Float32Array(16)
-		lib.symbols.canvas_get_transform(ptrs.get(this),ptr(arr))
-		return new DOMMatrix(arr);
-	}
-	setTransform(matrix : DOMMatrix) : void;
-	setTransform(a : number, b : number,c : number,d : number,e : number,f : number) : void;
-	setTransform(...args : any) : void {
-		if (args[0] instanceof DOMMatrix) lib.symbols.canvas_set_transform(ptrs.get(this),args[0].ptr)
-		if (args.length == 6) {
-			const mtx = new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5]]);
-			lib.symbols.canvas_set_transform(ptrs.get(this),mtx.ptr)
-		}
-		if (args.length == 16) lib.symbols.canvas_set_transform(ptrs.get(this),new DOMMatrix([args[0],args[1],args[2],args[3],args[4],args[5],args[5],args[6],args[7],args[8],args[9],args[10],args[11],args[12],args[13],args[14],args[15]]).ptr)
-	}
-
-	transform(a : number, b : number, c : number, d : number, e : number, f : number){
-		const tf = this.getTransform();
-		const mul = new DOMMatrix([a,b,c,d,e,f]);
-		tf.multiplySelf(mul)
-		this.setTransform(tf)
-	}
-
-	resetTransform() : void {
-		lib.symbols.canvas_reset_transform(ptrs.get(this))
-	}
-
-	setLineDash(lines : number[]){
-		if (lines.constructor.name.toLowerCase().includes("array")){
-			let _a
-			if (lines.length&1) {
-				_a = lines.concat(Array.from(lines))
-			}else {
-				_a = lines;
-			}
-			const arr = new Float32Array(_a);
-			if(arr.some(Number.isNaN)) return;
-			lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,this.#currentState.lineDashOffset)
-			this.#currentState.lineDash = _a;
-			return;
-		}
-		
-		throw new TypeError(`Failed to execute 'setLineDash' on 'CanvasRenderingContext2D': The provided value cannot be converted to a sequence.`)
-	}
-	getLineDash(){
-		return this.#currentState.lineDash;
-	}
-
-	clip(){
-		lib.symbols.canvas_path_clip(ptrs.get(this))
-	}
-
-	set lineDashOffset(v : number){
-		if (this.#currentState.lineDash.length <= 0) {
-			this.#currentState.lineDashOffset = 0;
-			return
-		}
-		const arr = new Float32Array(this.#currentState.lineDash);
-		lib.symbols.canvas_set_line_dash(ptrs.get(this),ptr(arr),arr.length,v)
-		this.#currentState.lineDashOffset = v;
-	}
-
-	set textBaseline(baseline : CanvasTextBaselineArg){
-		const bl = CanvasTextBaseline[baseline]
-		if (!bl) return;
-		if (lib.symbols.canvas_set_text_baseline(ptrs.get(this),bl)) {
-			this.#currentState.textBaseline = baseline
-		}
-	}
-
-	set textAlign(alignment : CanvasTextAlignmentArg){
-		const al = CanvasTextAlignment[alignment];
-		if (!al) return;
-		if (lib.symbols.canvas_set_text_align(ptrs.get(this),al)) {
-			this.#currentState.textAlign = alignment
-		}
-	}
-	measureText(text : string) : TextMetrics {
-		const pArr = new Float32Array(12)
-		lib.symbols.canvas_measure_text(ptrs.get(this),encoder.encode(`${text}\0`),ptr(pArr))
-		return new TextMetrics(
-			INTERNAL_TOKEN,
-			pArr[0], 
-			pArr[1], 
-			pArr[2], 
-			pArr[3], 
-			pArr[4], 
-			pArr[5], 
-			pArr[6], 
-			pArr[7],
-			pArr[8],
-			pArr[9], 
-			pArr[10], 
-			pArr[11]
-		)
-	}
-	// clearRect(x,y,w,h){
-	//     lib.symbols.canvas_clear_rect(x,y,w,h)
-	// }
-	constructor(iptr : Pointer | null, cnv : Canvas, args: any, token: {}) {
-		if (token !== INTERNAL_TOKEN) throwIllegalConstructor(this)
-		const { desynchronized = false, alpha = true } = args ?? {};
-		const cb = new JSCallback(this.#reset.bind(this),{
-			args: [],
-			returns: "void"
-		})
-		const renderContextPtr = lib.symbols.canvas_get_context2D(iptr, cb.ptr, desynchronized, alpha)
-		this.#owner = cnv
-		
-		ptrs.set(this, renderContextPtr)
-	}
-}
-
-{
-	const proto = CanvasRenderingContext2D.prototype;
-	
-	for (const key of Object.getOwnPropertyNames(proto)) {
-		const desc = Object.getOwnPropertyDescriptor(proto, key);
-		if (key == "constructor"){
-			desc?desc.value.toString = () => {return`function ${proto.constructor.name}() { [native code] }`;}:undefined;
-			continue
-		}
-		if (typeof desc?.value === "function") {
-			desc.value.toString = () =>
-				`function ${key}() { [native code] }`;
-		}
-	}
+interface CanvasRenderingContext2DSettings {
+    alpha?: boolean;
+    colorSpace?: PredefinedColorSpace;
+    desynchronized?: boolean;
+    willReadFrequently?: boolean;
+    pipeline?: "batched" | "immediate";
 }
 
 export class Canvas {
 	#dim = new Float64Array(2);
-	#rCapture = {
-		cb : ()=>{}
+
+	#resizequeued = false;
+
+	#resizeQueueCb(){
+		if (this.#ctx) {
+			// @ts-expect-error Supress error on non-callable method on public interface
+			this.#ctx.reset(INTERNAL_TOKEN, this.#dim[0], this.#dim[1])
+		}
+		this.#resizequeued = false
 	}
-	constructor(w=1,h=1, options? : { gpu : boolean }) {
+	#resizeQueueCbBound = ()=>this.#resizeQueueCb()
+
+	#ctx : CanvasRenderingContext2D | null = null;
+	constructor(w=1,h=1) {
 		this.#dim[0] = w;
 		this.#dim[1] = h;
-
-		let ptr : bigint | Pointer | null; 
-
-		if (Bun.isMainThread) {
-			ptr = lib.symbols.canvas_create(w,h,options?options.gpu:true);
-		} else {
-			ptr = lib.symbols.canvas_create(w,h,false);
-		}
-
-		
-		ptrs.set(this,ptr)
-		canvasFinalizationRegistry.register(this,ptr)
-	}
-
-	get _ptr(){
-		return ptrs.get(this)
 	}
 	
-	set width(v : string){
-		this.#dim[0] = Number.parseInt(v)
-		this.#rCapture.cb()
-		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
+	set width(v : number){
+		this.#dim[0] = v<1?1:v;
+		if (!this.#resizequeued) {
+			this.#resizequeued = true;
+			queueMicrotask(this.#resizeQueueCbBound)
+		}
 	}
-	set height(v : string){
-		this.#dim[1] = Number.parseInt(v)
-		this.#rCapture.cb()
-		lib.symbols.canvas_resize(ptrs.get(this),this.#dim[0],this.#dim[1])
+	set height(v : number){
+		this.#dim[1] = v<1?1:v
+		if (!this.#resizequeued) {
+			this.#resizequeued = true;
+			queueMicrotask(this.#resizeQueueCbBound)
+		}
 	}
 	get width() : number{
 		return this.#dim[0]
@@ -645,9 +59,19 @@ export class Canvas {
 		return this.#dim[1]
 	}
 	
-	getContext(contextType : string, args : any) {
+	getContext(contextType : "2d", args : CanvasRenderingContext2DSettings) {
 		if (contextType == "2d") {
-			return new CanvasRenderingContext2D(ptrs.get(this),this, args, INTERNAL_TOKEN)
+			if (this.#ctx) return this.#ctx
+			
+			if (!args || !args?.pipeline || args?.pipeline == "batched"){
+				this.#ctx = new CanvasBatchedRenderingContext2D(this.#dim[0],this.#dim[0],this, args, INTERNAL_TOKEN)
+			}else if (args?.pipeline == "immediate") {
+				this.#ctx = new CanvasImmediateRenderingContext2D(this.#dim[0],this.#dim[0],this, args, INTERNAL_TOKEN)
+			}else {
+				throw new SyntaxError(`Failed to execute 'getContext' on '${this.constructor.name}': unknown pipeline: ${args?.pipeline}`)
+			}
+			if(!ctx2ds.has(this)) ctx2ds.set(this,this.#ctx!)
+			return this.#ctx
 		}
 	}
 

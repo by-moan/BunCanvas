@@ -321,7 +321,7 @@ namespace VK {
         scInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         scInfo.preTransform = caps.currentTransform;
         scInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        scInfo.presentMode = vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
+        scInfo.presentMode = vsync ? VK_PRESENT_MODE_MAILBOX_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
         scInfo.clipped = VK_TRUE;
 
         if (vkCreateSwapchainKHR(device, &scInfo, nullptr, &swapchain) != VK_SUCCESS) return false;

@@ -2,36 +2,8 @@ SkPaint g_clearColor;
 SkPaint g_noAlphaClearColor;
 SkPaint pImageDataColor;
 
-class BunCanvas;
-
-enum class GradientType {
-    Linear,
-    Radial,
-    Conic
-};
-
-enum class CanvasTextBaseLine {
-    Top,
-    Hanging,
-    Middle,
-    Alphabetic,
-    Ideographic,
-    Bottom,
-};
-
-enum class CanvasTextAlignment {
-    Left,
-    Right,
-    Center,
-    Start,
-    End
-};
-
-enum class CanvasSmoothingQuality {
-    Low,
-    Medium,
-    High,
-};
+#include "./Canvas/Enums.cpp"
+#include "./Canvas/Structs.cpp"
 
 struct ColorStop {
     float offset;      // 0..1
@@ -80,7 +52,6 @@ class Rendering2DState {
     sk_sp<SkImageFilter> resolvedFilters{nullptr};
     SkPaint imageColor;
     SkPaint shadowBlurColor;
-    // std::string cssFont = "10px sans-serif";
     SkFont font_current;
     float shadowBlurAmount = 0.f;
     float shadowBlurOffsetX = 0.f;
@@ -114,82 +85,6 @@ class Rendering2DState {
     };
 };
 
-class BunCanvasRenderingContext2D {
-    sk_sp<SkSurface> sfc = nullptr;
-    public:
-    BunCanvas* owner;
-    CanvasFontCache font_cache;
-    JSCallback_CReset jsResetCanvas;
-    static constexpr uint64_t MAGIC = 0x5E5A8750;
-    uint64_t magic = MAGIC;
-    bool desynchronized = false;
-    bool alpha = true;
-    SkPaint clearColor;
-
-    Rendering2DState currentState{};
-    Rendering2DState savedState;
-    
-    
-    BunCanvasRenderingContext2D(
-        sk_sp<SkSurface> surface,
-        BunCanvas* owner,
-        JSCallback_CReset cb,
-        bool desync,
-        bool alpha
-    ) : sfc(surface), owner{owner}, jsResetCanvas(cb), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {}
-
-    void save(){
-        this->savedState = currentState;
-        sfc->getCanvas()->save();
-    }
-
-    void restore(){
-        currentState = savedState;
-        sfc->getCanvas()->restore();
-    }
-    
-    //Mimicking the behavior of values reset when resizing a canvas object.
-    void reset(sk_sp<SkSurface> surface, SkImage* tmpImage) {
-     sfc = surface;
-     sfc->getCanvas()->resetMatrix();
-     currentState = Rendering2DState{};
-     savedState = Rendering2DState{};
-
-     jsResetCanvas();
-
-     if (tmpImage) {
-         sfc->getCanvas()->drawImageRect(
-             tmpImage,
-             SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
-             currentState.sampling
-         );
-     }
-
-     font_cache.setFont("10px sans-serif", currentState.font_current);
- }
-
-    void reset(sk_sp<SkSurface> surface, sk_sp<SkImage> tmpImage) {
-        sfc = surface;
-        sfc->getCanvas()->resetMatrix();
-        currentState = Rendering2DState{};
-        savedState = Rendering2DState{};
-
-        if (tmpImage) {
-            sfc->getCanvas()->drawImageRect(
-                tmpImage,
-                SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
-                currentState.sampling
-            );
-        }
-        jsResetCanvas();
-
-        font_cache.setFont("10px sans-serif", currentState.font_current);
-        tmpImage.reset();
-    }
-    SkCanvas* operator()() {
-        return sfc->getCanvas();
-    }
-};
 
 enum CanvasContextType {
     None = 0,
@@ -201,27 +96,277 @@ struct RetiredTexture {
     int framesLeft;
 };
 
-class BunCanvas {
+static const std::string RasterCanvasUseGPUSpecifiedWarn = "[WARN] Raster layer was used when it was automatically specified that a GPU is used to back the layer!\n";
+
+// class BunCanvas {
+//     bool useGPU = true;
+//     public:
+// 
+//     size_t pendingOps{0};
+//
+//     static constexpr uint64_t MAGIC = 0xBCA1155A;
+//     uint64_t magic = MAGIC;
+//     sk_sp<SkSurface> workSurface;
+//     sk_sp<SkSurface> renderSurface;
+//     std::mutex mutex;
+//
+//     CanvasContextType ctxType;
+//
+//     BunCanvasRenderingContext2D* rendering2D = nullptr;
+//  
+//     #ifndef __APPLE__
+//     public:
+//     GrBackendTexture workBackendTex;
+//     GrBackendTexture renderBackendTex;
+//     bool hasBackendTex = false;
+//     std::vector<RetiredTexture> retiredTextures;
+//     #endif
+//
+//     BunCanvas(int w, int h, bool gpu = true) : useGPU(gpu){
+//         initSurfaces(w,h);
+//     }
+//
+//     void initSurfaces(int w, int h){
+//         // nonapple(std::lock_guard lock(mutex, std::defer_lock));
+//         #ifdef __APPLE__
+//         if (renderThreadContext == nullptr){
+//             surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w,h));
+//         }else {
+//             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
+//         }
+//         #else
+//
+//         if (gpuContextReady && useGPU) {
+//             workBackendTex = mainThreadCtx->context->createBackendTexture(
+//                 w, h,
+//                 kN32_SkColorType,
+//                 skgpu::Mipmapped::kNo,
+//                 GrRenderable::kYes,
+//                 GrProtected::kNo
+//             );
+//             renderBackendTex = mainThreadCtx->context->createBackendTexture(
+//                 w, h,
+//                 kN32_SkColorType,
+//                 skgpu::Mipmapped::kNo,
+//                 GrRenderable::kYes,
+//                 GrProtected::kNo
+//             );
+//
+//             bool workIsValid = workBackendTex.isValid();
+//             bool renderIsValid = renderBackendTex.isValid();
+//
+//             if (workIsValid && renderIsValid) {
+//                 workSurface = SkSurfaces::WrapBackendTexture(
+//                     mainThreadCtx->context.get(),
+//                     workBackendTex,
+//                     kTopLeft_GrSurfaceOrigin,
+//                     1,
+//                     kN32_SkColorType,
+//                     nullptr,
+//                     nullptr
+//                 );
+//                 renderSurface = SkSurfaces::WrapBackendTexture(
+//                     mainThreadCtx->context.get(),
+//                     renderBackendTex,
+//                     kTopLeft_GrSurfaceOrigin,
+//                     1,
+//                     kN32_SkColorType,
+//                     nullptr,
+//                     nullptr
+//                 );
+//                 hasBackendTex = true;
+//             } else if ((!workIsValid && renderIsValid) || (workIsValid && !renderIsValid)) {
+//                 // Fallback in case one succeeds creation and the second one fails
+//
+//                 if (workIsValid) mainThreadCtx->context->deleteBackendTexture(workBackendTex);
+//                 if (renderIsValid) mainThreadCtx->context->deleteBackendTexture(renderBackendTex);
+//                 std::cout << RasterCanvasUseGPUSpecifiedWarn;
+//                 workSurface = SkSurfaces::Raster(
+//                     SkImageInfo::MakeN32Premul(w,h)
+//                 );
+//                 renderSurface = SkSurfaces::Raster(
+//                     SkImageInfo::MakeN32Premul(w,h)
+//                 );
+//                 hasBackendTex = false;
+//             }
+//
+//         }
+//         if (!workSurface || !renderSurface) {
+//             std::cout << RasterCanvasUseGPUSpecifiedWarn;
+//             workSurface= SkSurfaces::Raster(
+//                 SkImageInfo::MakeN32Premul(w,h)
+//             );
+//             renderSurface = SkSurfaces::Raster(
+//                 SkImageInfo::MakeN32Premul(w,h)
+//             );
+//             hasBackendTex = false;
+//         }
+//         #endif
+//     }
+//
+//     //Maybe future support for webGPU rendering context if possible
+//     ~BunCanvas(){
+//         delete rendering2D;
+//         workSurface.reset();
+//         renderSurface.reset();
+//
+//         #ifndef __APPLE__
+//         // Flush to ensure no pending operations on the current texture
+//         if (hasBackendTex && mainThreadCtx) {
+//             mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+//             mainThreadCtx->context->deleteBackendTexture(workBackendTex);
+//             mainThreadCtx->context->deleteBackendTexture(renderBackendTex);
+//         }
+//         // Clean up any retired textures immediately
+//         if (mainThreadCtx && mainThreadCtx->context) {
+//             for (auto& r : retiredTextures) {
+//                 mainThreadCtx->context->deleteBackendTexture(r.tex);
+//             }
+//         }
+//         retiredTextures.clear();
+//         #endif
+//     }
+//
+//     void* getContext2D(bool desync, bool alpha) {
+//         if (!rendering2D) {
+//             ctxType = CanvasContextType::Rendering2D;
+//             rendering2D = new BunCanvasRenderingContext2D(workSurface,this, desync, alpha);
+//             return rendering2D;
+//         };
+//         return rendering2D;
+//     }
+//
+//     void resize(int w, int h) {
+//         if (!rendering2D) return;
+//         sk_sp<SkImage> tmp;
+//
+//     #ifdef __APPLE__
+//         if (surface) {
+//             tmp = surface->makeImageSnapshot();
+//         }
+//         surface.reset();
+//
+//         initSurfaces(w, h);
+//
+//         if (surface) {
+//             surface->getCanvas()->clear(SK_ColorTRANSPARENT);
+//         }
+//         if (ctxType == CanvasContextType::Rendering2D) {
+//             rendering2D->reset(surface, std::move(tmp));
+//         }
+//     #else
+//         if (gpuContextReady && useGPU && !retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
+//             for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
+//                 it->framesLeft--;
+//                 if (it->framesLeft <= 0) {
+//                     mainThreadCtx->context->deleteBackendTexture(it->tex);
+//                     it = retiredTextures.erase(it);
+//                 } else {
+//                     ++it;
+//                 }
+//             }
+//         }
+//
+//         GrBackendTexture oldWorkTex = workBackendTex;
+//         GrBackendTexture oldRenderTex = renderBackendTex;
+//         bool hadOldTex = hasBackendTex;
+//
+//         // If currently on a raster surface, grab a temporary image before resetting
+//         if (!hadOldTex && workSurface) {
+//             tmp = workSurface->makeTemporaryImage();
+//         }
+//
+//         // Reset existing surfaces so initSurfaces() cleanly recreates them (and its
+//         // `if (!workSurface || !renderSurface)` raster fallback always triggers if needed)
+//         workSurface.reset();
+//         renderSurface.reset();
+//         hasBackendTex = false;
+//
+//         initSurfaces(w, h);
+//
+//         // Clear both surfaces so expanded borders never expose uninitialized VMA memory
+//         if (workSurface) {
+//             workSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+//         }
+//         if (renderSurface) {
+//             renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+//         }
+//
+//         // Borrow the previous GPU texture for a zero-copy transfer (also works if
+//         // initSurfaces fell back to raster—Skia will perform the readback on draw)
+//         if (hadOldTex && oldWorkTex.isValid() && mainThreadCtx && mainThreadCtx->context) {
+//             tmp = SkImages::BorrowTextureFrom(
+//                 mainThreadCtx->context.get(),
+//                 oldWorkTex,
+//                 kTopLeft_GrSurfaceOrigin,
+//                 kN32_SkColorType,
+//                 kPremul_SkAlphaType,
+//                 nullptr
+//             );
+//         }
+//
+//         if (ctxType == CanvasContextType::Rendering2D) {
+//             // Note: if Rendering2D::reset now accepts both buffers, pass (workSurface, renderSurface, std::move(tmp))
+//             rendering2D->reset(workSurface, std::move(tmp));
+//             commit();
+//         }
+//
+//         if (hasBackendTex && mainThreadCtx && mainThreadCtx->context) {
+//             // Transition new backend textures to SHADER_READ_ONLY_OPTIMAL before releasing mutex
+//             skgpu::MutableTextureState readState =
+//                 skgpu::MutableTextureStates::MakeVulkan(
+//                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+//                     VK_QUEUE_FAMILY_IGNORED
+//                 );
+//             if (workSurface) {
+//                 mainThreadCtx->context->flush(workSurface.get(), GrFlushInfo{}, &readState);
+//             }
+//             if (renderSurface) {
+//                 mainThreadCtx->context->flush(renderSurface.get(), GrFlushInfo{}, &readState);
+//             }
+//             mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+//         }
+//
+//         if (hadOldTex) {
+//             if (oldWorkTex.isValid()) {
+//                 retiredTextures.push_back({oldWorkTex, 3});
+//             }
+//             if (oldRenderTex.isValid()) {
+//                 retiredTextures.push_back({oldRenderTex, 3});
+//             }
+//         }
+//     #endif
+//     }
+//
+//     // Commit all the draw operations to the render surface
+//     void commit(){
+//         renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+//         renderSurface->getCanvas()->drawImage(workSurface->makeTemporaryImage(),0,0);
+//     }
+// };
+
+class BunCanvasSurfaceProvider {
     bool useGPU = true;
     public:
-    
-    static constexpr uint64_t MAGIC = 0xBCA1155A;
-    uint64_t magic = MAGIC;
-    sk_sp<SkSurface> surface;
+    sk_sp<SkSurface> workSurface;
+    sk_sp<SkSurface> renderSurface;
     std::mutex mutex;
-
-    CanvasContextType ctxType;
-
-    BunCanvasRenderingContext2D* rendering2D = nullptr;
+    size_t pendingOps{0};
     
     #ifndef __APPLE__
-    GrBackendTexture backendTex;
+    public:
+    bool isImmediate;
+    GrBackendTexture workBackendTex;
+    GrBackendTexture renderBackendTex;
     bool hasBackendTex = false;
     std::vector<RetiredTexture> retiredTextures;
     #endif
-    
-    
-    BunCanvas(int w, int h, bool gpu = true) : useGPU(gpu){
+
+    BunCanvasSurfaceProvider(int w, int h, bool gpu = true, bool isImmediate = false) : useGPU(gpu), isImmediate(isImmediate) {
+        initSurfaces(w,h);
+    }
+
+    void initSurfaces(int w, int h){
         // nonapple(std::lock_guard lock(mutex, std::defer_lock));
         #ifdef __APPLE__
         if (renderThreadContext == nullptr){
@@ -230,8 +375,16 @@ class BunCanvas {
             surface = SkSurfaces::RenderTarget(renderThreadContext->context.get(), skgpu::Budgeted::kYes, SkImageInfo::MakeN32Premul(w,h));
         }
         #else
+
         if (gpuContextReady && useGPU) {
-            backendTex = mainThreadCtx->context->createBackendTexture(
+            workBackendTex = mainThreadCtx->context->createBackendTexture(
+                w, h,
+                kN32_SkColorType,
+                skgpu::Mipmapped::kNo,
+                GrRenderable::kYes,
+                GrProtected::kNo
+            );
+            renderBackendTex = mainThreadCtx->context->createBackendTexture(
                 w, h,
                 kN32_SkColorType,
                 skgpu::Mipmapped::kNo,
@@ -239,10 +392,22 @@ class BunCanvas {
                 GrProtected::kNo
             );
             
-            if (backendTex.isValid()) {
-                surface = SkSurfaces::WrapBackendTexture(
+            bool workIsValid = workBackendTex.isValid();
+            bool renderIsValid = renderBackendTex.isValid();
+            
+            if (workIsValid && renderIsValid) {
+                workSurface = SkSurfaces::WrapBackendTexture(
                     mainThreadCtx->context.get(),
-                    backendTex,
+                    workBackendTex,
+                    kTopLeft_GrSurfaceOrigin,
+                    1,
+                    kN32_SkColorType,
+                    nullptr,
+                    nullptr
+                );
+                renderSurface = SkSurfaces::WrapBackendTexture(
+                    mainThreadCtx->context.get(),
+                    renderBackendTex,
                     kTopLeft_GrSurfaceOrigin,
                     1,
                     kN32_SkColorType,
@@ -250,163 +415,206 @@ class BunCanvas {
                     nullptr
                 );
                 hasBackendTex = true;
+            } else if ((!workIsValid && renderIsValid) || (workIsValid && !renderIsValid)) {
+                // Fallback in case one succeeds creation and the second one fails
+
+                if (workIsValid) mainThreadCtx->context->deleteBackendTexture(workBackendTex);
+                if (renderIsValid) mainThreadCtx->context->deleteBackendTexture(renderBackendTex);
+                std::cout << RasterCanvasUseGPUSpecifiedWarn;
+                workSurface = SkSurfaces::Raster(
+                    SkImageInfo::MakeN32Premul(w,h)
+                );
+                renderSurface = SkSurfaces::Raster(
+                    SkImageInfo::MakeN32Premul(w,h)
+                );
+                hasBackendTex = false;
             }
+            
         }
-        if (!surface) {
-            std::cout << "rasted used!\n";
-            surface = SkSurfaces::Raster(
+        if (!workSurface || !renderSurface) {
+            if (useGPU) std::cout << RasterCanvasUseGPUSpecifiedWarn;
+            workSurface= SkSurfaces::Raster(
+                SkImageInfo::MakeN32Premul(w,h)
+            );
+            renderSurface = SkSurfaces::Raster(
                 SkImageInfo::MakeN32Premul(w,h)
             );
             hasBackendTex = false;
         }
         #endif
     }
-    
-    //Maybe future support for webGPU rendering context if possible
-    ~BunCanvas(){
-        delete rendering2D;
-        surface.reset();
-        
-        #ifndef __APPLE__
-        // Flush to ensure no pending operations on the current texture
-        if (hasBackendTex && mainThreadCtx) {
-            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-            mainThreadCtx->context->deleteBackendTexture(backendTex);
-        }
-        // Clean up any retired textures immediately
-        if (mainThreadCtx && mainThreadCtx->context) {
-            for (auto& r : retiredTextures) {
-                mainThreadCtx->context->deleteBackendTexture(r.tex);
-            }
-        }
-        retiredTextures.clear();
-        #endif
-    }
-    
-    void* getContext2D(JSCallback_CReset cb, bool desync, bool alpha) {
-        if (!rendering2D) {
-            ctxType = CanvasContextType::Rendering2D;
-            rendering2D = new BunCanvasRenderingContext2D(surface,this,cb, desync, alpha);
-            return rendering2D;
-        };
-        return rendering2D;
-    }
-    
-    void resize(int w, int h) {
-        if (!rendering2D) return;
-        sk_sp<SkImage> tmp;
 
+    void flushSurfacesForRead(){
+        if (hasBackendTex && mainThreadCtx && mainThreadCtx->context) {
+            // Transition new backend textures to SHADER_READ_ONLY_OPTIMAL before releasing mutex
+            skgpu::MutableTextureState readState =
+                skgpu::MutableTextureStates::MakeVulkan(
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_QUEUE_FAMILY_IGNORED
+                );
+            if (workSurface) {
+                mainThreadCtx->context->flush(workSurface.get(), GrFlushInfo{}, &readState);
+            }
+            if (renderSurface) {
+                mainThreadCtx->context->flush(renderSurface.get(), GrFlushInfo{}, &readState);
+            }
+            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+        }
+    }
+    
+    // Returns image that was drawn before resizing.
+    sk_sp<SkImage> resize(int w, int h) {
+        sk_sp<SkImage> tmp;
         #ifdef __APPLE__
         if (surface) {
             tmp = surface->makeImageSnapshot();
         }
-        surface.reset();
-        if (renderThreadContext == nullptr) {
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-        } else {
-            surface = SkSurfaces::RenderTarget(
-                renderThreadContext->context.get(),
-                skgpu::Budgeted::kYes,
-                SkImageInfo::MakeN32Premul(w, h)
-            );
-        }
+        workSurface.reset();
+        renderSurface.reset();
+
+        initSurfaces(w, h);
+
         if (surface) {
             surface->getCanvas()->clear(SK_ColorTRANSPARENT);
         }
-        #else
-        if (gpuContextReady && useGPU) {
-            GrBackendTexture oldTex = backendTex;
-            bool hadOldTex = hasBackendTex;
-
-            backendTex = mainThreadCtx->context->createBackendTexture(
-                w, h,
-                kN32_SkColorType,
-                skgpu::Mipmapped::kNo,
-                GrRenderable::kYes,
-                GrProtected::kNo
-            );
-
-            if (!retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
-                for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
-                    it->framesLeft--;
-                    if (it->framesLeft <= 0) {
-                        mainThreadCtx->context->deleteBackendTexture(it->tex);
-                        it = retiredTextures.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-            }
-
-            if (backendTex.isValid()) {
-                surface.reset();
-                surface = SkSurfaces::WrapBackendTexture(
-                    mainThreadCtx->context.get(),
-                    backendTex,
-                    kTopLeft_GrSurfaceOrigin,
-                    1,
-                    kN32_SkColorType,
-                    nullptr,
-                    nullptr
-                );
-                hasBackendTex = true;
-
-                // Clear entire new texture so expanded borders never expose uninitialized VMA memory
-                surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-
-                // GPU-to-GPU copy from old texture without CPU readback
-                if (hadOldTex && oldTex.isValid()) {
-                    tmp = SkImages::BorrowTextureFrom(
-                        mainThreadCtx->context.get(),
-                        oldTex,
-                        kTopLeft_GrSurfaceOrigin,
-                        kN32_SkColorType,
-                        kPremul_SkAlphaType,
-                        nullptr
-                    );
-                }
-
-                if (ctxType == CanvasContextType::Rendering2D) {
-                    rendering2D->reset(surface, std::move(tmp));
-                }
-
-                // Transition new backendTex to SHADER_READ_ONLY_OPTIMAL before releasing element->mutex
-                skgpu::MutableTextureState readState =
-                    skgpu::MutableTextureStates::MakeVulkan(
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        VK_QUEUE_FAMILY_IGNORED
-                    );
-                mainThreadCtx->context->flush(surface.get(), GrFlushInfo{}, &readState);
-                mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
-
-                if (hadOldTex) {
-                    retiredTextures.push_back({oldTex, 3});
-                }
-                return;
-            } else {
-                tmp = surface ? surface->makeTemporaryImage() : nullptr;
-                surface.reset();
-                surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-                surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-                hasBackendTex = false;
-            }
-        } else {
-            tmp = surface ? surface->makeTemporaryImage() : nullptr;
-            surface.reset();
-            surface = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(w, h));
-            surface->getCanvas()->clear(SK_ColorTRANSPARENT);
-            hasBackendTex = false;
-        }
-        #endif
-
         if (ctxType == CanvasContextType::Rendering2D) {
             rendering2D->reset(surface, std::move(tmp));
         }
+        #else
+        if (gpuContextReady && useGPU && !retiredTextures.empty() && mainThreadCtx && mainThreadCtx->context) {
+            for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
+                it->framesLeft--;
+                if (it->framesLeft <= 0) {
+                    mainThreadCtx->context->deleteBackendTexture(it->tex);
+                    it = retiredTextures.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
+        GrBackendTexture oldWorkTex = workBackendTex;
+        GrBackendTexture oldRenderTex = renderBackendTex;
+        bool hadOldTex = hasBackendTex;
+
+        // If currently on a raster surface, grab a temporary image before resetting
+        if (!hadOldTex && workSurface) {
+            tmp = workSurface->makeTemporaryImage();
+        }
+
+        // Reset existing surfaces so initSurfaces() cleanly recreates them (and its
+        // `if (!workSurface || !renderSurface)` raster fallback always triggers if needed)
+        workSurface.reset();
+        renderSurface.reset();
+        hasBackendTex = false;
+
+        initSurfaces(w, h);
+
+        // Clear both surfaces so expanded borders never expose uninitialized VMA memory
+        if (workSurface) {
+            workSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        }
+        if (renderSurface) {
+            renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        }
+
+        // Borrow the previous GPU texture for a zero-copy transfer (also works if
+        // initSurfaces fell back to raster—Skia will perform the readback on draw)
+        if (hadOldTex && oldWorkTex.isValid() && mainThreadCtx && mainThreadCtx->context) {
+            tmp = SkImages::BorrowTextureFrom(
+                mainThreadCtx->context.get(),
+                oldWorkTex,
+                kTopLeft_GrSurfaceOrigin,
+                kN32_SkColorType,
+                kPremul_SkAlphaType,
+                nullptr
+            );
+        }
+
+        // if (ctxType == CanvasContextType::Rendering2D) {
+        //     // Note: if Rendering2D::reset now accepts both buffers, pass (workSurface, renderSurface, std::move(tmp))
+        //     rendering2D->reset(workSurface, std::move(tmp));
+        //     commit();
+        // }
+        if (hadOldTex) {
+            if (oldWorkTex.isValid()) {
+                retiredTextures.push_back({oldWorkTex, 0});
+            }
+            if (oldRenderTex.isValid()) {
+                retiredTextures.push_back({oldRenderTex, 0});
+            }
+        }
+        #endif
+        return std::move(tmp);
+    }
+    
+    void commit(){
+        renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
+        renderSurface->getCanvas()->drawImage(workSurface->makeTemporaryImage(),0,0);
+    }
+};
+
+class BunCanvasRenderingContext2D : public BunCanvasSurfaceProvider {
+    public:
+    CanvasFontCache font_cache;
+    static constexpr uint64_t MAGIC = 0x5E5A8750;
+    uint64_t magic = MAGIC;
+    bool desynchronized = false;
+    bool alpha = true;
+    SkPaint clearColor;
+
+    Rendering2DState currentState{};
+    Rendering2DState savedState;
+    
+    
+    BunCanvasRenderingContext2D(
+        int w, int h,
+        bool desync,
+        bool alpha,
+        bool willReadFrequently,
+        bool isImmediate
+    ) : BunCanvasSurfaceProvider(w,h,!willReadFrequently, isImmediate), desynchronized(desync), alpha(alpha), clearColor(alpha?g_clearColor:g_noAlphaClearColor) {}
+
+    void save(){
+        this->savedState = currentState;
+        workSurface->getCanvas()->save();
+    }
+
+    void restore(){
+        currentState = savedState;
+        workSurface->getCanvas()->restore();
+    }
+
+    void resize(int w, int h){
+        sk_sp<SkImage> img = BunCanvasSurfaceProvider::resize(w,h);
+        reset(img);
+        commit();
+        flushSurfacesForRead();
+    }
+    
+    //Mimicking the behavior of values reset when resizing a canvas object.
+    void reset(sk_sp<SkImage> tmpImage) {
+        workSurface->getCanvas()->resetMatrix();
+        currentState = Rendering2DState{};
+        savedState = Rendering2DState{};
+        if (tmpImage) {
+            workSurface->getCanvas()->drawImageRect(
+                tmpImage,
+                SkRect::MakeXYWH(0, 0, tmpImage->width(), tmpImage->height()),
+                currentState.sampling
+            );
+        }
+
+        font_cache.setFont("10px sans-serif", currentState.font_current);
+    }
+    
+    SkCanvas* operator()() {
+        return workSurface->getCanvas();
     }
 };
 
 
-std::vector<BunCanvas*> canvases;
+std::vector<BunCanvasSurfaceProvider*> canvases;
 
 void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
     if (!mainCtx) return;;
@@ -419,13 +627,14 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
 
     for (auto* element : canvases) {
         std::lock_guard<std::mutex> lock(element->mutex);
+        if (element->isImmediate) element->commit();
         #ifdef __APPLE__
         if (element->surface) {
             mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
         }
         #else
-        if (element->hasBackendTex && element->surface) {
-            mainCtx->flush(element->surface.get(), GrFlushInfo{}, &readState);
+        if (element->hasBackendTex && element->renderSurface) {
+            mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
         }
         #endif
         
@@ -445,6 +654,32 @@ void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img, float* d, i
             img.get(),
             SkRect::MakeXYWH(d[0],d[1],d[2],d[3]),
             SkRect::MakeXYWH(d[4],d[5],d[6],d[7]),
+            ctx->currentState.sampling,
+            &(ctx->currentState.imageColor),
+            {}
+        );
+    }
+}
+
+void drawImage(BunCanvasRenderingContext2D* ctx, sk_sp<SkImage> img,
+    int argc, 
+    float x_sx,
+    float y_sy,
+    float w_sw,
+    float h_sh,
+    float dx,
+    float dy,
+    float dw,
+    float dh
+){
+    if (argc == 4) {
+        (*ctx)()->drawImageRect(img.get(),SkRect::MakeXYWH(x_sx,y_sy,w_sw,h_sh),ctx->currentState.sampling,&(ctx->currentState.imageColor));
+    }
+    if (argc == 8) {
+        (*ctx)()->drawImageRect(
+            img.get(),
+            SkRect::MakeXYWH(x_sx,y_sy,w_sw,h_sh),
+            SkRect::MakeXYWH(dx,dy,dw,dh),
             ctx->currentState.sampling,
             &(ctx->currentState.imageColor),
             {}
@@ -515,7 +750,7 @@ static bool setCanvasGradientInternal(
 
     nonapple(
         std::optional<std::lock_guard<std::mutex>> lock;
-        if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+        if (!obj->desynchronized) lock.emplace(obj->mutex);
     );
 
     sk_sp<SkShader> shader = buildSkiaShader(gradType, gradient_args, stops_length, stops_color, stops_offset);
@@ -563,39 +798,40 @@ void updateCanvasFilters(Rendering2DState& state) {
 
 extern "C" {
     WINDOWS_EXPORT void* canvas_create(int w, int h, bool useGPU) {
-        return new BunCanvas(w,h,useGPU);
+        // return new BunCanvas(w,h,useGPU);
+        return nullptr;
     }
     
     WINDOWS_EXPORT void canvas_append(void* canvasObj) {
-        if (!canvasObj) return;
-        BunCanvas* obj = static_cast<BunCanvas*>(canvasObj);
-        if (obj->magic != BunCanvas::MAGIC)
-        return;
+        // if (!canvasObj) return;
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
+        if (!obj) return;
+        // return;
         
         canvases.push_back(obj);
     }
     
     //Sets native internal context so it is returned if is asked again.
-    WINDOWS_EXPORT void* canvas_get_context2D(void* canvasObj, JSCallback_CReset cb, bool desync, bool alpha){
-        if (!canvasObj) return nullptr;
-        BunCanvas* obj = validated<BunCanvas>(canvasObj);
+    WINDOWS_EXPORT void* canvas_get_context2D(int w, int h, bool desync, bool alpha, bool willReadFrequently, bool isImmediate){
+        return new BunCanvasRenderingContext2D(w,h,desync,alpha,willReadFrequently, isImmediate);
+        // if (!canvasObj) return nullptr;
+        // BunCanvas* obj = validated<BunCanvas>(canvasObj);
         
-        if (obj == nullptr) return nullptr;
+        // if (obj == nullptr) return nullptr;
         
-        void* ptr = obj->getContext2D(cb, desync, alpha);
+        // void* ptr = obj->getContext2D(desync, alpha);
         
-        return ptr;
         
         // obj->ctx = obj->surface->getCanvas();
     }
     
-    
+    #pragma region CanvasRenderingContext2D
     WINDOWS_EXPORT bool canvas_set_fill_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         auto col = parseCssColor(c);
         if (col){
@@ -612,12 +848,13 @@ extern "C" {
     ) {
         return setCanvasGradientInternal(canvasObj, gradType, gradient_args, stops_length, stops_color, stops_offset, true);
     }
+    
     WINDOWS_EXPORT bool canvas_set_stroke_style(void* renderingContext, const char* c){
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(renderingContext);
         if (obj == nullptr) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         
         auto col = parseCssColor(c);
@@ -645,7 +882,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.strokeColor.setStrokeWidth(w);
     }
@@ -655,7 +892,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         
         SkPaint fColor = obj->currentState.fillColor;
@@ -676,7 +913,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         SkPaint sColor = obj->currentState.strokeColor;
         sColor.setAlphaf(obj->currentState.strokeColor.getAlphaf()*obj->currentState.globalAlpha);
@@ -702,14 +939,14 @@ extern "C" {
         if (!obj) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         (*obj)()->drawRect(SkRect::MakeXYWH(x,y,w,h), obj->clearColor);
     }
     
     WINDOWS_EXPORT void canvas_resize(void* canvasObj, int w, int h) {
         if (!canvasObj) return;
-        BunCanvas* obj = validated<BunCanvas>(canvasObj);
+        BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr || std::isnan(w) || std::isnan(h)) {
             return;
         };
@@ -727,7 +964,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.reset();
     }
@@ -739,10 +976,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.moveTo(x,y);
     }
+    
     WINDOWS_EXPORT void canvas_path_line_to(void* canvasObj, int x, int y) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -750,7 +988,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.lineTo(x,y);
     }
@@ -762,7 +1000,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.arc(x1,y1,radius,startAngle,sweepangle);
     }
@@ -795,7 +1033,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.arcTo(x1,y1,x2,y2,radius);
     }
@@ -807,10 +1045,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.bezierTo(x1,y1,x2,y2,x3,y3);
     }
+    
     WINDOWS_EXPORT void canvas_path_quad_to(void* canvasObj, float x1, float y1, float x2, float y2) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -818,10 +1057,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.quadraticCurveTo(x1,y1,x2,y2);
     }
+    
     WINDOWS_EXPORT void canvas_path_fill(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -832,7 +1072,7 @@ extern "C" {
         };
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         
         SkPath finalPath = path?(*path)():obj->currentState.path();
@@ -846,6 +1086,7 @@ extern "C" {
         }
         (*obj)()->drawPath(finalPath, fColor);
     }
+    
     WINDOWS_EXPORT void canvas_path_stroke(void* canvasObj, void* path2d) {
         if (!canvasObj) return;
 
@@ -859,7 +1100,7 @@ extern "C" {
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized)
-                lock.emplace(obj->owner->mutex);
+                lock.emplace(obj->mutex);
         );
 
         SkPath finalPath =
@@ -886,6 +1127,7 @@ extern "C" {
 
         (*obj)()->drawPath(finalPath, strokePaint);
     }
+    
     WINDOWS_EXPORT void canvas_path_clip(void* canvasObj) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -895,7 +1137,7 @@ extern "C" {
         };
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         (*obj)()->clipPath(obj->currentState.path());
     }
@@ -907,7 +1149,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.close();
     }
@@ -918,27 +1160,29 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.rect(x,y,w,h);
     }
+    
     WINDOWS_EXPORT void canvas_path_roundrect(void* canvasObj, float x, float y, float w, float h, float radii) {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.roundRect(x,y,w,h,radii);
     }
+    
     WINDOWS_EXPORT void canvas_path_roundrect_array(void* canvasObj, float x, float y, float w, float h, float* radii, int len) {
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.path.roundRect_array(x,y,w,h,radii,len);
     }
@@ -950,7 +1194,7 @@ extern "C" {
         if (obj == nullptr || img == nullptr || !dimensions) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         // if(obj->shadowBlurAmount > 0.5f) {
         //     SkPaint shColor = obj->shadowBlurColor;
@@ -972,21 +1216,21 @@ extern "C" {
     WINDOWS_EXPORT void canvas_draw_image_canvasType(void* canvasObj, void* image, float* dimensions, int argc) {
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
-        BunCanvas* img = validated<BunCanvas>(image);
+        BunCanvasRenderingContext2D* img = validated<BunCanvasRenderingContext2D>(image);
         if (obj == nullptr || img == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock2;
-            if (img->rendering2D && !img->rendering2D->desynchronized) lock2.emplace(img->mutex);
+            if (!obj->desynchronized) lock2.emplace(img->mutex);
         );
         #ifndef __APPLE__
         if (img->hasBackendTex) {
             auto _img = SkImages::BorrowTextureFrom(
                 mainThreadCtx->context.get(),
-                img->backendTex,
+                img->renderBackendTex,
                 kTopLeft_GrSurfaceOrigin,
                 kN32_SkColorType,
                 kPremul_SkAlphaType,
@@ -1002,7 +1246,7 @@ extern "C" {
                 drawImage(obj,_img,dimensions,argc);
             }
         } else {
-            auto _img = img->surface->makeTemporaryImage();
+            auto _img = img->renderSurface->makeTemporaryImage();
             // if(obj->shadowBlurAmount > 0.5f) {
             //     SkPaint shColor = obj->shadowBlurColor;
             //     auto _af = shColor.getAlphaf()*obj->globalAlpha;
@@ -1025,7 +1269,7 @@ extern "C" {
         if (obj == nullptr) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.fillColor.setBlendMode(operation);
         obj->currentState.strokeColor.setBlendMode(operation);
@@ -1042,7 +1286,7 @@ extern "C" {
         {
             nonapple(
                 std::optional<std::lock_guard<std::mutex>> lock;
-                if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+                if (!obj->desynchronized) lock.emplace(obj->mutex);
             );
             SkImageInfo dstInfo = SkImageInfo::Make(
                 w,h,
@@ -1052,10 +1296,10 @@ extern "C" {
             size_t rowBytes = w * 4;
             
             #ifndef __APPLE__
-            if (gpuContextReady && obj->owner->hasBackendTex) {
+            if (gpuContextReady && obj->hasBackendTex) {
                 auto img = SkImages::BorrowTextureFrom(
                     mainThreadCtx->context.get(),
-                    obj->owner->backendTex,
+                    obj->renderBackendTex,
                     kTopLeft_GrSurfaceOrigin,
                     kN32_SkColorType,
                     kPremul_SkAlphaType,
@@ -1077,7 +1321,7 @@ extern "C" {
                 }
             }
             #else
-            auto img = obj->owner->surface->makeImageSnapshot();
+            auto img = obj->surface->makeImageSnapshot();
                 
                 if (img) {
                     // canvas->drawImage(img, 0, 0);
@@ -1118,7 +1362,6 @@ extern "C" {
     //             kPremul_SkAlphaType
     //         );
     //         size_t rowBytes = w * 4;
-    
     //         if (obj->owner->hasBackendTex) {
     //             auto _img = SkImages::BorrowTextureFrom(
     //                 renderThreadContext->context.get(),
@@ -1148,14 +1391,10 @@ extern "C" {
     //                 y, 
     //                 SkImage::CachingHint::kDisallow_CachingHint
     //             );
-    
     //             return false;
     //         }
-    
-    
     //     }
     // }
-    
     
     WINDOWS_EXPORT bool canvas_put_image_data(
         void* canvasObj,
@@ -1181,7 +1420,7 @@ extern "C" {
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
             if (!obj->desynchronized)
-                lock.emplace(obj->owner->mutex);
+                lock.emplace(obj->mutex);
         );
 
         // Normalize negative dirty dimensions.
@@ -1263,21 +1502,23 @@ extern "C" {
 
         return true;
     }
+    
     WINDOWS_EXPORT float canvas_set_global_alpha(void* canvasObj, float a){
         float _a = std::clamp(a, 0.0f, 1.0f);
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
         if (obj == nullptr) return _a;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->currentState.globalAlpha = _a;
         obj->currentState.imageColor.setAlphaf(_a);
-        obj->currentState.fillColor.setAlphaf(_a);
-        obj->currentState.strokeColor.setAlphaf(_a);
-        obj->currentState.shadowBlurColor.setAlphaf(_a);
+        // obj->currentState.fillColor.setAlphaf(_a);
+        // obj->currentState.strokeColor.setAlphaf(_a);
+        // obj->currentState.shadowBlurColor.setAlphaf(_a);
         return _a;
     }
+    
     WINDOWS_EXPORT void canvas_save(void* canvasObj){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1285,10 +1526,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->save();
     }
+    
     WINDOWS_EXPORT void canvas_restore(void* canvasObj){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1296,10 +1538,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         obj->restore();
     }
+    
     WINDOWS_EXPORT void canvas_translate(void* canvasObj, float x, float y){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1307,10 +1550,11 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         (*obj)()->translate(x,y);
     }
+    
     WINDOWS_EXPORT void canvas_rotate(void* canvasObj, float deg){
         if (!canvasObj) return;
         BunCanvasRenderingContext2D* obj = validated<BunCanvasRenderingContext2D>(canvasObj);
@@ -1318,7 +1562,7 @@ extern "C" {
         if (obj == nullptr) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!obj->desynchronized) lock.emplace(obj->owner->mutex);
+            if (!obj->desynchronized) lock.emplace(obj->mutex);
         );
         (*obj)()->rotate(deg*57.29577951308232);
     }
@@ -1328,7 +1572,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         return ctx->font_cache.setFont(cssString,ctx->currentState.font_current);
     }
@@ -1338,7 +1582,7 @@ extern "C" {
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         
         float width = ctx->currentState.font_current.measureText(
@@ -1425,7 +1669,7 @@ extern "C" {
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         float width = ctx->currentState.font_current.measureText(
             txt,
@@ -1458,7 +1702,7 @@ extern "C" {
 
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         if (std::strcmp(fltr, "none") == 0) {
@@ -1481,7 +1725,7 @@ extern "C" {
 
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         ctx->currentState.shadowBlurAmount = std::max(b, 0.0f);
@@ -1496,7 +1740,7 @@ extern "C" {
 
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         if (ctx->currentState.shadowBlurOffsetX == oX) return;
@@ -1514,7 +1758,7 @@ extern "C" {
 
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         if (ctx->currentState.shadowBlurOffsetY == oY) return;
@@ -1532,7 +1776,7 @@ extern "C" {
 
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         auto col = parseCssColor(c);
@@ -1553,7 +1797,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         
         if (v){
@@ -1580,7 +1824,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         switch(v) {
             case CanvasSmoothingQuality::Low: {
@@ -1603,7 +1847,7 @@ extern "C" {
     }
     
     WINDOWS_EXPORT void canvas_destroy(void* ptr) {
-        auto* cnv = validated<BunCanvas>(ptr);
+        auto* cnv = validated<BunCanvasRenderingContext2D>(ptr);
         if (!cnv) return;
         auto it = std::find(canvases.begin(), canvases.end(), ptr);
         if (it != canvases.end()) {
@@ -1613,14 +1857,24 @@ extern "C" {
     }
 
     WINDOWS_EXPORT void canvas_destroy_all() {
+        #ifndef __APPLE__
+        if (mainThreadCtx && mainThreadCtx->context) {
+            std::unique_lock<std::mutex> qLock(VK::sharedQueueMtx, std::defer_lock);
+            if (VK::mainQueue == VK::renderQueue) qLock.lock();
+            mainThreadCtx->context->flushAndSubmit(GrSyncCpu::kYes);
+        }
+        #endif
+
         for (auto* cnv : canvases) {
             if (!cnv) continue;
             std::lock_guard<std::mutex> lock(cnv->mutex);
-            cnv->surface.reset();
+            cnv->workSurface.reset();
+            cnv->renderSurface.reset();
             #ifndef __APPLE__
             if (mainThreadCtx && mainThreadCtx->context) {
                 if (cnv->hasBackendTex) {
-                    mainThreadCtx->context->deleteBackendTexture(cnv->backendTex);
+                    mainThreadCtx->context->deleteBackendTexture(cnv->workBackendTex);
+                    mainThreadCtx->context->deleteBackendTexture(cnv->renderBackendTex);
                     cnv->hasBackendTex = false;
                 }
                 for (auto& r : cnv->retiredTextures) {
@@ -1638,11 +1892,11 @@ extern "C" {
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         
         auto matrix = (*ctx)()->getLocalToDevice();
-        matrix.getRowMajor(mtx);
+        matrix.getColMajor(mtx);
     }
     
     WINDOWS_EXPORT void canvas_set_transform(void* ctxPtr, double* mtx){
@@ -1650,7 +1904,7 @@ extern "C" {
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         (*ctx)()->resetMatrix();
         (*ctx)()->setMatrix(SkM44{
@@ -1662,12 +1916,13 @@ extern "C" {
 
         // SkImageFilters::Compose
     }
+    
     WINDOWS_EXPORT void canvas_reset_transform(void* ctxPtr){
         auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         (*ctx)()->resetMatrix();
     }
@@ -1677,7 +1932,7 @@ extern "C" {
         if (!ctx) return;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
 
         if(!pts || len <= 0) ctx->currentState.strokeColor.setPathEffect(nullptr);
@@ -1690,7 +1945,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         ctx->currentState.strokeColor.setStrokeJoin(lJoinType);
         return true;
@@ -1701,7 +1956,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         ctx->currentState.textBaseline = bl;
         return true;
@@ -1712,7 +1967,7 @@ extern "C" {
         if (!ctx) return false;
         nonapple(
             std::optional<std::lock_guard<std::mutex>> lock;
-            if (!ctx->desynchronized) lock.emplace(ctx->owner->mutex);
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
         );
         ctx->currentState.textAlign = al;
         return true;
@@ -1751,4 +2006,554 @@ extern "C" {
         fMetrics[10] = ctx->currentState.textBaseline == CanvasTextBaseLine::Hanging;
         fMetrics[11] = ctx->currentState.textBaseline == CanvasTextBaseLine::Ideographic;
     }
+
+    WINDOWS_EXPORT void canvas_submit_batch(void* ctxPtr, const uint8_t* batch, int byteLength, bool commit = false) {
+        auto* ctx = validated<BunCanvasRenderingContext2D>(ctxPtr);
+        if (!ctx) return;
+
+        nonapple(
+            std::optional<std::lock_guard<std::mutex>> lock;
+            if (!ctx->desynchronized) lock.emplace(ctx->mutex);
+        );
+        size_t offset = 0;
+        while (offset < byteLength) {
+            offset = (offset + 7) & ~7; // Match 8-byte alignment
+
+            //Flush to prevent overallocation of GrOp's 
+            if (++ctx->pendingOps >= 16384) {
+                ctx->pendingOps = 0;
+
+                #ifndef __APPLE__
+                if (gpuContextReady && ctx->hasBackendTex && ctx->workSurface) {
+                    mainThreadCtx->context->flush(ctx->workSurface.get());
+                }
+                #endif
+            }
+
+            CanvasBatchOperationType op = *reinterpret_cast<const CanvasBatchOperationType*>(batch + offset);
+
+            switch (op) {
+                case CanvasBatchOperationType::StrokeRect:
+                case CanvasBatchOperationType::FillRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::FillRect*>(batch + offset);
+                    SkPaint selColor = op == CanvasBatchOperationType::FillRect
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), selColor);
+                    offset += sizeof(CanvasBatchCommands::FillRect);
+                    break;
+                }
+                case CanvasBatchOperationType::ClearRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::ClearRect*>(batch + offset);
+                    (*ctx)()->drawRect(SkRect::MakeXYWH(cmd->x,cmd->y,cmd->w,cmd->h), ctx->clearColor);
+                    offset += sizeof(CanvasBatchCommands::ClearRect);
+                    break;
+                }
+                case CanvasBatchOperationType::SetStrokeStyleColor:
+                case CanvasBatchOperationType::SetFillStyleColor: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyle*>(batch + offset);
+                    auto col = parseCssColor(cmd->color);
+                    
+                    SkPaint& selectedColor = op == CanvasBatchOperationType::SetFillStyleColor
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    if (col){
+                        selectedColor.setColor4f(*col);
+                        selectedColor.setShader(nullptr);
+                    }else {
+                        selectedColor.setColor(SK_ColorBLACK);
+                        selectedColor.setShader(nullptr);
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetFillStyle);
+                    break;
+                }
+                case CanvasBatchOperationType::SetStrokeStyleGradient:
+                case CanvasBatchOperationType::SetFillStyleGradient: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFillStyleGradient*>(batch + offset);
+
+                    sk_sp<SkShader> shader = buildSkiaShader(cmd->gradType, cmd->gradientArgs, cmd->stopsLength, cmd->stopsColor, cmd->stopsOffset);
+                    if (shader){
+                        SkPaint& selectedColor = op == CanvasBatchOperationType::SetFillStyleGradient
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+
+                        selectedColor.setShader(std::move(shader));
+                    }
+
+                    
+                    offset += sizeof(CanvasBatchCommands::SetFillStyleGradient);
+                    break;
+                }
+                case CanvasBatchOperationType::UploadTransform: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::UploadTransform*>(batch + offset);
+                    // (*ctx)()->setMatrix(SkM44::ColMajor(cmd->matrix));
+                    double * mtx = cmd->matrix;
+                    (*ctx)()->setMatrix(SkM44{
+                        (float)mtx[0],  (float)mtx[4],  (float)mtx[8],  (float)mtx[12],
+                        (float)mtx[1],  (float)mtx[5],  (float)mtx[9],  (float)mtx[13],
+                        (float)mtx[2],  (float)mtx[6],  (float)mtx[10], (float)mtx[14],
+                        (float)mtx[3], (float)mtx[7], (float)mtx[11], (float)mtx[15]
+                    });
+                    offset += sizeof(CanvasBatchCommands::UploadTransform);
+                    break;
+                }
+                case CanvasBatchOperationType::UploadTransformNoArray: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::UploadTransformNoArray*>(batch + offset);
+                    // (*ctx)()->setMatrix(SkM44::ColMajor(cmd->matrix));
+                    (*ctx)()->setMatrix(SkM44{
+                        cmd->v0,  cmd->v4,  cmd->v8,  cmd->v12,
+                        cmd->v1,  cmd->v5,  cmd->v9,  cmd->v13,
+                        cmd->v2,  cmd->v6,  cmd->v10, cmd->v14,
+                        cmd->v3, cmd->v7, cmd->v11, cmd->v15
+                    });
+                    offset += sizeof(CanvasBatchCommands::UploadTransformNoArray);
+                    break;
+                }
+                case CanvasBatchOperationType::Save: {
+                    ctx->save();
+                    offset += sizeof(CanvasBatchCommands::Save);
+                    break;
+                }
+                case CanvasBatchOperationType::Restore: {
+                    ctx->restore();
+                    offset += sizeof(CanvasBatchCommands::Restore);
+                    break;
+                }
+
+                case CanvasBatchOperationType::BeginPath: {
+                    ctx->currentState.path.reset();
+
+                    offset += sizeof(CanvasBatchCommands::BeginPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::MoveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::MoveTo*>(batch + offset);
+                    ctx->currentState.path.moveTo(cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::MoveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::LineTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::MoveTo*>(batch + offset);
+                    ctx->currentState.path.lineTo(cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::LineTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Arc: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Arc*>(batch + offset);
+                    ctx->currentState.path.arc(cmd->x,cmd->y,cmd->radius,cmd->startAngle,cmd->sweepAngle);
+                    offset += sizeof(CanvasBatchCommands::Arc);
+                    break;
+                }
+                case CanvasBatchOperationType::ArcTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::ArcTo*>(batch + offset);
+                    ctx->currentState.path.arcTo(cmd->x1,cmd->y1,cmd->x2,cmd->y2,cmd->radius);
+                    offset += sizeof(CanvasBatchCommands::ArcTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Ellipse: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Ellipse*>(batch + offset);
+                    ctx->currentState.path.ellipse(cmd->x,cmd->y,cmd->radiusX,cmd->radiusY,cmd->rotation,cmd->startAngle,cmd->endAngle,!!cmd->counterclockwise);
+                    offset += sizeof(CanvasBatchCommands::Ellipse);
+                    break;
+                }
+                case CanvasBatchOperationType::BezierCurveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::BezierCurveTo*>(batch + offset);
+                    ctx->currentState.path.bezierTo(cmd->cp1x,cmd->cp1y,cmd->cp2x,cmd->cp2y,cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::BezierCurveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::QuadraticCurveTo: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::QuadraticCurveTo*>(batch + offset);
+                    ctx->currentState.path.quadraticCurveTo(cmd->cpx,cmd->cpy,cmd->x,cmd->y);
+                    offset += sizeof(CanvasBatchCommands::QuadraticCurveTo);
+                    break;
+                }
+                case CanvasBatchOperationType::Stroke:
+                case CanvasBatchOperationType::Fill:{
+                    SkPaint selColor = (op == CanvasBatchOperationType::Fill)
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+
+                    (*ctx)()->drawPath(ctx->currentState.path(), selColor);
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithoutPath);
+                    break;
+                }
+                case CanvasBatchOperationType::StrokePath:
+                case CanvasBatchOperationType::FillPath: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::PathOpWithPath*>(batch + offset);
+                    
+                    Path2D* path = validated<Path2D>(cmd->path2d);
+
+                    if (!path) {
+                        offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                        continue;
+                    };
+
+                    SkPaint selColor = (op == CanvasBatchOperationType::FillPath)
+                        ? ctx->currentState.fillColor
+                        : ctx->currentState.strokeColor;
+                    
+                    selColor.setAlphaf(selColor.getAlphaf()*ctx->currentState.globalAlpha);
+                    (*ctx)()->drawPath((*path)(), selColor);
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::Clip:{
+                    (*ctx)()->clipPath(ctx->currentState.path());
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithoutPath);
+                    break;
+                }
+                
+                case CanvasBatchOperationType::ClipPath: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::PathOpWithPath*>(batch + offset);
+                    
+                    Path2D* path = validated<Path2D>(cmd->path2d);
+                        
+                    (*ctx)()->clipPath((*path)());
+
+                    offset += sizeof(CanvasBatchCommands::PathOpWithPath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::Rect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Rect*>(batch + offset);
+                    ctx->currentState.path.rect(cmd->x,cmd->y,cmd->w,cmd->h);
+                    offset += sizeof(CanvasBatchCommands::Rect);
+                    break;
+                }
+                case CanvasBatchOperationType::RoundRect: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::RoundRect*>(batch + offset);
+                    ctx->currentState.path.roundRect(cmd->x,cmd->y,cmd->w,cmd->h,cmd->radius);
+                    offset += sizeof(CanvasBatchCommands::RoundRect);
+                    break;
+                }
+                case CanvasBatchOperationType::RoundRectArray: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::RoundRectArray*>(batch + offset);
+                    ctx->currentState.path.roundRect_array(cmd->x,cmd->y,cmd->w,cmd->h,new float[]{cmd->a0,cmd->a1,cmd->a2,cmd->a3},cmd->len);
+                    offset += sizeof(CanvasBatchCommands::RoundRectArray);
+                    break;
+                }
+
+                case CanvasBatchOperationType::ClosePath: {
+                    ctx->currentState.path.close();
+                    offset += sizeof(CanvasBatchCommands::ClosePath);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetFont: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFont*>(batch + offset);
+                    
+                    if (cmd->cssString) ctx->font_cache.setFont(cmd->cssString,ctx->currentState.font_current);
+                    offset += sizeof(CanvasBatchCommands::SetFont);
+                    break;
+                }
+                case CanvasBatchOperationType::SetTextAlign: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetTextAlign*>(batch + offset);
+                    ctx->currentState.textAlign = cmd->alignment;
+                    offset += sizeof(CanvasBatchCommands::SetTextAlign);
+                    break;
+                }
+                case CanvasBatchOperationType::SetTextBaseline: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetTextBaseline*>(batch + offset);
+                    ctx->currentState.textBaseline = cmd->baseline;
+                    offset += sizeof(CanvasBatchCommands::SetTextBaseline);
+                    break;
+                }
+                case CanvasBatchOperationType::StrokeText:
+                case CanvasBatchOperationType::FillText: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::FillText*>(batch + offset);
+                    float width = ctx->currentState.font_current.measureText(
+                        cmd->text,
+                        cmd->strLen,
+                        SkTextEncoding::kUTF8
+                    );
+                    
+                    SkPaint selColor = (op == CanvasBatchOperationType::FillText)
+                        ?ctx->currentState.fillColor
+                        :ctx->currentState.strokeColor;
+                    auto alphaf = selColor.getAlphaf() * ctx->currentState.globalAlpha;
+                    selColor.setAlphaf(alphaf);
+
+                    SkFontMetrics m;
+                    ctx->currentState.font_current.getMetrics(&m);
+                    float finalY = 0.f;
+
+                    int x = cmd->x;
+                    int y = cmd->y;
+                    switch (ctx->currentState.textBaseline) {
+                        case CanvasTextBaseLine::Top :
+                            finalY = y - m.fTop;
+                            break;
+
+                        case CanvasTextBaseLine::Middle:
+                            finalY = y - (m.fAscent + m.fDescent) * 0.5f;
+                            break;
+
+                        case CanvasTextBaseLine::Alphabetic:
+                            finalY = y;
+                            break;
+
+                        case CanvasTextBaseLine::Bottom:
+                            finalY = y - m.fBottom;
+                            break;
+
+                        case CanvasTextBaseLine::Hanging:
+                            finalY = y - m.fAscent;
+                            break;
+
+                        case CanvasTextBaseLine::Ideographic:
+                            finalY = y - m.fDescent;
+                            break;
+                        default: break;
+                    }
+                    float finalX = 0.f;
+                    switch (ctx->currentState.textAlign) {
+                        case CanvasTextAlignment::Left :
+                            finalX = x;
+                            break;
+                        case CanvasTextAlignment::Right :
+                            finalX = x - width;
+                            break;
+                        case CanvasTextAlignment::Center :
+                            finalX = x - width/2;
+                            break;
+                        case CanvasTextAlignment::Start :
+                            finalX = x;
+                            break;
+                        case CanvasTextAlignment::End :
+                            finalX = x - width;
+                            break;
+                        default: break;
+                    }
+                    
+                    if (width > cmd->maxWidth && cmd->maxWidth > -1) {
+                        float scale = cmd->maxWidth / width;
+                        (*ctx)()->save();
+                        (*ctx)()->translate(cmd->x, cmd->y);
+                        (*ctx)()->scale(scale, 1.0f);
+                        // if(ctx->currentState.shadowBlurColor.getAlpha() > 0) {
+                        //     SkPaint shColor = ctx->currentState.shadowBlurColor;
+                        //     auto _af = shColor.getAlphaf()*ctx->currentState.globalAlpha;
+                        //     shColor.setAlphaf(_af);
+                        //     (*ctx)()->drawString(txt, finalX+ctx->currentState.shadowBlurOffsetX, finalY+ctx->currentState.shadowBlurOffsetY, ctx->currentState.font_current, shColor);
+                        // }
+                        (*ctx)()->drawString(cmd->text, finalX, finalY, ctx->currentState.font_current, selColor);
+                        (*ctx)()->restore();
+                    } else {
+                        (*ctx)()->drawString(cmd->text, finalX, finalY, ctx->currentState.font_current, selColor);
+                    }
+
+                    offset += sizeof(CanvasBatchCommands::FillText);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetGlobalAlpha: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetGlobalAlpha*>(batch + offset);
+                    ctx->currentState.globalAlpha = cmd->alpha;
+                    offset += sizeof(CanvasBatchCommands::SetGlobalAlpha);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetGlobalCompositeOperation: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetGlobalCompositeOperation*>(batch + offset);
+                    ctx->currentState.fillColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.strokeColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.shadowBlurColor.setBlendMode(cmd->blendMode);
+                    ctx->currentState.imageColor.setBlendMode(cmd->blendMode);
+                    offset += sizeof(CanvasBatchCommands::SetGlobalCompositeOperation);
+                    break;
+                }
+                case CanvasBatchOperationType::Resize: {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Resize*>(batch + offset);
+                    ctx->resize(std::max(cmd->w, 1),std::max(cmd->h, 1));
+                    offset += sizeof(CanvasBatchCommands::Resize);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetFilter : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetFilter*>(batch + offset);
+                    if (std::strcmp(cmd->filter, "none") == 0) {
+                        ctx->currentState.filters = nullptr;
+                        updateCanvasFilters(ctx->currentState);
+                    }
+
+                    auto filter = css::buildSkiaFilter(cmd->filter);
+                    if (!filter) {
+                        offset += sizeof(CanvasBatchCommands::SetFilter);
+                        continue;
+                    };
+
+                    ctx->currentState.filters = std::move(filter);
+                    updateCanvasFilters(ctx->currentState);
+                    offset += sizeof(CanvasBatchCommands::SetFilter);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetImageSmoothingEnabled : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetImageSmoothingEnabled*>(batch + offset);
+                    if (cmd->enabled){
+                        switch(ctx->currentState.samplingQuality) {
+                            case CanvasSmoothingQuality::Low: {
+                                ctx->currentState.sampling = SkFilterMode::kLinear;
+                            }
+                            case CanvasSmoothingQuality::Medium: {
+                                ctx->currentState.sampling = SkFilterMode::kLinear;
+                            }
+                            case CanvasSmoothingQuality::High: {
+                                ctx->currentState.sampling = SkCubicResampler::Mitchell();
+                            }
+                        }
+                    } else {
+                        ctx->currentState.sampling = SkFilterMode::kNearest;
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetImageSmoothingEnabled);
+                    break;
+                }
+                case CanvasBatchOperationType::SetImageSmoothingQuality : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetImageSmoothingQuality*>(batch + offset);
+                    switch(cmd->quality) {
+                        case CanvasSmoothingQuality::Low: {
+                            ctx->currentState.sampling = SkFilterMode::kLinear;
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                        case CanvasSmoothingQuality::Medium: {
+                            ctx->currentState.sampling = SkFilterMode::kLinear;
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                        case CanvasSmoothingQuality::High: {
+                            ctx->currentState.sampling = SkCubicResampler::Mitchell();
+                            ctx->currentState.samplingQuality = cmd->quality;
+                        }
+                    }
+                    offset += sizeof(CanvasBatchCommands::SetImageSmoothingQuality);
+                    break;
+                }
+                case CanvasBatchOperationType::DrawImage_CanvasType : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::DrawImage_CanvasType*>(batch + offset);
+                    BunCanvasRenderingContext2D *img = validated<BunCanvasRenderingContext2D>(cmd->canvas);
+                    #ifndef __APPLE__
+                    if (img->hasBackendTex) {
+                        // Use the work backend texture, it is going to be flushed to the render one anyway.
+                        auto _img = SkImages::BorrowTextureFrom(
+                            mainThreadCtx->context.get(),
+                            img->workBackendTex,
+                            kTopLeft_GrSurfaceOrigin,
+                            kN32_SkColorType,
+                            kPremul_SkAlphaType,
+                            nullptr
+                        );
+                        if (_img) {
+                            drawImage(ctx,_img,
+                                cmd->argc,
+                                cmd->x_sx,
+                                cmd->y_sy,
+                                cmd->w_sw,
+                                cmd->h_sh,
+                                cmd->dx,
+                                cmd->dy,
+                                cmd->dw,
+                                cmd->dh
+                            );
+                        }
+                    } else {
+                        auto _img = img->renderSurface->makeTemporaryImage();
+                        drawImage(ctx,_img,
+                            cmd->argc,
+                            cmd->x_sx,
+                            cmd->y_sy,
+                            cmd->w_sw,
+                            cmd->h_sh,
+                            cmd->dx,
+                            cmd->dy,
+                            cmd->dw,
+                            cmd->dh
+                        );
+                    }
+                    #else
+                    auto _img = img->surface->makeTemporaryImage();
+                    drawImage(ctx,_img,
+                        cmd->argc,
+                        cmd->x_sx,
+                        cmd->y_sy,
+                        cmd->w_sw,
+                        cmd->h_sh,
+                        cmd->dx,
+                        cmd->dy,
+                        cmd->dw,
+                        cmd->dh
+                    );
+                    #endif
+                    offset += sizeof(CanvasBatchCommands::DrawImage_CanvasType);
+                    break;
+                }
+                case CanvasBatchOperationType::DrawImage_ImageType : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::DrawImage_ImageType*>(batch + offset);
+                    ImageWrapper *img = validated<ImageWrapper>(cmd->image);
+                    
+                    if (img) {
+                        drawImage(ctx,img->image,
+                            cmd->argc,
+                            cmd->x_sx,
+                            cmd->y_sy,
+                            cmd->w_sw,
+                            cmd->h_sh,
+                            cmd->dx,
+                            cmd->dy,
+                            cmd->dw,
+                            cmd->dh
+                        );
+                    }
+                    offset += sizeof(CanvasBatchCommands::DrawImage_ImageType);
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetLineDash : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineDash*>(batch + offset);
+                    auto arr = reinterpret_cast<const float*>(batch + offset + sizeof(CanvasBatchCommands::SetLineDash));
+
+                    if(cmd->len <= 0) {
+                        ctx->currentState.strokeColor.setPathEffect(nullptr);
+                    }else {
+                        ctx->currentState.lineDashEffect = SkDashPathEffect::Make(SkSpan<const SkScalar>(arr, cmd->len), cmd->lineDashOffset);
+                        ctx->currentState.strokeColor.setPathEffect(ctx->currentState.lineDashEffect);
+                    }
+                    
+                    offset += sizeof(CanvasBatchCommands::SetLineDash) + sizeof(float)*cmd->len;
+                    break;
+                }
+
+                case CanvasBatchOperationType::SetLineWidth : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineWidth*>(batch + offset);
+                    ctx->currentState.strokeColor.setStrokeWidth(cmd->width);
+                    offset += sizeof(CanvasBatchCommands::SetLineWidth);
+                    break;
+                }
+                case CanvasBatchOperationType::SetLineJoin : {
+                    const auto* cmd = reinterpret_cast<const CanvasBatchCommands::SetLineJoin*>(batch + offset);
+                    ctx->currentState.strokeColor.setStrokeJoin(cmd->joinType);
+                    offset += sizeof(CanvasBatchCommands::SetLineJoin);
+                    break;
+                }
+
+                default: {
+                    std::cout << "unknown opcode: " << static_cast<int>(op) << "\n";
+                    continue;
+                }
+            }
+        }
+        
+        if (commit) {
+
+            ctx->commit();
+        }
+    }
+    #pragma endregion
 }

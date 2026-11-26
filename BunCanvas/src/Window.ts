@@ -10,8 +10,9 @@ import WindowThread from "../internal/WindowThread.js" with { type:"text" };
 import { Canvas } from "./Canvas.js";
 import { WheelEvent } from "./WheelEvent.js";
 import { GLFW_CODE_MAP, GLFW_KEY_MAP, GLFW_KEY_MAP_SHIFT } from "../internal/window/glfwKeyMap.js";
-import { attachEventTarget } from "../internal/attachEventTarget.js";
-
+import { ptrs } from "../internal/pointers.js";
+import { WindowEventListenerNames, WindowEventTarget } from "../internal/Event/WindowEventTarget.js";
+import { ctx2ds } from "./Canvas/RenderingContexts/RenderingContext2D.js";
 
 // #region Init
 let requestedFrames : ((arg?: number)=>void)[] = []
@@ -36,60 +37,7 @@ if (Bun.isMainThread) {
 
 //#endregion
 
-export class Window extends EventTarget {
-	#setHandler<T extends Event>(
-        type: string,
-        current: ((evt: T) => any) | null,
-        next: ((evt: T) => any) | null
-    ) {
-        if (current) {
-            this.removeEventListener(type, current as EventListener);
-        }
-        if (next) {
-            this.addEventListener(type, next as EventListener);
-        }
-        return next;
-    }
-
-	#resizeHandler : ((this: Window, evt: Event) => any) | null = null;
-	#mousemoveHandler : ((evt: MouseEvent) => any) | null = null;
-	#mousedownHandler : ((evt: MouseEvent) => any) | null = null;
-	#mouseupHandler : ((evt: MouseEvent) => any) | null = null;
-	#clickHandler : ((evt: MouseEvent) => any) | null = null;
-	#keydownHandler : ((evt: KeyboardEvent) => any) | null = null;
-	#keyupHandler : ((evt: KeyboardEvent) => any) | null = null;
-	#wheelHandler : ((evt: WheelEvent) => any) | null = null;
-
-	get onresize() { return this.#resizeHandler; }
-    set onresize(fn : ((this: Window, evt: Event) => any) | null) { this.#resizeHandler = this.#setHandler('resize', this.#resizeHandler, fn); }
-
-    get onmousemove() { return this.#mousemoveHandler; }
-    set onmousemove(fn : ((evt: MouseEvent) => any) | null) { this.#mousemoveHandler = this.#setHandler('mousemove', this.#mousemoveHandler, fn); }
-
-    get onmousedown() { return this.#mousedownHandler; }
-    set onmousedown(fn : ((evt: MouseEvent) => any) | null) { this.#mousedownHandler = this.#setHandler('mousedown', this.#mousedownHandler, fn); }
-
-    get onmouseup() { return this.#mouseupHandler; }
-    set onmouseup(fn : ((evt: MouseEvent) => any) | null) { this.#mouseupHandler = this.#setHandler('mouseup', this.#mouseupHandler, fn); }
-
-    get onclick() { return this.#clickHandler; }
-    set onclick(fn : ((evt: MouseEvent) => any) | null) { this.#clickHandler = this.#setHandler('click', this.#clickHandler, fn); }
-
-    get onkeydown() { return this.#keydownHandler; }
-    set onkeydown(fn : ((evt: KeyboardEvent) => any) | null) { this.#keydownHandler = this.#setHandler('keydown', this.#keydownHandler, fn); }
-
-    get onkeyup() { return this.#keyupHandler; }
-    set onkeyup(fn : ((evt: KeyboardEvent) => any) | null) { this.#keyupHandler = this.#setHandler('keyup', this.#keyupHandler, fn); }
-
-    get onwheel() { return this.#wheelHandler; }
-    set onwheel(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('wheel', this.#wheelHandler, fn); }
-
-    get onfocus() { return this.#wheelHandler; }
-    set onfocus(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('focus', this.#wheelHandler, fn); }
-	
-    get onblur() { return this.#wheelHandler; }
-    set onblur(fn : ((evt: WheelEvent) => any) | null) { this.#wheelHandler = this.#setHandler('blur', this.#wheelHandler, fn); }
-
+export class Window extends WindowEventTarget {
 	#wPropertiesViewer = new Int32Array(toArrayBuffer(lib.symbols.get_wPropertiesViewer()!,0, 6 * 4));
 	#mMoveViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mMoveViewer()!,0, 9 * 8));
 	#mClickViewer = new Float64Array(toArrayBuffer(lib.symbols.get_mClickViewer()!,0, 9 * 8));
@@ -187,6 +135,24 @@ export class Window extends EventTarget {
 				bubbles: true,
 				cancelable: true,
 			});
+			// console.log(this.#mDownViewer[4]&2)
+			if (this.#mDownViewer[3] == 2) {
+				const evt = new MouseEvent("contextmenu", {
+					clientX: this.#mDownViewer[1],
+					clientY: this.#mDownViewer[2],
+					button: this.#mDownViewer[3],
+					buttons: this.#mDownViewer[4],
+					shiftKey: Boolean(this.#mDownViewer[5]),
+					ctrlKey: Boolean(this.#mDownViewer[6]),
+					altKey: Boolean(this.#mDownViewer[7]),
+					metaKey: Boolean(this.#mDownViewer[8]),
+					screenX: this.#mDownViewer[1],
+					screenY: this.#mDownViewer[2],
+					bubbles: true,
+					cancelable: true,
+				});
+				this.dispatchEvent(evt)
+			}
 			this.dispatchEvent(evt)
 		}
 
@@ -276,7 +242,13 @@ export class Window extends EventTarget {
 
 	maxFramerate = 0
 	#isFullscreen = false;
-	
+
+	addEventListener(type: WindowEventListenerNames, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean): void;
+    addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean): void;
+    addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean): void {
+		if(!type || !callback) throw new TypeError(`Failed to execute 'addEventListener' on '${this.constructor.name}': 2 arguments required, but only ${Number(!!type)+Number(!!callback)+Number(!!options)} present.`)
+		super.addEventListener(type, callback, options);
+    }
 	get fullscreen(){
 		return this.#isFullscreen;
 	}
@@ -343,9 +315,7 @@ export class Window extends EventTarget {
 				nativePath: dlPath 
 			});
 
-			let pendingFrame = false;
 			let shuttingDown = false;
-			let lastFrame = performance.now();
 
 			// Removed 'async' wrapper to prevent promise allocation overhead
 			render_thread.onmessage = (msg) => {
@@ -364,8 +334,13 @@ export class Window extends EventTarget {
 					lib.symbols.create_window(width, height, titleBuf);
 				}
 			}
+
+			let pendingFrame = false;
+			let lastFrame = performance.now();
+
 			const loop = () => {
-				lib.symbols.signal_frame_ready();
+				// lib.symbols.signal_frame_ready();
+				this.#processEvents();
 
 				const frameInterval = this.maxFramerate > 0 ? 1000 / this.maxFramerate : 0;
 				const now = performance.now();
@@ -378,28 +353,22 @@ export class Window extends EventTarget {
 					}
 
 					if (!pendingFrame) {
-						pendingFrame = true;
-
-						setImmediate(() => {
-							const queueLen = requestedFrames.length;
-							if (queueLen > 0) {
-								// Atomic swap avoids .splice() O(N) array re-indexing
-								const framesToProcess = requestedFrames;
-								requestedFrames = [];
-								for (let i = 0; i < queueLen; i++) {
-									framesToProcess[i](now);
-								}
+						const queueLen = requestedFrames.length;
+						if (queueLen > 0) {
+							// Atomic swap avoids .splice() O(N) array re-indexing
+							const framesToProcess = requestedFrames;
+							requestedFrames = [];
+							for (let i = 0; i < queueLen; i++) {
+								framesToProcess[i](now);
 							}
-							lib.symbols.canvas_flush_gpu();
-							pendingFrame = false;
-						});
+						}
 					}
+						lib.symbols.canvas_flush_gpu();
 				}
-				this.#processEvents();
 				setImmediate(loop);
 			};
 
-			setImmediate(loop);
+			loop()
 		}else /* MACOS JS LOOP */ {
 			let aaplLib = dlopen(dlPath, {
 				setup_render_thread: {
@@ -448,16 +417,19 @@ export class Window extends EventTarget {
 	}
 
 	append(canvas : Canvas){
-		const canvasPtr = canvas._ptr
-		if (canvasPtr == undefined) {
-			console.error("Canvas was not found")
-			return
-		}
-		lib.symbols.canvas_append(canvasPtr)
+		setImmediate(()=>{
+			const ctx2d = ctx2ds.get(canvas);
+			const canvasPtr = ptrs.get(ctx2d!)
+			if (canvasPtr == undefined) {
+				console.error("Canvas was not found")
+				return
+			}
+			lib.symbols.canvas_append(canvasPtr)
+		})
 	}
 
 	requestAnimationFrame(callback :(cb : any)=>void) : void {
-		setImmediate(()=>{requestedFrames.push(callback);})
+		requestedFrames.push(callback);
 	}
 };
 

@@ -1,4 +1,4 @@
-import { SkBlendMode } from "../native/enums";
+import { SkBlendMode } from "../../internal/native/enums";
 
 export const CanvasBlendMode = {
     "source-over": SkBlendMode.kSrcOver,

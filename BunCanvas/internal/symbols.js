@@ -75,10 +75,6 @@ export const lib = dlopen(dlPath, {
 		args: [],
 		returns: "ptr",
 	},
-	signal_frame_ready:{
-		args: [],
-		returns: "void",
-	},
 	set_vsync: {
 		args: ["bool"],
 		returns: "void",
@@ -120,7 +116,7 @@ export const lib = dlopen(dlPath, {
 		returns: "void",
 	},
 	canvas_get_context2D: {
-		args: ["ptr", "ptr", "bool", "bool"],
+		args: ["int", "int", "bool", "bool", "bool", "bool"],
 		returns: "ptr",
 	},
 	canvas_set_fill_style: {
@@ -325,6 +321,10 @@ export const lib = dlopen(dlPath, {
 	},
 	canvas_measure_text: {
 		args: ["ptr", "cstring", "ptr"],
+		returns: "void",
+	},
+	canvas_submit_batch: {
+		args: ["ptr", "ptr", "int", "bool"],
 		returns: "void",
 	},
 	canvas_destroy: {

@@ -253,8 +253,6 @@ static int32_t kDownViewer[7]{};
 static int32_t kUpViewer[7]{};
 
 
-std::mutex frameMtx;
-std::condition_variable frameCv;
 bool frameReady = true;
 
 extern "C" {
@@ -267,14 +265,6 @@ extern "C" {
     WINDOWS_EXPORT int32_t* get_kUpViewer(){return kUpViewer;}
 
     WINDOWS_EXPORT _Float64_t* get_mWheelViewer(){return mWheelViewer;}
-
-    WINDOWS_EXPORT void signal_frame_ready() {
-        {
-            std::lock_guard<std::mutex> lock(frameMtx);
-            frameReady = true;
-        }
-        frameCv.notify_one();
-    }
 }
 
 // For this function to compile the object to convert MUST have the following components: static constexpr uint64_t MAGIC and uint64_t magic
@@ -283,18 +273,18 @@ targetPtr* validated(void* ptr){
     if (!ptr) return nullptr;
     targetPtr* obj = static_cast<targetPtr*>(ptr);
         
-    if (obj->magic != targetPtr::MAGIC)
-    return nullptr;
+    if (obj->magic != targetPtr::MAGIC) return nullptr;
+
     return obj;
 }
 
 #include "src/Audio.cpp"
 
 
+#include "src/Font.cpp"
 #include "src/KeywordColors.h"
 #include "src/CssColorParser.cpp"
 #include "src/CanvasFilterParser.cpp"
-#include "src/Font.cpp"
 #include "src/Image.cpp"
 #include "src/Path2D.cpp"
 #include "src/Canvas.cpp"

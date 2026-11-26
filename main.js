@@ -1,7 +1,7 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D, KeyboardEvent } from "./BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D } from "./BunCanvas";
 
 
-const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:165});
+const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:0});
 // Create and append canvas
 const canvas = new Canvas(800,600)
 window.append(canvas);
@@ -11,7 +11,9 @@ window.onresize = (evt)=>{
     canvas.height = window.innerHeight
 }
 
-const ctx = canvas.getContext('2d', {desynchronized:true});
+const ctx = canvas.getContext('2d', {pipeline:"batched"});
+
+console.log(ctx.constructor.name)
 
 // Forward native canvas events to canvas/window callback properties
 if (canvas) {
@@ -29,7 +31,6 @@ if (canvas) {
         const pos = getPos(e);
         const evt = { x: pos.x, y: pos.y, button: e.button, type: 'mousedown' };
         if (canvas.onmousedown) canvas.onmousedown(evt);
-        
     });
     
     window.addEventListener('mousemove', (e) => {
@@ -118,13 +119,14 @@ class Ball {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // Glow & Color
-        // ctx.globalCompositeOperation = "multiply"
+        // // Glow & Color
         ctx.fillStyle = this.color;
+        // // ctx.beginPath();
+
         ctx.fill(Ball.BallPath);
         
-        // Highlight arc for depth
-        ctx.beginPath();
+        // // Highlight arc for depth
+        // // ctx.beginPath();
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.fill(Ball.BallShinePath);
         
@@ -261,6 +263,10 @@ function resolveCollisions() {
 }
 
 // Overlay rendering
+/**
+ * 
+ * @param {CanvasRenderingContext2D} ctx 
+ */
 function drawCanvasHUD(ctx) {
     ctx.save();
     
@@ -310,10 +316,10 @@ function step(now) {
     lastFrameTime = now;
     
     // Handle Continuous Spawning while Mouse Down
-    if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
-        spawnBall(mouseX, mouseY);
-        lastSpawnTime = now;
-    }
+    // if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
+    //     spawnBall(mouseX, mouseY);
+    //     lastSpawnTime = now;
+    // }
     
     // Sub-step physics solver for stability
     const subDt = dt / PHYSICS.subSteps;
@@ -344,32 +350,15 @@ function step(now) {
         frameCount = 0;
         lastFpsUpdate = now;
     }
-    window.requestAnimationFrame(step);
+    requestAnimationFrame(step);
 }
 
 // Seed initial balls
-for (let i = 0; i < 1000 ; i++) {
+for (let i = 0; i < 1000; i++) {
     const rx = 100 + Math.random() * (window.innerWidth - 200);
     const ry = 50 + Math.random() * (window.innerHeight / 2);
     balls.push(new Ball(rx, ry, PHYSICS.defaultRadius, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4));
 }
 
-window.onfocus = ()=>{
-    console.log("window is focused")
-    window.maxFramerate = 165;
-}
-window.onblur = ()=>{
-    console.log("window is blurred")
-    window.maxFramerate = 15;
-}
-
-/**
- * 
- * @param {KeyboardEvent} evt 
- */
-window.onkeydown = (evt) => {
-    if (evt.key == "F11") window.toggleFullscreen()
-}
-
 // Start Animation Frame Loop
-window.requestAnimationFrame(step);
+requestAnimationFrame(step);

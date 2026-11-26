@@ -72,21 +72,6 @@ std::optional<SkColor4f> parseCssColor(const char* c){
             ((b << 4) | b) / 255.f,
             1.0f
         };
-        // unsigned int rgb = std::strtoul(c + 1, nullptr, 16);
-        // uint8_t r = (rgb >> 8) & 0xF;
-        // uint8_t g = (rgb >> 4) & 0xF;
-        // uint8_t b = rgb & 0xF;
-        // r = (r << 4) | r;
-        // g = (g << 4) | g;
-        // b = (b << 4) | b;
-        // auto col = SkColor4f{
-        //     r / 255.f,
-        //     g / 255.f,
-        //     b / 255.f,
-        //     1.0f
-        // };
-        // colorCache.insert({c,col});
-        // return col;
     } else if (len == 5 && c[0] == '#') {
         uint8_t r = hexTable[(uint8_t)c[1]];
         uint8_t g = hexTable[(uint8_t)c[2]];
@@ -98,56 +83,19 @@ std::optional<SkColor4f> parseCssColor(const char* c){
             ((b << 4) | b) / 255.f,
             ((a << 4) | a) / 255.f
         };
-        // unsigned int rgba = std::strtoul(c + 1, nullptr, 16);
-        // uint8_t r = (rgba >> 12) & 0xF;
-        // uint8_t g = (rgba >> 8) & 0xF;
-        // uint8_t b = (rgba >> 4) & 0xF;
-        // uint8_t a = rgba & 0xF;
-        // r = (r << 4) | r;
-        // g = (g << 4) | g;
-        // b = (b << 4) | b;
-        // a = (a << 4) | a;
-        // auto col = SkColor4f{
-        //     r / 255.f,
-        //     g / 255.f,
-        //     b / 255.f,
-        //     a / 255.f
-        // };
-        // colorCache.insert({c,col});
-        // return col;
     } else if (len == 7 && c[0] == '#') {
-        unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-        auto col = SkColor4f{
-            ((rgb >> 16) & 0xFF) / 255.f,
-            ((rgb >> 8) & 0xFF) / 255.f,
-            (rgb & 0xFF) / 255.f,
-            1.0f
-        };
-        // colorCache.insert({c,col});
-        return col;
+        uint8_t r = (hexTable[(uint8_t)c[1]] << 4) | hexTable[(uint8_t)c[2]];
+        uint8_t g = (hexTable[(uint8_t)c[3]] << 4) | hexTable[(uint8_t)c[4]];
+        uint8_t b = (hexTable[(uint8_t)c[5]] << 4) | hexTable[(uint8_t)c[6]];
+        return SkColor4f{ r / 255.f, g / 255.f, b / 255.f, 1.0f };
     } else if (len == 9 && c[0] == '#') {
-        unsigned int rgb = std::strtoul(c+1, nullptr, 16);
-        auto col = SkColor4f{
-            ((rgb >> 24) & 0xFF) / 255.f,
-            ((rgb >> 16) & 0xFF) / 255.f,
-            ((rgb >> 8) & 0xFF) / 255.f,
-            (rgb & 0xFF) / 255.f
-        };
-        // colorCache.insert({c,col});
-        return col;
+        uint8_t r = (hexTable[(uint8_t)c[1]] << 4) | hexTable[(uint8_t)c[2]];
+        uint8_t g = (hexTable[(uint8_t)c[3]] << 4) | hexTable[(uint8_t)c[4]];
+        uint8_t b = (hexTable[(uint8_t)c[5]] << 4) | hexTable[(uint8_t)c[6]];
+        uint8_t a = (hexTable[(uint8_t)c[7]] << 4) | hexTable[(uint8_t)c[8]];
+        return SkColor4f{ r / 255.f, g / 255.f, b / 255.f, a / 255.f };
     }
-    // if (len > 1 && c[0] == '#') {
-    //     //Check if valid before computing
-    //     for (size_t i = 1 ; i < len; i++) {
-    //         if (!(
-    //             (c[i] >= '0' && c[i] <= '9') ||
-    //             (c[i] >= 'a' && c[i] <= 'f') ||
-    //             (c[i] >= 'A' && c[i] <= 'F')
-    //         )) return std::nullopt;
-    //     }
-        
-    //     return std::nullopt;
-    // }
+    //Check color in cache before trying to perform heavier parsing methods
     {
         auto it = colorCache.find(c);
         if (it != colorCache.end()) {

@@ -538,10 +538,10 @@ class BunCanvasSurfaceProvider {
         // }
         if (hadOldTex) {
             if (oldWorkTex.isValid()) {
-                retiredTextures.push_back({oldWorkTex, 1});
+                retiredTextures.push_back({oldWorkTex, 0});
             }
             if (oldRenderTex.isValid()) {
-                retiredTextures.push_back({oldRenderTex, 1});
+                retiredTextures.push_back({oldRenderTex, 0});
             }
         }
         #endif

@@ -562,21 +562,6 @@ class BunCanvasSurfaceProvider {
         #endif
         return std::move(tmp);
     }
-
-    // In BunCanvasSurfaceProvider: add a helper called after GPU sync
-    void drainRetiredTextures(bool forceAll = false) {
-    #ifndef __APPLE__
-        if (!gpuContextReady || retiredTextures.empty() || !mainThreadCtx || !mainThreadCtx->context) return;
-        for (auto it = retiredTextures.begin(); it != retiredTextures.end(); ) {
-            if (forceAll || --it->framesLeft <= 0) {
-                mainThreadCtx->context->deleteBackendTexture(it->tex);
-                it = retiredTextures.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    #endif
-    }
     
     void commit(){
         renderSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
@@ -662,7 +647,7 @@ void VK::flushAndSyncMainContext(GrDirectContext* mainCtx) {
     for (auto* element : canvases) {
         std::lock_guard<std::mutex> lock(element->mutex);
         if (element->isImmediate) element->commit();
-        element->drainRetiredTextures(false);
+        // element->drainRetiredTextures(false);
         // #ifdef __APPLE__
         // if (element->renderSurface) {
         //     mainCtx->flush(element->renderSurface.get(), GrFlushInfo{}, &readState);
@@ -2410,6 +2395,10 @@ extern "C" {
                     break;
                 }
                 case CanvasBatchOperationType::Resize: {
+                    nonapple(
+                        std::optional<std::lock_guard<std::mutex>> lock;
+                        if (ctx->desynchronized) lock.emplace(ctx->mutex);
+                    );
                     const auto* cmd = reinterpret_cast<const CanvasBatchCommands::Resize*>(batch + offset);
                     ctx->resize(std::max(cmd->w, 1),std::max(cmd->h, 1));
                     offset += sizeof(CanvasBatchCommands::Resize);

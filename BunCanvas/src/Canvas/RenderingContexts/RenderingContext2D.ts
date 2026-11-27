@@ -354,9 +354,6 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 	}
 
 	#flush(commit = false) {
-		if (this.#flushScheduled) {
-			this.#flushScheduled = false;
-		}
 		if (this.#byteOffset === 0) return;
 		lib.symbols.canvas_submit_batch(
 			ptrs.get(this),
@@ -367,11 +364,13 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 
 		this.#byteOffset = 0;
 		this.#retained.length = 0;
+		this.#flushScheduled = false;
 	}
 
 	#scheduleFlush() {
 		if (this.#flushScheduled === false) {
 			queueMicrotask(this.#flushBound);
+			this.#flushScheduled = true;
 		}
 	}
 
@@ -1100,6 +1099,10 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 				return;
 			}
 			if (img instanceof Canvas) {
+				const ctx2d = ctx2ds.get(img);
+				//Return if the canvas does not have a context that is an instance of BunCanvasSurfaceProvider
+				if (!ctx2d) return
+				let ctxPtr = ptrs.get(ctx2d!);
 				if (this.#transformDirty) this.#uploadTransform()
 				this.#retained.push(img);
 				// Flush the batched commands so what is drawn so far can be seen on the canvas where it is being drawn.
@@ -1107,7 +1110,7 @@ export class CanvasBatchedRenderingContext2D extends CanvasRenderingContext2D {
 				let off = this.#alloc(48);
 				this.#i32[off >> 2] = CanvasBatchOperationType.DrawImage_CanvasType;
 				this.#i32[(off + 4) >> 2] = len == 2 ? 4 : len;
-				writePtrU64(this.#u32, (off + 8) >> 2, ptrs.get(img))
+				writePtrU64(this.#u32, (off + 8) >> 2, ctxPtr)
 				this.#f32[(off + 16) >> 2] = args[0] ?? 0;
 				this.#f32[(off + 20) >> 2] = args[1] ?? 0;
 				this.#f32[(off + 24) >> 2] = len == 2 ? img.width : args[2] ?? 0;
@@ -1429,7 +1432,11 @@ export class CanvasImmediateRenderingContext2D extends CanvasRenderingContext2D 
 			return;
 		}
 		if (img instanceof Canvas) {
-			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ptrs.get(img),ptr(arr),len)
+			const ctx2d = ctx2ds.get(img);
+			//Return if the canvas does not have a context that is an instance of BunCanvasSurfaceProvider
+			if (!ctx2d) return
+			let ctxPtr = ptrs.get(ctx2d!);
+			lib.symbols.canvas_draw_image_canvasType(ptrs.get(this),ctxPtr,ptr(arr),len)
 			return;
 		}
 		

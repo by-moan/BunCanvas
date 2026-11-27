@@ -1,4 +1,4 @@
-import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D, CanvasRenderingContext2D } from "./BunCanvas";
+import { Window, requestAnimationFrame, Canvas, Image, DOMMatrix, Audio, Path2D } from "./BunCanvas";
 
 
 const window = new Window(800,600, "Physics", {vsync:false, maxFramerate:0});
@@ -11,9 +11,7 @@ window.onresize = (evt)=>{
     canvas.height = window.innerHeight
 }
 
-const ctx = canvas.getContext('2d', {pipeline:"batched"});
-
-console.log(ctx.constructor.name)
+const ctx = canvas.getContext('2d', {desynchronized:true, pipeline:"batched"});
 
 // Forward native canvas events to canvas/window callback properties
 if (canvas) {
@@ -111,22 +109,16 @@ class Ball {
     static BallPath = new Path2D()
     static BallShinePath = new Path2D()
     
-    /**
-     * 
-     * @param {CanvasRenderingContext2D} ctx 
-     */
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // // Glow & Color
+        // Glow & Color
         ctx.fillStyle = this.color;
-        // // ctx.beginPath();
-
         ctx.fill(Ball.BallPath);
         
-        // // Highlight arc for depth
-        // // ctx.beginPath();
+        // Highlight arc for depth
+        ctx.beginPath();
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.fill(Ball.BallShinePath);
         
@@ -263,10 +255,6 @@ function resolveCollisions() {
 }
 
 // Overlay rendering
-/**
- * 
- * @param {CanvasRenderingContext2D} ctx 
- */
 function drawCanvasHUD(ctx) {
     ctx.save();
     
@@ -316,10 +304,10 @@ function step(now) {
     lastFrameTime = now;
     
     // Handle Continuous Spawning while Mouse Down
-    // if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
-    //     spawnBall(mouseX, mouseY);
-    //     lastSpawnTime = now;
-    // }
+    if (isMouseDown && (now - lastSpawnTime >= PHYSICS.spawnRateMs)) {
+        spawnBall(mouseX, mouseY);
+        lastSpawnTime = now;
+    }
     
     // Sub-step physics solver for stability
     const subDt = dt / PHYSICS.subSteps;

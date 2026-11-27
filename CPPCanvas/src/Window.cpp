@@ -282,7 +282,7 @@ void render_composited_canvases(SkCanvas* targetCanvas) {
             targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         }
         #else
-        targetCanvas->drawImage(element->surface->makeTemporaryImage(), 0, 0);
+        targetCanvas->drawImage(element->renderSurface->makeTemporaryImage(), 0, 0);
         #endif
     }
 }
@@ -416,12 +416,6 @@ extern "C" {
         }
         return gpuContextReady;
     }
-
-    WINDOWS_EXPORT void canvas_flush_gpu() {
-        if (!gpuContextReady) return;
-        std::lock_guard<std::mutex> lock(renderMutex);
-        VK::flushAndSyncMainContext(mainThreadCtx->context.get());
-    }
     #else
     WINDOWS_EXPORT void setup_render_thread(int w, int h, const char* title, JSCallback_WRefresh onrefresh, bool vsync) {
         width = w;
@@ -463,16 +457,50 @@ extern "C" {
     }
 
     WINDOWS_EXPORT bool canvas_init_gpu_context() { return false; }
-    WINDOWS_EXPORT void canvas_flush_gpu() {}
     #endif
+
+    WINDOWS_EXPORT void canvas_flush_gpu() {
+        #ifdef __APPLE__
+        if (!renderThreadContext || !renderThreadContext->context) return;
+        std::lock_guard<std::mutex> lock(renderMutex);
+        for (auto* element : canvases) {
+            std::lock_guard<std::mutex> cLock(element->mutex);
+            if (element->isImmediate) element->commit();
+            if (element->workSurface) {
+                renderThreadContext->context->flush(element->workSurface.get());
+            }
+            if (element->renderSurface) {
+                renderThreadContext->context->flush(element->renderSurface.get());
+            }
+        }
+        renderThreadContext->context->flushAndSubmit(GrSyncCpu::kNo);
+        #else
+        if (!gpuContextReady) return;
+        std::lock_guard<std::mutex> lock(renderMutex);
+        VK::flushAndSyncMainContext(mainThreadCtx->context.get());
+        #endif
+    }
 
     WINDOWS_EXPORT void update_window() {
     #ifdef __APPLE__
         if (!ready || !window) return;
+        void* pool = objc_autoreleasePoolPush();
+
         wPropertiesViewer[3] = glfwWindowShouldClose(window);
-        if (glfwWindowShouldClose(window)) return;
-        glfwPollEvents();
-        present_composited_frame();
+        if (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+
+            if (renderThreadContext && renderThreadContext->context) {
+                for (auto* element : canvases) {
+                    std::lock_guard<std::mutex> cLock(element->mutex);
+                    if (element->isImmediate) element->commit();
+                }
+            }
+
+            present_composited_frame();
+        }
+
+        objc_autoreleasePoolPop(pool);
     #endif
     }
 
